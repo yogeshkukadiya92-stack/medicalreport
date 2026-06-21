@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediVault — Your Health, Organized</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --teal-50:#F0FDFA;--teal-100:#CCFBF1;--teal-200:#99F6E4;--teal-500:#14B8A6;--teal-600:#0D9488;--teal-700:#0F766E;--teal-800:#115E59;
+  --cyan-100:#CFFAFE;--cyan-500:#06B6D4;--cyan-600:#0891B2;
+  --indigo-50:#EEF2FF;--indigo-100:#E0E7FF;--indigo-500:#6366F1;--indigo-600:#4F46E5;
+  --green-50:#ECFDF5;--green-100:#D1FAE5;--green-500:#10B981;--green-600:#059669;
+  --amber-50:#FFFBEB;--amber-100:#FEF3C7;--amber-500:#F59E0B;--amber-600:#D97706;
+  --red-50:#FEF2F2;--red-100:#FEE2E2;--red-500:#EF4444;--red-600:#DC2626;
+  --gray-50:#F9FAFB;--gray-100:#F3F4F6;--gray-200:#E5E7EB;--gray-300:#D1D5DB;--gray-400:#9CA3AF;--gray-500:#6B7280;--gray-600:#4B5563;--gray-700:#374151;--gray-800:#1F2937;--gray-900:#111827;
+  --white:#FFFFFF;--bg:#F8FAFB;
+  --shadow-sm:0 1px 2px rgba(0,0,0,0.05);
+  --shadow:0 1px 3px rgba(0,0,0,0.1),0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md:0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -1px rgba(0,0,0,0.06);
+  --shadow-lg:0 10px 15px -3px rgba(0,0,0,0.1),0 4px 6px -2px rgba(0,0,0,0.05);
+  --radius:12px;--radius-lg:16px;--radius-xl:24px;
+}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--gray-800);line-height:1.5;overflow-x:hidden;min-height:100vh}
+button{font-family:inherit;cursor:pointer;border:none;background:none;font-size:inherit}
+input,select,textarea{font-family:inherit;font-size:1rem;border:1.5px solid var(--gray-300);border-radius:var(--radius);padding:12px 16px;width:100%;background:var(--white);color:var(--gray-800);transition:border-color .2s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--teal-500);box-shadow:0 0 0 3px rgba(13,148,136,0.1)}
+a{color:var(--teal-600);text-decoration:none}
+
+.screen{display:none;min-height:100vh;position:relative;animation:fadeIn .3s ease}
+.screen.active{display:flex;flex-direction:column}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes bounceIn{0%{transform:scale(0)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+.screen-body{flex:1;overflow-y:auto;padding:0 20px 100px;max-width:600px;margin:0 auto;width:100%}
+.top-bar{display:flex;align-items:center;padding:16px 20px;background:var(--white);border-bottom:1px solid var(--gray-100);position:sticky;top:0;z-index:50;max-width:600px;margin:0 auto;width:100%}
+.top-bar h1{font-size:1.125rem;font-weight:700;flex:1;text-align:center;color:var(--gray-900)}
+.top-bar .back-btn{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:background .2s}
+.top-bar .back-btn:hover{background:var(--gray-100)}
+.top-bar .action-btn{width:40px}
+
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--gray-100);display:flex;align-items:center;justify-content:space-around;padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:100;max-width:600px;margin:0 auto}
+.bottom-nav .nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 12px;border-radius:8px;transition:all .2s;color:var(--gray-400);font-size:.625rem;font-weight:500}
+.bottom-nav .nav-item.active{color:var(--teal-600)}
+.bottom-nav .nav-item svg{width:24px;height:24px}
+.bottom-nav .fab{width:52px;height:52px;background:linear-gradient(135deg,var(--teal-500),var(--teal-600));border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 4px 12px rgba(13,148,136,.4);margin-top:-20px;transition:transform .2s}
+.bottom-nav .fab:hover{transform:scale(1.08)}
+.bottom-nav .fab svg{width:26px;height:26px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 28px;border-radius:var(--radius);font-weight:600;font-size:1rem;transition:all .2s;width:100%}
+.btn-primary{background:var(--teal-600);color:white;box-shadow:0 2px 8px rgba(13,148,136,.3)}
+.btn-primary:hover{background:var(--teal-700);transform:translateY(-1px);box-shadow:0 4px 12px rgba(13,148,136,.4)}
+.btn-secondary{background:var(--white);color:var(--teal-600);border:1.5px solid var(--teal-600)}
+.btn-secondary:hover{background:var(--teal-50)}
+.btn-ghost{color:var(--gray-500);padding:14px 16px}
+.btn-ghost:hover{color:var(--gray-700);background:var(--gray-50)}
+.btn-sm{padding:8px 16px;font-size:.875rem;border-radius:8px}
+
+.card{background:var(--white);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow);border:1px solid var(--gray-100)}
+.card-sm{padding:16px;border-radius:var(--radius);background:var(--white)}
+
+.mt-4{margin-top:16px}.mt-6{margin-top:24px}.mt-8{margin-top:32px}
+.mb-2{margin-bottom:8px}.mb-3{margin-bottom:12px}.mb-4{margin-bottom:16px}.mb-6{margin-bottom:24px}
+.gap-3{gap:12px}.gap-4{gap:16px}
+.text-center{text-align:center}
+.text-sm{font-size:.875rem}.text-xs{font-size:.75rem}
+.flex{display:flex}.flex-col{flex-direction:column}.items-center{align-items:center}.justify-between{justify-content:space-between}.justify-center{justify-content:center}.flex-1{flex:1}.flex-wrap{flex-wrap:wrap}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.w-full{width:100%}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:.75rem;font-weight:600}
+.badge-green{background:var(--green-50);color:var(--green-600)}
+.badge-amber{background:var(--amber-50);color:var(--amber-600)}
+.badge-red{background:var(--red-50);color:var(--red-600)}
+.badge-teal{background:var(--teal-50);color:var(--teal-600)}
+.badge-gray{background:var(--gray-100);color:var(--gray-600)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:.8125rem;font-weight:500;border:1.5px solid var(--gray-200);color:var(--gray-600);background:var(--white);cursor:pointer;transition:all .2s}
+.chip.active{border-color:var(--teal-500);background:var(--teal-50);color:var(--teal-700)}
+.chip:hover{border-color:var(--teal-300)}
+.section-title{font-size:.8125rem;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
+.avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.125rem;color:white}
+.toggle{width:48px;height:28px;border-radius:14px;background:var(--gray-300);position:relative;cursor:pointer;transition:background .2s}
+.toggle.on{background:var(--teal-500)}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:white;box-shadow:var(--shadow-sm);transition:transform .2s}
+.toggle.on::after{transform:translateX(20px)}
+.icon-circle{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--gray-800);color:white;padding:12px 24px;border-radius:var(--radius);font-size:.875rem;font-weight:500;z-index:200;animation:slideUp .3s ease;box-shadow:var(--shadow-lg)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:150;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s}
+.modal-sheet{background:var(--white);border-radius:var(--radius-xl) var(--radius-xl) 0 0;padding:24px 20px calc(24px + env(safe-area-inset-bottom));width:100%;max-width:600px;max-height:80vh;overflow-y:auto;animation:slideUp .3s ease}
+.modal-handle{width:40px;height:4px;border-radius:2px;background:var(--gray-300);margin:0 auto 20px}
+.progress-bar{height:6px;background:var(--gray-200);border-radius:3px;overflow:hidden}
+.progress-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+@media(min-width:641px){
+  body{display:flex;justify-content:center;background:var(--gray-100)}
+  .screen{max-width:430px;margin:0 auto;background:var(--bg);box-shadow:0 0 40px rgba(0,0,0,.08);border-left:1px solid var(--gray-200);border-right:1px solid var(--gray-200)}
+  .bottom-nav{max-width:430px;left:50%;transform:translateX(-50%)}
+  .toast{max-width:380px}
+  .modal-overlay{align-items:center}
+  .modal-sheet{border-radius:var(--radius-xl);max-width:430px;margin-bottom:0}
+}
+</style>
+</head>
+<body>
+
+<!-- SCREEN: WELCOME -->
+<div class="screen active" id="screen-welcome">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center;background:linear-gradient(180deg,var(--white) 0%,var(--teal-50) 100%)">
+    <div id="carousel" style="width:100%;max-width:340px">
+      <div class="carousel-slide active" data-slide="0">
+        <div style="width:120px;height:120px;margin:0 auto 32px;background:var(--teal-100);border-radius:50%;display:flex;align-items:center;justify-content:center">
+          <svg width="56" height="56" fill="none" viewBox="0 0 24 24" stroke="var(--teal-600)" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        </div>
+        <h2 style="font-size:1.5rem;font-weight:800;color:var(--gray-900);margin-bottom:12px">Store all your medical reports in one place</h2>
+        <p style="color:var(--gray-500);font-size:.9375rem;line-height:1.6">Upload prescriptions, lab results, and scans. Access them anytime, anywhere — securely.</p>
+      </div>
+      <div class="carousel-slide" data-slide="1" style="display:none">
+        <div style="width:120px;height:120px;margin:0 auto 32px;background:var(--indigo-100);border-radius:50%;display:flex;align-items:center;justify-content:center">
+          <svg width="56" height="56" fill="none" viewBox="0 0 24 24" stroke="var(--indigo-500)" stroke-width="1.5"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        </div>
+        <h2 style="font-size:1.5rem;font-weight:800;color:var(--gray-900);margin-bottom:12px">AI reads your reports and tracks your health</h2>
+        <p style="color:var(--gray-500);font-size:.9375rem;line-height:1.6">Our AI extracts key values automatically. Track trends over time and spot changes early.</p>
+      </div>
+      <div class="carousel-slide" data-slide="2" style="display:none">
+        <div style="width:120px;height:120px;margin:0 auto 32px;background:var(--green-100);border-radius:50%;display:flex;align-items:center;justify-content:center">
+          <svg width="56" height="56" fill="none" viewBox="0 0 24 24" stroke="var(--green-500)" stroke-width="1.5"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+        </div>
+        <h2 style="font-size:1.5rem;font-weight:800;color:var(--gray-900);margin-bottom:12px">Share reports with doctors instantly</h2>
+        <p style="color:var(--gray-500);font-size:.9375rem;line-height:1.6">Generate secure, time-limited links. Doctors see exactly what you share — nothing more.</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin:32px 0 40px">
+      <span class="dot active" data-dot="0" style="width:24px;height:8px;border-radius:4px;background:var(--teal-500);transition:all .3s"></span>
+      <span class="dot" data-dot="1" style="width:8px;height:8px;border-radius:4px;background:var(--gray-300);transition:all .3s"></span>
+      <span class="dot" data-dot="2" style="width:8px;height:8px;border-radius:4px;background:var(--gray-300);transition:all .3s"></span>
+    </div>
+    <div style="width:100%;max-width:340px">
+      <button class="btn btn-primary mb-4" onclick="nextSlide()">Next</button>
+      <button class="btn btn-ghost" onclick="navigateTo('screen-login')">Skip</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: LOGIN -->
+<div class="screen" id="screen-login">
+  <div style="flex:1;display:flex;flex-direction:column;padding:60px 24px 40px;max-width:600px;margin:0 auto;width:100%">
+    <div style="text-align:center;margin-bottom:40px">
+      <div style="width:64px;height:64px;margin:0 auto 16px;background:linear-gradient(135deg,var(--teal-500),var(--teal-700));border-radius:16px;display:flex;align-items:center;justify-content:center">
+        <span style="color:white;font-size:1.75rem;font-weight:800">M</span>
+      </div>
+      <h1 style="font-size:1.75rem;font-weight:800;color:var(--gray-900)">Welcome to MediVault</h1>
+      <p style="color:var(--gray-500);margin-top:8px">Your health records, safe and organized</p>
+    </div>
+    <div class="flex flex-col gap-3">
+      <label style="font-size:.875rem;font-weight:600;color:var(--gray-700)">Mobile Number</label>
+      <div style="display:flex;gap:8px">
+        <div style="padding:12px 14px;border:1.5px solid var(--gray-300);border-radius:var(--radius);background:var(--gray-50);color:var(--gray-600);font-weight:600;white-space:nowrap">+91</div>
+        <input type="tel" placeholder="Enter your mobile number" maxlength="10" style="flex:1">
+      </div>
+      <button class="btn btn-primary mt-4" onclick="navigateTo('screen-otp')">Send OTP</button>
+      <div style="display:flex;align-items:center;gap:12px;margin:24px 0">
+        <div style="flex:1;height:1px;background:var(--gray-200)"></div>
+        <span style="color:var(--gray-400);font-size:.8125rem">or continue with</span>
+        <div style="flex:1;height:1px;background:var(--gray-200)"></div>
+      </div>
+      <button class="btn btn-secondary" onclick="navigateTo('screen-otp')">
+        <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+    <div style="margin-top:auto;text-align:center;padding-top:32px">
+      <p style="font-size:.75rem;color:var(--gray-400);line-height:1.6">By continuing, you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: OTP -->
+<div class="screen" id="screen-otp">
+  <div class="top-bar">
+    <button class="back-btn" onclick="navigateTo('screen-login')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <h1>Verify OTP</h1>
+    <div class="action-btn" style="width:40px"></div>
+  </div>
+  <div style="flex:1;padding:40px 24px;max-width:600px;margin:0 auto;width:100%">
+    <div class="text-center mb-6">
+      <div style="width:64px;height:64px;margin:0 auto 20px;background:var(--teal-50);border-radius:50%;display:flex;align-items:center;justify-content:center">
+        <svg width="28" height="28" fill="none" stroke="var(--teal-600)" stroke-width="2"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      </div>
+      <h2 style="font-size:1.25rem;font-weight:700;color:var(--gray-900);margin-bottom:8px">Enter verification code</h2>
+      <p style="color:var(--gray-500);font-size:.875rem">We sent a 6-digit code to<br><strong style="color:var(--gray-700)">+91 98765 XXXXX</strong></p>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-bottom:32px">
+      <input type="text" maxlength="1" class="otp-input" style="width:48px;height:56px;text-align:center;font-size:1.5rem;font-weight:700;padding:0" value="4">
+      <input type="text" maxlength="1" class="otp-input" style="width:48px;height:56px;text-align:center;font-size:1.5rem;font-weight:700;padding:0" value="8">
+      <input type="text" maxlength="1" class="otp-input" style="width:48px;height:56px;text-align:center;font-size:1.5rem;font-weight:700;padding:0" value="2">
+      <input type="text" maxlength="1" class="otp-input" style="width:48px;height:56px;text-align:center;font-size:1.5rem;font-weight:700;padding:0" value="7">
+      <input type="text" maxlength="1" class="otp-input" style="width:48px;height:56px;text-align:center;font-size:1.5rem;font-weight:700;padding:0">
+      <input type="text" maxlength="1" class="otp-input" style="width:48px;height:56px;text-align:center;font-size:1.5rem;font-weight:700;padding:0">
+    </div>
+    <button class="btn btn-primary mb-4" onclick="navigateTo('screen-consent')">Verify & Continue</button>
+    <div class="text-center mt-4">
+      <p style="color:var(--gray-400);font-size:.875rem">Didn't receive code? <button style="color:var(--teal-600);font-weight:600;font-size:.875rem" onclick="showToast('OTP resent!')">Resend OTP</button></p>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: CONSENT -->
+<div class="screen" id="screen-consent">
+  <div class="top-bar">
+    <button class="back-btn" onclick="navigateTo('screen-otp')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <h1>AI Consent</h1>
+    <div class="action-btn" style="width:40px"></div>
+  </div>
+  <div class="screen-body" style="padding-top:24px">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="width:72px;height:72px;margin:0 auto 16px;background:var(--indigo-50);border-radius:50%;display:flex;align-items:center;justify-content:center">
+        <svg width="32" height="32" fill="none" stroke="var(--indigo-500)" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+      </div>
+      <h2 style="font-size:1.25rem;font-weight:700;color:var(--gray-900)">How MediVault uses AI</h2>
+      <p style="color:var(--gray-500);font-size:.875rem;margin-top:8px">We use AI to make your life easier. Here's what you should know:</p>
+    </div>
+    <div class="card mb-4" style="border-left:3px solid var(--teal-500)">
+      <div class="flex items-center gap-3 mb-2">
+        <svg width="20" height="20" fill="none" stroke="var(--teal-600)" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <strong style="color:var(--gray-800)">AI reads your reports</strong>
+      </div>
+      <p style="color:var(--gray-500);font-size:.875rem">We extract lab values, dates, and medical terms automatically so you don't have to type them.</p>
+    </div>
+    <div class="card mb-4" style="border-left:3px solid var(--green-500)">
+      <div class="flex items-center gap-3 mb-2">
+        <svg width="20" height="20" fill="none" stroke="var(--green-600)" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        <strong style="color:var(--gray-800)">Your data is encrypted</strong>
+      </div>
+      <p style="color:var(--gray-500);font-size:.875rem">End-to-end encryption. Your reports are never shared without your permission.</p>
+    </div>
+    <div class="card mb-6" style="border-left:3px solid var(--indigo-500)">
+      <div class="flex items-center gap-3 mb-2">
+        <svg width="20" height="20" fill="none" stroke="var(--indigo-500)" stroke-width="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        <strong style="color:var(--gray-800)">You're always in control</strong>
+      </div>
+      <p style="color:var(--gray-500);font-size:.875rem">You can review, edit, or delete any AI-extracted data. Disable AI anytime in Settings.</p>
+    </div>
+    <button class="btn btn-primary mb-4" onclick="navigateTo('screen-profile')">I Agree — Continue</button>
+    <button class="btn btn-ghost" onclick="navigateTo('screen-profile')">Skip for now</button>
+  </div>
+</div>
+
+<!-- SCREEN: CREATE PROFILE -->
+<div class="screen" id="screen-profile">
+  <div class="top-bar">
+    <button class="back-btn" onclick="navigateTo('screen-consent')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <h1>Create Profile</h1>
+    <div class="action-btn" style="width:40px"></div>
+  </div>
+  <div class="screen-body" style="padding-top:24px">
+    <p style="color:var(--gray-500);font-size:.875rem;margin-bottom:24px">Help us personalize your experience. You can update these anytime.</p>
+    <div class="flex flex-col gap-4">
+      <div>
+        <label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px">Full Name *</label>
+        <input type="text" placeholder="Enter your full name" value="Rajesh Kumar">
+      </div>
+      <div class="grid-2">
+        <div>
+          <label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px">Age *</label>
+          <input type="number" placeholder="Age" value="45">
+        </div>
+        <div>
+          <label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px">Gender *</label>
+          <select><option>Male</option><option>Female</option><option>Other</option></select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px">Blood Group</label>
+        <select><option value="">Select</option><option selected>B+</option><option>A+</option><option>O+</option><option>AB+</option></select>
+      </div>
+      <div>
+        <label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px">Known Medical Conditions</label>
+        <p style="font-size:.75rem;color:var(--gray-400);margin-bottom:8px">Select all that apply</p>
+        <div class="flex flex-wrap gap-3">
+          <span class="chip active" onclick="this.classList.toggle('active')">Diabetes</span>
+          <span class="chip" onclick="this.classList.toggle('active')">Hypertension</span>
+          <span class="chip active" onclick="this.classList.toggle('active')">Thyroid</span>
+          <span class="chip" onclick="this.classList.toggle('active')">Heart Disease</span>
+          <span class="chip" onclick="this.classList.toggle('active')">Asthma</span>
+          <span class="chip" onclick="this.classList.toggle('active')">None</span>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary mt-8" onclick="navigateTo('screen-dashboard')">Save & Continue</button>
+    <button class="btn btn-ghost mt-4" onclick="navigateTo('screen-dashboard')">Set up later</button>
+  </div>
+</div>
+
+<!-- SCREEN: HOME DASHBOARD -->
+<div class="screen" id="screen-dashboard">
+  <div style="background:linear-gradient(135deg,var(--teal-600),var(--teal-700));padding:20px 20px 28px;color:white">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div style="width:44px;height:44px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.125rem">RK</div>
+        <div>
+          <p style="font-size:.75rem;opacity:.8">Good morning</p>
+          <h2 style="font-size:1.125rem;font-weight:700">Rajesh Kumar</h2>
+        </div>
+      </div>
+      <button onclick="navigateTo('screen-settings')" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.15)">
+        <svg width="22" height="22" fill="none" stroke="white" stroke-width="2"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+      </button>
+    </div>
+    <div style="background:rgba(255,255,255,.12);border-radius:var(--radius);padding:16px;backdrop-filter:blur(10px)">
+      <div class="flex items-center justify-between mb-2">
+        <span style="font-size:.8125rem;opacity:.85;font-weight:500">Health Snapshot</span>
+        <span class="badge" style="background:rgba(255,255,255,.2);color:white;font-size:.6875rem">2 need attention</span>
+      </div>
+      <div class="flex gap-4" style="margin-top:12px">
+        <div style="flex:1;text-align:center">
+          <div style="font-size:1.5rem;font-weight:800">12</div>
+          <div style="font-size:.6875rem;opacity:.7">Reports</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,.2)"></div>
+        <div style="flex:1;text-align:center">
+          <div style="font-size:1.5rem;font-weight:800;color:#FCD34D">2</div>
+          <div style="font-size:.6875rem;opacity:.7">Attention</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,.2)"></div>
+        <div style="flex:1;text-align:center">
+          <div style="font-size:1.5rem;font-weight:800">3</div>
+          <div style="font-size:.6875rem;opacity:.7">Members</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="screen-body" style="padding-top:20px;margin-top:-8px;background:var(--bg);border-radius:var(--radius-lg) var(--radius-lg) 0 0;position:relative">
+    <div class="section-title">Quick Actions</div>
+    <div class="grid-2 mb-6">
+      <button class="card-sm flex items-center gap-3" onclick="navigateTo('screen-upload')" style="border:1px solid var(--gray-100);text-align:left">
+        <div class="icon-circle" style="background:var(--teal-50)"><svg width="22" height="22" fill="none" stroke="var(--teal-600)" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg></div>
+        <div><div style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Upload</div><div style="font-size:.6875rem;color:var(--gray-400)">New report</div></div>
+      </button>
+      <button class="card-sm flex items-center gap-3" onclick="navigateTo('screen-analytics')" style="border:1px solid var(--gray-100);text-align:left">
+        <div class="icon-circle" style="background:var(--indigo-50)"><svg width="22" height="22" fill="none" stroke="var(--indigo-500)" stroke-width="2"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div>
+        <div><div style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Analytics</div><div style="font-size:.6875rem;color:var(--gray-400)">View trends</div></div>
+      </button>
+    </div>
+
+    <div class="section-title">Needs Attention</div>
+    <div class="card mb-3" style="border-left:3px solid var(--amber-500)">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <svg width="18" height="18" fill="var(--amber-500)" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+          <span style="font-weight:600;font-size:.875rem;color:var(--gray-800)">HbA1c — 7.1%</span>
+        </div>
+        <span class="badge badge-red">High</span>
+      </div>
+      <p style="font-size:.8125rem;color:var(--gray-500)">Normal: below 5.7%. Tested 3 days ago.</p>
+    </div>
+    <div class="card mb-6" style="border-left:3px solid var(--amber-500)">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <svg width="18" height="18" fill="var(--amber-500)" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+          <span style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Vitamin D — 18 ng/mL</span>
+        </div>
+        <span class="badge badge-amber">Low</span>
+      </div>
+      <p style="font-size:.8125rem;color:var(--gray-500)">Normal: 30–100 ng/mL. Consider supplements.</p>
+    </div>
+
+    <div class="flex items-center justify-between mb-4">
+      <div class="section-title" style="margin-bottom:0">Recent Reports</div>
+      <button style="color:var(--teal-600);font-size:.8125rem;font-weight:600" onclick="navigateTo('screen-reports')">See All</button>
+    </div>
+    <div onclick="navigateTo('screen-report-detail')" class="card-sm flex items-center gap-3 mb-3" style="cursor:pointer;border:1px solid var(--gray-100)">
+      <div class="icon-circle" style="background:var(--red-50)"><svg width="20" height="20" fill="none" stroke="var(--red-500)" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+      <div style="flex:1"><div style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Complete Blood Count</div><div style="font-size:.75rem;color:var(--gray-400)">Apollo Labs · 18 Jun 2026</div></div>
+      <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+    </div>
+    <div onclick="navigateTo('screen-report-detail')" class="card-sm flex items-center gap-3 mb-3" style="cursor:pointer;border:1px solid var(--gray-100)">
+      <div class="icon-circle" style="background:var(--amber-50)"><svg width="20" height="20" fill="none" stroke="var(--amber-500)" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+      <div style="flex:1"><div style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Thyroid Profile</div><div style="font-size:.75rem;color:var(--gray-400)">Max Labs · 10 Jun 2026</div></div>
+      <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+    </div>
+    <div onclick="navigateTo('screen-report-detail')" class="card-sm flex items-center gap-3 mb-3" style="cursor:pointer;border:1px solid var(--gray-100)">
+      <div class="icon-circle" style="background:var(--green-50)"><svg width="20" height="20" fill="none" stroke="var(--green-500)" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+      <div style="flex:1"><div style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Lipid Panel</div><div style="font-size:.75rem;color:var(--gray-400)">SRL Labs · 2 Jun 2026</div></div>
+      <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+    </div>
+
+    <div class="section-title mt-6">Upcoming Reminders</div>
+    <div class="card-sm flex items-center gap-3" style="border:1px solid var(--gray-100)">
+      <div class="icon-circle" style="background:var(--cyan-100)"><svg width="20" height="20" fill="none" stroke="var(--cyan-600)" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+      <div style="flex:1"><div style="font-weight:600;font-size:.875rem;color:var(--gray-800)">HbA1c Retest</div><div style="font-size:.75rem;color:var(--gray-400)">Due in 4 days · 25 Jun 2026</div></div>
+      <span class="badge badge-teal">Soon</span>
+    </div>
+  </div>
+  <nav class="bottom-nav" id="nav-dashboard">
+    <button class="nav-item active" onclick="navigateTo('screen-dashboard')"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Home</button>
+    <button class="nav-item" onclick="navigateTo('screen-reports')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Reports</button>
+    <button class="fab" onclick="navigateTo('screen-upload')"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg></button>
+    <button class="nav-item" onclick="navigateTo('screen-analytics')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Analytics</button>
+    <button class="nav-item" onclick="navigateTo('screen-settings')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>More</button>
+  </nav>
+</div>
+
+<!-- SCREEN: UPLOAD -->
+<div class="screen" id="screen-upload">
+  <div class="top-bar">
+    <button class="back-btn" onclick="navigateTo('screen-dashboard')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <h1>Upload Report</h1>
+    <div class="action-btn" style="width:40px"></div>
+  </div>
+  <div class="screen-body" style="padding-top:24px">
+    <div style="border:2px dashed var(--teal-300);border-radius:var(--radius-lg);padding:48px 24px;text-align:center;background:var(--teal-50);margin-bottom:24px;cursor:pointer" onclick="navigateTo('screen-ai-processing')">
+      <div style="width:64px;height:64px;margin:0 auto 16px;background:var(--white);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow)">
+        <svg width="28" height="28" fill="none" stroke="var(--teal-600)" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+      </div>
+      <p style="font-weight:600;color:var(--gray-800);margin-bottom:4px">Tap to upload or take a photo</p>
+      <p style="font-size:.8125rem;color:var(--gray-400)">JPG, PNG, PDF · Max 20 MB</p>
+    </div>
+    <div class="section-title">Choose Source</div>
+    <div class="grid-2 mb-6">
+      <button class="card-sm flex flex-col items-center gap-2" onclick="navigateTo('screen-ai-processing')" style="border:1px solid var(--gray-100);padding:20px">
+        <div class="icon-circle" style="background:var(--teal-50)"><svg width="24" height="24" fill="none" stroke="var(--teal-600)" stroke-width="2"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
+        <span style="font-weight:600;font-size:.8125rem;color:var(--gray-700)">Camera</span>
+      </button>
+      <button class="card-sm flex flex-col items-center gap-2" onclick="navigateTo('screen-ai-processing')" style="border:1px solid var(--gray-100);padding:20px">
+        <div class="icon-circle" style="background:var(--indigo-50)"><svg width="24" height="24" fill="none" stroke="var(--indigo-500)" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+        <span style="font-weight:600;font-size:.8125rem;color:var(--gray-700)">Gallery</span>
+      </button>
+      <button class="card-sm flex flex-col items-center gap-2" onclick="navigateTo('screen-ai-processing')" style="border:1px solid var(--gray-100);padding:20px">
+        <div class="icon-circle" style="background:var(--red-50)"><svg width="24" height="24" fill="none" stroke="var(--red-500)" stroke-width="2"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>
+        <span style="font-weight:600;font-size:.8125rem;color:var(--gray-700)">PDF File</span>
+      </button>
+      <button class="card-sm flex flex-col items-center gap-2" onclick="navigateTo('screen-ai-processing')" style="border:1px solid var(--gray-100);padding:20px">
+        <div class="icon-circle" style="background:var(--amber-50)"><svg width="24" height="24" fill="none" stroke="var(--amber-500)" stroke-width="2"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg></div>
+        <span style="font-weight:600;font-size:.8125rem;color:var(--gray-700)">Document</span>
+      </button>
+    </div>
+    <div class="section-title">Upload for</div>
+    <div class="flex gap-3 flex-wrap">
+      <span class="chip active" onclick="selectChipGroup(this)">Rajesh (Me)</span>
+      <span class="chip" onclick="selectChipGroup(this)">Priya</span>
+      <span class="chip" onclick="selectChipGroup(this)">Father</span>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: AI PROCESSING -->
+<div class="screen" id="screen-ai-processing">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center">
+    <div style="width:100px;height:100px;margin-bottom:32px;position:relative">
+      <div style="width:100px;height:100px;border-radius:50%;background:var(--teal-50);display:flex;align-items:center;justify-content:center;animation:pulse 2s infinite">
+        <svg width="44" height="44" fill="none" stroke="var(--teal-600)" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      </div>
+      <div style="position:absolute;top:-4px;right:-4px;width:28px;height:28px;background:var(--indigo-500);border-radius:50%;display:flex;align-items:center;justify-content:center;animation:bounceIn 1s ease .5s both">
+        <svg width="14" height="14" fill="white" viewBox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"/></svg>
+      </div>
+    </div>
+    <h2 style="font-size:1.25rem;font-weight:700;color:var(--gray-900);margin-bottom:8px" id="ai-status-text">Reading your report...</h2>
+    <p style="color:var(--gray-400);font-size:.875rem;margin-bottom:32px">This usually takes 10–20 seconds</p>
+    <div style="width:100%;max-width:300px;margin-bottom:32px">
+      <div class="progress-bar"><div class="progress-bar-fill" id="ai-progress" style="width:0%;background:linear-gradient(90deg,var(--teal-500),var(--indigo-500))"></div></div>
+      <div style="text-align:right;margin-top:6px;font-size:.8125rem;font-weight:600;color:var(--teal-600)" id="ai-percent">0%</div>
+    </div>
+    <div style="text-align:left;width:100%;max-width:280px" id="ai-steps">
+      <div class="flex items-center gap-3 mb-4 ai-step" data-step="0">
+        <div class="step-circle" style="width:24px;height:24px;border-radius:50%;background:var(--teal-500);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" fill="white" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg></div>
+        <span style="font-size:.875rem;color:var(--gray-700)">Document scanned</span>
+      </div>
+      <div class="flex items-center gap-3 mb-4 ai-step" data-step="1">
+        <div class="step-circle" style="width:24px;height:24px;border-radius:50%;background:var(--teal-500);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" fill="white" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg></div>
+        <span style="font-size:.875rem;color:var(--gray-700)">Text extracted</span>
+      </div>
+      <div class="flex items-center gap-3 mb-4 ai-step" data-step="2">
+        <div class="step-circle" style="width:24px;height:24px;border-radius:50%;border:2px solid var(--teal-500);display:flex;align-items:center;justify-content:center;flex-shrink:0;animation:pulse 1.5s infinite"><div style="width:8px;height:8px;border-radius:50%;background:var(--teal-500)"></div></div>
+        <span style="font-size:.875rem;color:var(--teal-600);font-weight:600">Finding medical values...</span>
+      </div>
+      <div class="flex items-center gap-3 ai-step" data-step="3">
+        <div class="step-circle" style="width:24px;height:24px;border-radius:50%;border:2px solid var(--gray-300);flex-shrink:0"></div>
+        <span style="font-size:.875rem;color:var(--gray-400)">Organizing data</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: EXTRACTED DATA REVIEW -->
+<div class="screen" id="screen-review">
+  <div class="top-bar">
+    <button class="back-btn" onclick="navigateTo('screen-upload')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <h1>Review Extracted Data</h1>
+    <div class="action-btn" style="width:40px"></div>
+  </div>
+  <div class="screen-body" style="padding-top:16px">
+    <div style="background:var(--teal-50);border-radius:var(--radius);padding:14px 16px;margin-bottom:20px">
+      <div class="flex items-center gap-2">
+        <svg width="18" height="18" fill="none" stroke="var(--teal-600)" stroke-width="2"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span style="font-size:.8125rem;color:var(--teal-700);font-weight:500">AI extracted these values. Please check and correct if needed.</span>
+      </div>
+    </div>
+    <div class="card-sm mb-4" style="border:1px solid var(--gray-100)">
+      <div class="flex items-center justify-between mb-2">
+        <span style="font-weight:600;color:var(--gray-800)">Detected Report Type</span>
+        <span class="badge badge-teal">Auto-detected</span>
+      </div>
+      <span style="font-size:.9375rem;color:var(--gray-700)">Complete Blood Count (CBC)</span>
+      <div style="font-size:.75rem;color:var(--gray-400);margin-top:4px">Apollo Diagnostics · 18 Jun 2026</div>
+    </div>
+    <div class="section-title">Extracted Values</div>
+
+    <div class="card-sm mb-3" style="border:1px solid var(--gray-100)">
+      <div class="flex items-center justify-between">
+        <div><div style="font-size:.75rem;color:var(--gray-400)">Hemoglobin</div><div class="flex items-center gap-2 mt-1"><span style="font-size:1.125rem;font-weight:700;color:var(--gray-900)" id="val-hb">14.2</span><span style="font-size:.8125rem;color:var(--gray-500)">g/dL</span><span class="badge badge-green">Normal</span></div><div style="font-size:.6875rem;color:var(--gray-400);margin-top:2px">Ref: 13.0–17.0</div></div>
+        <button onclick="editValue('val-hb','Hemoglobin','14.2')" style="width:36px;height:36px;border-radius:8px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;border:1px solid var(--gray-200)"><svg width="16" height="16" fill="none" stroke="var(--gray-500)" stroke-width="2"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+      </div>
+    </div>
+    <div class="card-sm mb-3" style="border:1px solid var(--gray-100)">
+      <div class="flex items-center justify-between">
+        <div><div style="font-size:.75rem;color:var(--gray-400)">Fasting Blood Sugar</div><div class="flex items-center gap-2 mt-1"><span style="font-size:1.125rem;font-weight:700;color:var(--gray-900)" id="val-fbs">142</span><span style="font-size:.8125rem;color:var(--gray-500)">mg/dL</span><span class="badge badge-amber">Borderline</span></div><div style="font-size:.6875rem;color:var(--gray-400);margin-top:2px">Ref: 70–110</div></div>
+        <button onclick="editValue('val-fbs','Fasting Sugar','142')" style="width:36px;height:36px;border-radius:8px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;border:1px solid var(--gray-200)"><svg width="16" height="16" fill="none" stroke="var(--gray-500)" stroke-width="2"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+      </div>
+    </div>
+    <div class="card-sm mb-3" style="border:1px solid var(--gray-100)">
+      <div class="flex items-center justify-between">
+        <div><div style="font-size:.75rem;color:var(--gray-400)">HbA1c</div><div class="flex items-center gap-2 mt-1"><span style="font-size:1.125rem;font-weight:700;color:var(--gray-900)" id="val-hba1c">7.1</span><span style="font-size:.8125rem;color:var(--gray-500)">%</span><span class="badge badge-red">High</span></div><div style="font-size:.6875rem;color:var(--gray-400);margin-top:2px">Ref: &lt;5.7</div></div>
+        <button onclick="editValue('val-hba1c','HbA1c','7.1')" style="width:36px;height:36px;border-radius:8px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;border:1px solid var(--gray-200)"><svg width="16" height="16" fill="none" stroke="var(--gray-500)" stroke-width="2"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+      </div>
+    </div>
+    <div class="card-sm mb-3" style="border:1px solid var(--gray-100)">
+      <div class="flex items-center justify-between">
+        <div><div style="font-size:.75rem;color:var(--gray-400)">Total Cholesterol</div><div class="flex items-center gap-2 mt-1"><span style="font-size:1.125rem;font-weight:700;color:var(--gray-900)" id="val-chol">210</span><span style="font-size:.8125rem;color:var(--gray-500)">mg/dL</span><span class="badge badge-amber">Borderline</span></div><div style="font-size:.6875rem;color:var(--gray-400);margin-top:2px">Ref: &lt;200</div></div>
+        <button onclick="editValue('val-chol','Cholesterol','210')" style="width:36px;height:36px;border-radius:8px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;border:1px solid var(--gray-200)"><svg width="16" height="16" fill="none" stroke="var(--gray-500)" stroke-width="2"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+      </div>
+    </div>
+    <div class="card-sm mb-3" style="border:1px solid var(--gray-100)">
+      <div class="flex items-center justify-between">
+        <div><div style="font-size:.75rem;color:var(--gray-400)">Vitamin D</div><div class="flex items-center gap-2 mt-1"><span style="font-size:1.125rem;font-weight:700;color:var(--gray-900)" id="val-vitd">18</span><span style="font-size:.8125rem;color:var(--gray-500)">ng/mL</span><span class="badge badge-red">Low</span></div><div style="font-size:.6875rem;color:var(--gray-400);margin-top:2px">Ref: 30–100</div></div>
+        <button onclick="editValue('val-vitd','Vitamin D','18')" style="width:36px;height:36px;border-radius:8px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;border:1px solid var(--gray-200)"><svg width="16" height="16" fill="none" stroke="var(--gray-500)" stroke-width="2"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+      </div>
+    </div>
+    <div class="card-sm mb-3" style="border:1px solid var(--gray-100)">
+      <div class="flex items-center justify-between">
+        <div><div style="font-size:.75rem;color:var(--gray-400)">TSH (Thyroid)</div><div class="flex items-center gap-2 mt-1"><span style="font-size:1.125rem;font-weight:700;color:var(--gray-900)" id="val-tsh">3.8</span><span style="font-size:.8125rem;color:var(--gray-500)">mIU/L</span><span class="badge badge-green">Normal</span></div><div style="font-size:.6875rem;color:var(--gray-400);margin-top:2px">Ref: 0.4–4.0</div></div>
+        <button onclick="editValue('val-tsh','TSH','3.8')" style="width:36px;height:36px;border-radius:8px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;border:1px solid var(--gray-200)"><svg width="16" height="16" fill="none" stroke="var(--gray-500)" stroke-width="2"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+      </div>
+    </div>
+    <button class="btn btn-primary mt-6" onclick="saveReport()">Confirm & Save Report</button>
+    <button class="btn btn-ghost mt-4" onclick="navigateTo('screen-upload')">Re-upload</button>
+  </div>
+</div>
+
+<!-- SCREEN: PAST REPORTS -->
+<div class="screen" id="screen-reports">
+  <div class="top-bar">
+    <button class="back-btn" onclick="navigateTo('screen-dashboard')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <h1>My Reports</h1>
+    <div class="action-btn" style="width:40px"></div>
+  </div>
+  <div class="screen-body" style="padding-top:16px">
+    <div style="position:relative;margin-bottom:16px">
+      <svg width="18" height="18" fill="none" stroke="var(--gray-400)" stroke-width="2" style="position:absolute;left:14px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" placeholder="Search reports..." style="padding-left:40px">
+    </div>
+    <div class="flex gap-3 flex-wrap mb-4">
+      <span class="chip active">All</span><span class="chip">Blood Test</span><span class="chip">Thyroid</span><span class="chip">Diabetes</span><span class="chip">Lipid</span>
+    </div>
+    <div style="font-size:.8125rem;color:var(--gray-400);margin-bottom:12px">Showing 5 of 12 reports</div>
+
+    <div onclick="navigateTo('screen-report-detail')" class="card-sm flex items-center gap-3 mb-3" style="cursor:pointer;border:1px solid var(--gray-100)">
+      <div class="icon-circle" style="background:var(--red-50)"><svg width="20" height="20" fill="none" stroke="var(--red-500)" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+      <div style="flex:1"><div class="flex items-center gap-2"><span style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Complete Blood Count</span><span class="badge badge-red" style="font-size:.625rem">2 High</span></div><div style="font-size:.75rem;color:var(--gray-400)">Apollo Labs · 18 Jun 2026</div></div>
+      <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+    </div>
+    <div onclick="navigateTo('screen-report-detail')" class="card-sm flex items-center gap-3 mb-3" style="cursor:pointer;border:1px solid var(--gray-100)">
+      <div class="icon-circle" style="background:var(--amber-50)"><svg width="20" height="20" fill="none" stroke="var(--amber-500)" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+      <div style="flex:1"><div class="flex items-center gap-2"><span style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Thyroid Profile</span><span class="badge badge-green" style="font-size:.625rem">Normal</span></div><div style="font-size:.75rem;color:var(--gray-400)">Max Labs · 10 Jun 2026</div></div>
+      <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+    </div>
+    <div onclick="navigateTo('screen-report-detail')" class="card-sm flex items-center gap-3 mb-3" style="cursor:pointer;border:1px solid var(--gray-100)">
+      <div class="icon-circle" style="background:var(--green-50)"><svg width="20" height="20" fill="none" stroke="var(--green-500)" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+      <div style="flex:1"><div class="flex items-center gap-2"><span style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Lipid Panel</span><span class="badge badge-amber" style="font-size:.625rem">1 Borderline</span></div><div style="font-size:.75rem;color:var(--gray-400)">SRL Labs · 2 Jun 2026</div></div>
+      <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+    </div>
+    <div onclick="navigateTo('screen-report-detail')" class="card-sm flex items-center gap-3 mb-3" style="cursor:pointer;border:1px solid var(--gray-100)">
+      <div class="icon-circle" style="background:var(--indigo-50)"><svg width="20" height="20" fill="none" stroke="var(--indigo-500)" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+      <div style="flex:1"><div class="flex items-center gap-2"><span style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Vitamin D Test</span><span class="badge badge-red" style="font-size:.625rem">Low</span></div><div style="font-size:.75rem;color:var(--gray-400)">Apollo Labs · 25 May 2026 · Priya</div></div>
+      <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+    </div>
+    <div onclick="navigateTo('screen-report-detail')" class="card-sm flex items-center gap-3 mb-3" style="cursor:pointer;border:1px solid var(--gray-100)">
+      <div class="icon-circle" style="background:var(--teal-50)"><svg width="20" height="20" fill="none" stroke="var(--teal-600)" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+      <div style="flex:1"><div class="flex items-center gap-2"><span style="font-weight:600;font-size:.875rem;color:var(--gray-800)">HbA1c Test</span><span class="badge badge-red" style="font-size:.625rem">High</span></div><div style="font-size:.75rem;color:var(--gray-400)">Thyrocare · 15 May 2026</div></div>
+      <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+    </div>
+  </div>
+  <nav class="bottom-nav">
+    <button class="nav-item" onclick="navigateTo('screen-dashboard')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Home</button>
+    <button class="nav-item active" onclick="navigateTo('screen-reports')"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Reports</button>
+    <button class="fab" onclick="navigateTo('screen-upload')"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg></button>
+    <button class="nav-item" onclick="navigateTo('screen-analytics')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Analytics</button>
+    <button class="nav-item" onclick="navigateTo('screen-settings')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>More</button>
+  </nav>
+</div>
+
+<!-- SCREEN: REPORT DETAILS -->
+<div class="screen" id="screen-report-detail">
+  <div class="top-bar">
+    <button class="back-btn" onclick="navigateTo('screen-reports')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <h1>Report Details</h1>
+    <button class="back-btn" onclick="navigateTo('screen-share')"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg></button>
+  </div>
+  <div class="screen-body" style="padding-top:16px">
+    <div class="card mb-4">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="icon-circle" style="background:var(--red-50)"><svg width="24" height="24" fill="none" stroke="var(--red-500)" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+        <div><h3 style="font-weight:700;color:var(--gray-900)">Complete Blood Count</h3><p style="font-size:.75rem;color:var(--gray-400)">18 Jun 2026 · Apollo Diagnostics</p></div>
+      </div>
+      <div class="flex gap-3"><span class="badge badge-gray">Blood Test</span><span class="badge badge-teal">Rajesh Kumar</span></div>
+    </div>
+    <div class="section-title">Test Results</div>
+    <div class="card-sm mb-3" style="border:1px solid var(--gray-100);border-left:3px solid var(--green-500)">
+      <div class="flex items-center justify-between"><div><div style="font-size:.8125rem;color:var(--gray-500)">Hemoglobin</div><div style="font-size:1.125rem;font-weight:700;color:var(--gray-900)">14.2 <span style="font-size:.8125rem;font-weight:400;color:var(--gray-400)">g/dL</span></div></div><div style="text-align:right"><span class="badge badge-green">Normal</span><div style="font-size:.6875rem;color:var(--gray-400);margin-top:4px">13.0–17.0</div></div></div>
+    </div>
+    <div class="card-sm mb-3" style="border:1px solid var(--gray-100);border-left:3px solid var(--amber-500)">
+      <div class="flex items-center justify-between"><div><div style="font-size:.8125rem;color:var(--gray-500)">Fasting Blood Sugar</div><div style="font-size:1.125rem;font-weight:700;color:var(--gray-900)">142 <span style="font-size:.8125rem;font-weight:400;color:var(--gray-400)">mg/dL</span></div></div><div style="text-align:right"><span class="badge badge-amber">Borderline</span><div style="font-size:.6875rem;color:var(--gray-400);margin-top:4px">70–110</div></div></div>
+    </div>
+    <div class="card-sm mb-3" style="border:1px solid var(--gray-100);border-left:3px solid var(--red-500)">
+      <div class="flex items-center justify-between"><div><div style="font-size:.8125rem;color:var(--gray-500)">HbA1c</div><div style="font-size:1.125rem;font-weight:700;color:var(--gray-900)">7.1 <span style="font-size:.8125rem;font-weight:400;color:var(--gray-400)">%</span></div></div><div style="text-align:right"><span class="badge badge-red">High</span><div style="font-size:.6875rem;color:var(--gray-400);margin-top:4px">&lt;5.7</div></div></div>
+    </div>
+    <div class="card-sm mb-3" style="border:1px solid var(--gray-100);border-left:3px solid var(--amber-500)">
+      <div class="flex items-center justify-between"><div><div style="font-size:.8125rem;color:var(--gray-500)">Total Cholesterol</div><div style="font-size:1.125rem;font-weight:700;color:var(--gray-900)">210 <span style="font-size:.8125rem;font-weight:400;color:var(--gray-400)">mg/dL</span></div></div><div style="text-align:right"><span class="badge badge-amber">Borderline</span><div style="font-size:.6875rem;color:var(--gray-400);margin-top:4px">&lt;200</div></div></div>
+    </div>
+    <div class="card-sm mb-3" style="border:1px solid var(--gray-100);border-left:3px solid var(--red-500)">
+      <div class="flex items-center justify-between"><div><div style="font-size:.8125rem;color:var(--gray-500)">Vitamin D</div><div style="font-size:1.125rem;font-weight:700;color:var(--gray-900)">18 <span style="font-size:.8125rem;font-weight:400;color:var(--gray-400)">ng/mL</span></div></div><div style="text-align:right"><span class="badge badge-red">Low</span><div style="font-size:.6875rem;color:var(--gray-400);margin-top:4px">30–100</div></div></div>
+    </div>
+    <div class="card-sm mb-6" style="border:1px solid var(--gray-100);border-left:3px solid var(--green-500)">
+      <div class="flex items-center justify-between"><div><div style="font-size:.8125rem;color:var(--gray-500)">TSH</div><div style="font-size:1.125rem;font-weight:700;color:var(--gray-900)">3.8 <span style="font-size:.8125rem;font-weight:400;color:var(--gray-400)">mIU/L</span></div></div><div style="text-align:right"><span class="badge badge-green">Normal</span><div style="font-size:.6875rem;color:var(--gray-400);margin-top:4px">0.4–4.0</div></div></div>
+    </div>
+    <div class="grid-2">
+      <button class="btn btn-secondary btn-sm" onclick="navigateTo('screen-share')"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>Share</button>
+      <button class="btn btn-secondary btn-sm" onclick="navigateTo('screen-analytics')"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6m6 0h6m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10"/></svg>Compare</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: ANALYTICS -->
+<div class="screen" id="screen-analytics">
+  <div class="top-bar">
+    <button class="back-btn" onclick="navigateTo('screen-dashboard')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <h1>Analytics</h1>
+    <div class="action-btn" style="width:40px"></div>
+  </div>
+  <div class="screen-body" style="padding-top:16px">
+    <div class="grid-2 mb-6">
+      <div class="card-sm text-center" style="border:1px solid var(--gray-100)"><div style="font-size:2rem;font-weight:800;color:var(--teal-600)">12</div><div style="font-size:.75rem;color:var(--gray-500);font-weight:500">Total Reports</div></div>
+      <div class="card-sm text-center" style="border:1px solid var(--gray-100)"><div style="font-size:2rem;font-weight:800;color:var(--amber-500)">2</div><div style="font-size:.75rem;color:var(--gray-500);font-weight:500">Need Attention</div></div>
+      <div class="card-sm text-center" style="border:1px solid var(--gray-100)"><div style="font-size:.9375rem;font-weight:700;color:var(--gray-800)">18 Jun</div><div style="font-size:.75rem;color:var(--gray-500);font-weight:500">Last Uploaded</div></div>
+      <div class="card-sm text-center" style="border:1px solid var(--gray-100)"><div style="font-size:2rem;font-weight:800;color:var(--green-500)">4</div><div style="font-size:.75rem;color:var(--gray-500);font-weight:500">Values Normal</div></div>
+    </div>
+
+    <div class="section-title">HbA1c Trend</div>
+    <div class="card mb-4">
+      <div class="flex items-center justify-between mb-3"><div><span style="font-weight:700;color:var(--gray-900)">7.1%</span><span class="badge badge-red" style="margin-left:8px">High</span></div><span style="font-size:.75rem;color:var(--gray-400)">Last 6 months</span></div>
+      <svg viewBox="0 0 300 80" style="width:100%;height:80px">
+        <line x1="0" y1="38" x2="300" y2="38" stroke="var(--green-200)" stroke-width="1" stroke-dasharray="4"/>
+        <text x="280" y="34" fill="var(--green-500)" font-size="8" font-family="Inter">5.7%</text>
+        <path d="M 0 20 L 60 25 L 120 18 L 180 22 L 240 15 L 300 10" fill="none" stroke="var(--red-500)" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="0" cy="20" r="3" fill="var(--red-500)"/><circle cx="60" cy="25" r="3" fill="var(--red-500)"/><circle cx="120" cy="18" r="3" fill="var(--red-500)"/><circle cx="180" cy="22" r="3" fill="var(--red-500)"/><circle cx="240" cy="15" r="3" fill="var(--red-500)"/><circle cx="300" cy="10" r="4" fill="var(--red-500)" stroke="white" stroke-width="2"/>
+        <text x="0" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">Jan</text><text x="55" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">Feb</text><text x="113" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">Mar</text><text x="173" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">Apr</text><text x="233" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">May</text><text x="290" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">Jun</text>
+      </svg>
+      <p style="font-size:.75rem;color:var(--gray-400);margin-top:8px">Trending upward. Consult your doctor about management.</p>
+    </div>
+
+    <div class="section-title">Vitamin D Trend</div>
+    <div class="card mb-4">
+      <div class="flex items-center justify-between mb-3"><div><span style="font-weight:700;color:var(--gray-900)">18 ng/mL</span><span class="badge badge-red" style="margin-left:8px">Low</span></div><span style="font-size:.75rem;color:var(--gray-400)">Last 6 months</span></div>
+      <svg viewBox="0 0 300 80" style="width:100%;height:80px">
+        <line x1="0" y1="28" x2="300" y2="28" stroke="var(--green-200)" stroke-width="1" stroke-dasharray="4"/>
+        <text x="270" y="24" fill="var(--green-500)" font-size="8" font-family="Inter">30 ng/mL</text>
+        <path d="M 0 45 L 60 50 L 120 48 L 180 55 L 240 52 L 300 58" fill="none" stroke="var(--amber-500)" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="0" cy="45" r="3" fill="var(--amber-500)"/><circle cx="60" cy="50" r="3" fill="var(--amber-500)"/><circle cx="120" cy="48" r="3" fill="var(--amber-500)"/><circle cx="180" cy="55" r="3" fill="var(--amber-500)"/><circle cx="240" cy="52" r="3" fill="var(--amber-500)"/><circle cx="300" cy="58" r="4" fill="var(--amber-500)" stroke="white" stroke-width="2"/>
+        <text x="0" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">Jan</text><text x="55" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">Feb</text><text x="113" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">Mar</text><text x="173" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">Apr</text><text x="233" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">May</text><text x="290" y="75" fill="var(--gray-400)" font-size="8" font-family="Inter">Jun</text>
+      </svg>
+      <p style="font-size:.75rem;color:var(--gray-400);margin-top:8px">Below normal range. Consider Vitamin D supplements.</p>
+    </div>
+
+    <div class="section-title">Cholesterol Status</div>
+    <div class="card mb-4">
+      <div class="flex items-center justify-between mb-2"><span style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Total Cholesterol</span><span class="badge badge-amber">210 mg/dL</span></div>
+      <div class="progress-bar mb-4" style="height:8px;margin-top:8px"><div class="progress-bar-fill" style="width:70%;background:var(--amber-500)"></div></div>
+      <div class="grid-2" style="gap:8px">
+        <div style="background:var(--green-50);padding:10px;border-radius:8px;text-align:center"><div style="font-size:.6875rem;color:var(--gray-500)">HDL (Good)</div><div style="font-weight:700;color:var(--green-600)">55</div></div>
+        <div style="background:var(--amber-50);padding:10px;border-radius:8px;text-align:center"><div style="font-size:.6875rem;color:var(--gray-500)">LDL (Bad)</div><div style="font-weight:700;color:var(--amber-600)">135</div></div>
+      </div>
+    </div>
+
+    <div class="section-title">Blood Pressure</div>
+    <div class="card mb-4">
+      <div class="flex items-center justify-between mb-2"><div><span style="font-size:1.5rem;font-weight:800;color:var(--gray-900)">130/85</span><span style="font-size:.8125rem;color:var(--gray-400);margin-left:4px">mmHg</span></div><span class="badge badge-amber">Elevated</span></div>
+      <p style="font-size:.75rem;color:var(--gray-400)">Normal: below 120/80 mmHg</p>
+    </div>
+  </div>
+  <nav class="bottom-nav">
+    <button class="nav-item" onclick="navigateTo('screen-dashboard')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Home</button>
+    <button class="nav-item" onclick="navigateTo('screen-reports')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Reports</button>
+    <button class="fab" onclick="navigateTo('screen-upload')"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg></button>
+    <button class="nav-item active" onclick="navigateTo('screen-analytics')"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Analytics</button>
+    <button class="nav-item" onclick="navigateTo('screen-settings')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>More</button>
+  </nav>
+</div>
+
+<!-- SCREEN: FAMILY MEMBERS -->
+<div class="screen" id="screen-family">
+  <div class="top-bar">
+    <button class="back-btn" onclick="navigateTo('screen-dashboard')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <h1>Family Members</h1>
+    <div class="action-btn" style="width:40px"></div>
+  </div>
+  <div class="screen-body" style="padding-top:20px">
+    <p style="font-size:.875rem;color:var(--gray-500);margin-bottom:20px">Manage health records for your entire family in one place.</p>
+    <div class="card mb-3" style="border:2px solid var(--teal-200)">
+      <div class="flex items-center gap-3">
+        <div class="avatar" style="background:var(--teal-500)">RK</div>
+        <div style="flex:1"><div class="flex items-center gap-2"><span style="font-weight:700;color:var(--gray-900)">Rajesh Kumar</span><span class="badge badge-teal" style="font-size:.625rem">You</span></div><div style="font-size:.75rem;color:var(--gray-400)">45 yrs · Male · B+ · 8 reports</div></div>
+        <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="flex items-center gap-3">
+        <div class="avatar" style="background:var(--indigo-500)">PK</div>
+        <div style="flex:1"><div style="font-weight:700;color:var(--gray-900)">Priya Kumar</div><div style="font-size:.75rem;color:var(--gray-400)">40 yrs · Female · A+ · 3 reports</div></div>
+        <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="flex items-center gap-3">
+        <div class="avatar" style="background:var(--amber-500)">MK</div>
+        <div style="flex:1"><div style="font-weight:700;color:var(--gray-900)">Mohan Kumar</div><div style="font-size:.75rem;color:var(--gray-400)">72 yrs · Male · O+ · 1 report</div></div>
+        <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+      </div>
+    </div>
+    <button class="btn btn-secondary mt-6" onclick="showModal('modal-add-family')">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg>
+      Add Family Member
+    </button>
+  </div>
+</div>
+
+<!-- SCREEN: SHARE WITH DOCTOR -->
+<div class="screen" id="screen-share">
+  <div class="top-bar">
+    <button class="back-btn" onclick="navigateTo('screen-report-detail')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <h1>Share with Doctor</h1>
+    <div class="action-btn" style="width:40px"></div>
+  </div>
+  <div class="screen-body" style="padding-top:20px">
+    <div style="background:var(--teal-50);border-radius:var(--radius);padding:14px 16px;margin-bottom:24px">
+      <div class="flex items-center gap-2">
+        <svg width="18" height="18" fill="none" stroke="var(--teal-600)" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        <span style="font-size:.8125rem;color:var(--teal-700);font-weight:500">Shared links are encrypted and time-limited.</span>
+      </div>
+    </div>
+
+    <div class="section-title">Select Reports to Share</div>
+    <div class="card-sm mb-3 flex items-center gap-3" style="border:1px solid var(--teal-200);background:var(--teal-50);cursor:pointer">
+      <div style="width:22px;height:22px;border-radius:6px;background:var(--teal-500);display:flex;align-items:center;justify-content:center"><svg width="14" height="14" fill="white" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg></div>
+      <div style="flex:1"><div style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Complete Blood Count</div><div style="font-size:.75rem;color:var(--gray-400)">18 Jun 2026</div></div>
+    </div>
+    <div class="card-sm mb-3 flex items-center gap-3 share-report-item" style="border:1px solid var(--gray-200);cursor:pointer" onclick="toggleShareItem(this)">
+      <div class="share-check" style="width:22px;height:22px;border-radius:6px;border:2px solid var(--gray-300)"></div>
+      <div style="flex:1"><div style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Thyroid Profile</div><div style="font-size:.75rem;color:var(--gray-400)">10 Jun 2026</div></div>
+    </div>
+    <div class="card-sm mb-6 flex items-center gap-3 share-report-item" style="border:1px solid var(--gray-200);cursor:pointer" onclick="toggleShareItem(this)">
+      <div class="share-check" style="width:22px;height:22px;border-radius:6px;border:2px solid var(--gray-300)"></div>
+      <div style="flex:1"><div style="font-weight:600;font-size:.875rem;color:var(--gray-800)">Lipid Panel</div><div style="font-size:.75rem;color:var(--gray-400)">2 Jun 2026</div></div>
+    </div>
+
+    <div class="section-title">Link Settings</div>
+    <div class="card mb-6">
+      <div class="mb-4">
+        <label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:8px">Link expires in</label>
+        <div class="flex gap-3"><span class="chip" onclick="selectChipGroup(this)">24 hours</span><span class="chip active" onclick="selectChipGroup(this)">7 days</span><span class="chip" onclick="selectChipGroup(this)">30 days</span></div>
+      </div>
+      <div>
+        <label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:8px">Password protection</label>
+        <div class="flex items-center justify-between"><span style="font-size:.875rem;color:var(--gray-500)">Require password to view</span><div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+      </div>
+    </div>
+
+    <div class="section-title">Doctor Details (Optional)</div>
+    <div class="flex flex-col gap-3 mb-6"><input type="text" placeholder="Doctor's name"><input type="text" placeholder="Hospital / Clinic name"></div>
+
+    <button class="btn btn-primary" onclick="showModal('modal-share-success')">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+      Generate Secure Link
+    </button>
+    <div class="grid-2 mt-4">
+      <button class="btn btn-secondary btn-sm" onclick="showToast('Opening WhatsApp...')">WhatsApp</button>
+      <button class="btn btn-secondary btn-sm" onclick="showToast('Opening email...')">Email</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: SETTINGS -->
+<div class="screen" id="screen-settings">
+  <div class="top-bar">
+    <button class="back-btn" onclick="navigateTo('screen-dashboard')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <h1>Settings</h1>
+    <div class="action-btn" style="width:40px"></div>
+  </div>
+  <div class="screen-body" style="padding-top:16px">
+    <div class="card mb-6 flex items-center gap-3" onclick="navigateTo('screen-profile')" style="cursor:pointer">
+      <div class="avatar" style="background:var(--teal-500);width:52px;height:52px;font-size:1.25rem">RK</div>
+      <div style="flex:1"><div style="font-weight:700;color:var(--gray-900)">Rajesh Kumar</div><div style="font-size:.75rem;color:var(--gray-400)">+91 98765 43210 · B+</div></div>
+      <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+    </div>
+
+    <div class="section-title">Account</div>
+    <div class="card mb-6" style="padding:0;overflow:hidden">
+      <button class="flex items-center gap-3 w-full" onclick="navigateTo('screen-family')" style="padding:16px;border-bottom:1px solid var(--gray-100);text-align:left">
+        <div class="icon-circle" style="background:var(--indigo-50);width:40px;height:40px"><svg width="18" height="18" fill="none" stroke="var(--indigo-500)" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87m-4-12a4 4 0 010 7.75"/></svg></div>
+        <span style="flex:1;font-weight:500;color:var(--gray-700);font-size:.9375rem">Family Members</span>
+        <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+      </button>
+      <button class="flex items-center gap-3 w-full" style="padding:16px;border-bottom:1px solid var(--gray-100);text-align:left" onclick="showToast('Reminders coming soon!')">
+        <div class="icon-circle" style="background:var(--cyan-100);width:40px;height:40px"><svg width="18" height="18" fill="none" stroke="var(--cyan-600)" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+        <span style="flex:1;font-weight:500;color:var(--gray-700);font-size:.9375rem">Reminders</span>
+        <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+      </button>
+      <button class="flex items-center gap-3 w-full" style="padding:16px;text-align:left" onclick="showToast('Emergency card coming soon!')">
+        <div class="icon-circle" style="background:var(--red-50);width:40px;height:40px"><svg width="18" height="18" fill="none" stroke="var(--red-500)" stroke-width="2"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg></div>
+        <span style="flex:1;font-weight:500;color:var(--gray-700);font-size:.9375rem">Emergency Health Card</span>
+        <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+      </button>
+    </div>
+
+    <div class="section-title">Preferences</div>
+    <div class="card mb-6" style="padding:0;overflow:hidden">
+      <div class="flex items-center gap-3 w-full" style="padding:16px;border-bottom:1px solid var(--gray-100)">
+        <div class="icon-circle" style="background:var(--indigo-50);width:40px;height:40px"><svg width="18" height="18" fill="none" stroke="var(--indigo-500)" stroke-width="2"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></div>
+        <span style="flex:1;font-weight:500;color:var(--gray-700);font-size:.9375rem">AI Auto-extraction</span>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="flex items-center gap-3 w-full" style="padding:16px;border-bottom:1px solid var(--gray-100)">
+        <div class="icon-circle" style="background:var(--gray-100);width:40px;height:40px"><svg width="18" height="18" fill="none" stroke="var(--gray-600)" stroke-width="2"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg></div>
+        <span style="flex:1;font-weight:500;color:var(--gray-700);font-size:.9375rem">Dark Mode</span>
+        <div class="toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="flex items-center gap-3 w-full" style="padding:16px">
+        <div class="icon-circle" style="background:var(--green-50);width:40px;height:40px"><svg width="18" height="18" fill="none" stroke="var(--green-600)" stroke-width="2"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg></div>
+        <span style="flex:1;font-weight:500;color:var(--gray-700);font-size:.9375rem">Notifications</span>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+
+    <div class="section-title">Privacy & Security</div>
+    <div class="card mb-6" style="padding:0;overflow:hidden">
+      <button class="flex items-center gap-3 w-full" style="padding:16px;border-bottom:1px solid var(--gray-100);text-align:left" onclick="showToast('Privacy settings coming soon!')">
+        <div class="icon-circle" style="background:var(--green-50);width:40px;height:40px"><svg width="18" height="18" fill="none" stroke="var(--green-600)" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg></div>
+        <div style="flex:1;text-align:left"><div style="font-weight:500;color:var(--gray-700);font-size:.9375rem">Privacy & Security</div><div style="font-size:.6875rem;color:var(--green-600);font-weight:500;display:flex;align-items:center;gap:4px"><span class="status-dot" style="background:var(--green-500)"></span> End-to-end encrypted</div></div>
+        <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+      </button>
+      <button class="flex items-center gap-3 w-full" style="padding:16px;text-align:left" onclick="showToast('Export coming soon!')">
+        <div class="icon-circle" style="background:var(--amber-50);width:40px;height:40px"><svg width="18" height="18" fill="none" stroke="var(--amber-500)" stroke-width="2"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+        <span style="flex:1;font-weight:500;color:var(--gray-700);font-size:.9375rem;text-align:left">Export My Data</span>
+        <svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+      </button>
+    </div>
+
+    <div class="section-title">About</div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="flex items-center gap-3 w-full" style="padding:16px;border-bottom:1px solid var(--gray-100)"><span style="flex:1;font-weight:500;color:var(--gray-700);font-size:.9375rem">App Version</span><span style="font-size:.8125rem;color:var(--gray-400)">1.0.0 (MVP)</span></div>
+      <button class="flex items-center gap-3 w-full" style="padding:16px;border-bottom:1px solid var(--gray-100);text-align:left"><span style="flex:1;font-weight:500;color:var(--gray-700);font-size:.9375rem;text-align:left">Help & Support</span><svg width="16" height="16" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg></button>
+      <button class="flex items-center gap-3 w-full" style="padding:16px;text-align:left"><span style="flex:1;font-weight:500;color:var(--red-500);font-size:.9375rem;text-align:left">Log Out</span></button>
+    </div>
+    <div style="text-align:center;padding:24px 0 40px"><p style="font-size:.75rem;color:var(--gray-300)">Made with care for your health</p><p style="font-size:.6875rem;color:var(--gray-300);margin-top:4px">MediVault v1.0.0</p></div>
+  </div>
+  <nav class="bottom-nav">
+    <button class="nav-item" onclick="navigateTo('screen-dashboard')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Home</button>
+    <button class="nav-item" onclick="navigateTo('screen-reports')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Reports</button>
+    <button class="fab" onclick="navigateTo('screen-upload')"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg></button>
+    <button class="nav-item" onclick="navigateTo('screen-analytics')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Analytics</button>
+    <button class="nav-item active" onclick="navigateTo('screen-settings')"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>More</button>
+  </nav>
+</div>
+
+<!-- MODALS -->
+<div id="modal-edit" style="display:none"><div class="modal-overlay" onclick="closeModal('modal-edit')"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><h3 style="font-weight:700;font-size:1.125rem;color:var(--gray-900);margin-bottom:16px" id="edit-modal-title">Edit Value</h3><div class="mb-4"><label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px" id="edit-modal-label">Value</label><input type="text" id="edit-modal-input"></div><div class="flex gap-3"><button class="btn btn-ghost" onclick="closeModal('modal-edit')" style="flex:1">Cancel</button><button class="btn btn-primary" onclick="saveEditedValue()" style="flex:1">Save</button></div></div></div></div>
+
+<div id="modal-success" style="display:none"><div class="modal-overlay"><div class="modal-sheet" style="text-align:center;padding-top:40px"><div style="width:80px;height:80px;margin:0 auto 24px;background:var(--green-50);border-radius:50%;display:flex;align-items:center;justify-content:center;animation:bounceIn .5s ease"><svg width="40" height="40" fill="none" stroke="var(--green-500)" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg></div><h2 style="font-size:1.25rem;font-weight:700;color:var(--gray-900);margin-bottom:8px">Report Saved Successfully!</h2><p style="color:var(--gray-500);font-size:.875rem;margin-bottom:8px">Your report has been safely stored and organized.</p><div class="flex items-center justify-center gap-2 mb-6"><svg width="14" height="14" fill="none" stroke="var(--green-500)" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg><span style="font-size:.75rem;color:var(--green-600);font-weight:500">Encrypted & secured</span></div><button class="btn btn-primary mb-3" onclick="closeModal('modal-success');navigateTo('screen-report-detail')">View Report</button><button class="btn btn-secondary mb-3" onclick="closeModal('modal-success');navigateTo('screen-upload')">Upload Another</button><button class="btn btn-ghost" onclick="closeModal('modal-success');navigateTo('screen-dashboard')">Go to Home</button></div></div></div>
+
+<div id="modal-share-success" style="display:none"><div class="modal-overlay"><div class="modal-sheet" style="text-align:center;padding-top:40px"><div style="width:80px;height:80px;margin:0 auto 24px;background:var(--teal-50);border-radius:50%;display:flex;align-items:center;justify-content:center;animation:bounceIn .5s ease"><svg width="36" height="36" fill="none" stroke="var(--teal-600)" stroke-width="2"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg></div><h2 style="font-size:1.25rem;font-weight:700;color:var(--gray-900);margin-bottom:8px">Secure Link Created!</h2><p style="color:var(--gray-500);font-size:.875rem;margin-bottom:16px">Link expires in 7 days</p><div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius);padding:12px 16px;margin-bottom:24px;word-break:break-all"><code style="font-size:.8125rem;color:var(--gray-600)">https://medivault.app/s/xK9mP2q...</code></div><button class="btn btn-primary mb-3" onclick="closeModal('modal-share-success');showToast('Link copied to clipboard!')">Copy Link</button><button class="btn btn-ghost" onclick="closeModal('modal-share-success')">Done</button></div></div></div>
+
+<div id="modal-add-family" style="display:none"><div class="modal-overlay" onclick="closeModal('modal-add-family')"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><h3 style="font-weight:700;font-size:1.125rem;color:var(--gray-900);margin-bottom:20px">Add Family Member</h3><div class="flex flex-col gap-4"><div><label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px">Full Name *</label><input type="text" placeholder="Enter name"></div><div class="grid-2"><div><label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px">Age *</label><input type="number" placeholder="Age"></div><div><label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px">Relation</label><select><option>Spouse</option><option>Parent</option><option>Child</option><option>Sibling</option></select></div></div><div class="grid-2"><div><label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px">Gender</label><select><option>Male</option><option>Female</option><option>Other</option></select></div><div><label style="font-size:.875rem;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px">Blood Group</label><select><option value="">Select</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option></select></div></div></div><button class="btn btn-primary mt-6" onclick="closeModal('modal-add-family');showToast('Family member added!')">Add Member</button><button class="btn btn-ghost mt-3" onclick="closeModal('modal-add-family')">Cancel</button></div></div></div>
+
+<script>
+let currentScreen = 'screen-welcome';
+
+function navigateTo(screenId) {
+  if (screenId === 'screen-ai-processing') { showScreen(screenId); runAIProcessing(); return; }
+  showScreen(screenId);
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const t = document.getElementById(id);
+  if (t) { t.classList.add('active'); t.scrollTop = 0; currentScreen = id; window.scrollTo(0, 0); }
+}
+
+let currentSlide = 0;
+function nextSlide() {
+  if (currentSlide < 2) { currentSlide++; updateCarousel(); } else { navigateTo('screen-login'); }
+}
+function updateCarousel() {
+  document.querySelectorAll('.carousel-slide').forEach(s => s.style.display = 'none');
+  document.querySelectorAll('.dot').forEach(d => { d.style.background = 'var(--gray-300)'; d.style.width = '8px'; });
+  const s = document.querySelector(`.carousel-slide[data-slide="${currentSlide}"]`);
+  const d = document.querySelector(`.dot[data-dot="${currentSlide}"]`);
+  if (s) s.style.display = 'block';
+  if (d) { d.style.background = 'var(--teal-500)'; d.style.width = '24px'; }
+  const b = document.querySelector('#screen-welcome .btn-primary');
+  if (b) b.textContent = currentSlide === 2 ? 'Get Started' : 'Next';
+}
+
+function runAIProcessing() {
+  let progress = 0;
+  const bar = document.getElementById('ai-progress');
+  const pct = document.getElementById('ai-percent');
+  const txt = document.getElementById('ai-status-text');
+  const steps = [{ at: 30, step: 1, text: 'Extracting text...' },{ at: 60, step: 2, text: 'Finding medical values...' },{ at: 88, step: 3, text: 'Organizing data...' }];
+  const iv = setInterval(() => {
+    progress += Math.random() * 3 + 1;
+    if (progress > 100) progress = 100;
+    bar.style.width = progress + '%';
+    pct.textContent = Math.round(progress) + '%';
+    steps.forEach(s => {
+      if (progress >= s.at) {
+        const el = document.querySelector(`.ai-step[data-step="${s.step}"]`);
+        if (el && !el.classList.contains('done')) {
+          el.classList.add('done');
+          const c = el.querySelector('.step-circle');
+          if(c){c.style.background='var(--teal-500)';c.style.border='none';c.style.animation='none';c.innerHTML='<svg width="14" height="14" fill="white" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>';}
+          const sp = el.querySelector('span');
+          if(sp){sp.style.color='var(--gray-700)';sp.style.fontWeight='400';}
+        }
+        txt.textContent = s.text;
+      }
+    });
+    if (progress >= 100) { clearInterval(iv); txt.textContent = 'Done!'; setTimeout(() => navigateTo('screen-review'), 600); }
+  }, 80);
+}
+
+let editingValueId = null;
+function editValue(id, label, value) {
+  editingValueId = id;
+  document.getElementById('edit-modal-title').textContent = 'Edit ' + label;
+  document.getElementById('edit-modal-label').textContent = label;
+  document.getElementById('edit-modal-input').value = value;
+  showModal('modal-edit');
+}
+function saveEditedValue() {
+  const v = document.getElementById('edit-modal-input').value;
+  if (editingValueId) document.getElementById(editingValueId).textContent = v;
+  closeModal('modal-edit');
+  showToast('Value updated!');
+}
+
+function saveReport() { showModal('modal-success'); }
+function showModal(id) { document.getElementById(id).style.display = 'block'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function selectChipGroup(el) {
+  el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleShareItem(el) {
+  const c = el.querySelector('.share-check');
+  if (el.style.borderColor === 'var(--teal-200)') {
+    el.style.borderColor = 'var(--gray-200)'; el.style.background = 'var(--white)';
+    c.style.background = ''; c.style.border = '2px solid var(--gray-300)'; c.innerHTML = '';
+  } else {
+    el.style.borderColor = 'var(--teal-200)'; el.style.background = 'var(--teal-50)';
+    c.style.background = 'var(--teal-500)'; c.style.border = 'none';
+    c.innerHTML = '<svg width="14" height="14" fill="white" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>';
+  }
+}
+
+function showToast(msg) {
+  const e = document.querySelector('.toast');
+  if (e) e.remove();
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+document.querySelectorAll('.otp-input').forEach((inp, i, arr) => {
+  inp.addEventListener('input', () => { if (inp.value.length === 1 && i < arr.length - 1) arr[i + 1].focus(); });
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Backspace' && !inp.value && i > 0) arr[i - 1].focus(); });
+});
+</script>
+</body>
+</html>
