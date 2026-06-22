@@ -9,12 +9,16 @@ class Settings(BaseSettings):
     # Database — falls back to local SQLite when DATABASE_URL is empty.
     database_url: str = ""
 
-    # JWT
+    # Supabase JWT secret (Project Settings → API → JWT Secret in Supabase dashboard).
+    # When set, Supabase-issued tokens are verified instead of our own JWTs.
+    supabase_jwt_secret: str = ""
+
+    # Our own JWT (used as fallback when supabase_jwt_secret is empty — dev only).
     jwt_secret_key: str = "change-me-to-a-long-random-secret-string"
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 10080  # 7 days
 
-    # OTP
+    # OTP fallback (dev only — used when Supabase is not configured).
     otp_mode: str = "dev"  # dev | prod
     otp_dev_code: str = "123456"
 
@@ -29,7 +33,6 @@ class Settings(BaseSettings):
         url = self.database_url.strip()
         if not url:
             return "sqlite:///./medivault.db"
-        # Railway/Heroku style postgres:// -> postgresql://
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql://", 1)
         return url
@@ -39,6 +42,10 @@ class Settings(BaseSettings):
         if self.cors_origins.strip() == "*":
             return ["*"]
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def using_supabase(self) -> bool:
+        return bool(self.supabase_jwt_secret.strip())
 
 
 @lru_cache

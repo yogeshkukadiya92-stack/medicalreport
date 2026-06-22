@@ -1,36 +1,44 @@
-// Auth API Service — talks to the MediVault backend.
-import type { LoginResponse } from '@/lib/types';
-import apiClient, { setAccessToken, clearAccessToken } from '@/lib/api-client';
+// Auth API Service — uses Supabase for OTP + session management.
+// The Supabase access token is automatically forwarded to the backend
+// via the onAuthStateChange listener in supabase.ts.
+import { supabase } from '@/lib/supabase';
+import { clearAccessToken } from '@/lib/api-client';
 
 export const authAPI = {
-  // Send OTP to phone. In dev mode the backend returns `dev_otp`.
+  // Step 1: Send OTP to phone via Supabase.
+  // Requires Phone Auth enabled in Supabase dashboard + SMS provider.
   async sendOTP(phone: string) {
-    const res = await apiClient.post('/auth/otp/send', { phone });
-    return res.data; // { success, data: { phone, otp_expiry_seconds, is_new_user, dev_otp? } }
+    const { error } = await supabase.auth.signInWithOtp({ phone });
+    if (error) throw error;
+    return { success: true };
   },
 
-  // Verify OTP, store the access token, and return login state.
-  async verifyOTP(phone: string, otp: string): Promise<LoginResponse> {
-    const res = await apiClient.post('/auth/otp/verify', { phone, otp });
-    const data = res.data.data as LoginResponse;
-    if (data.access_token) {
-      setAccessToken(data.access_token);
-    }
-    return data;
+  // Step 2: Verify OTP — Supabase returns a session with access_token.
+  async verifyOTP(phone: string, otp: string) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone,
+      token: otp,
+      type: 'sms',
+    });
+    if (error) throw error;
+    return data; // { user, session }
   },
 
-  // Get the currently authenticated user.
-  async me() {
-    const res = await apiClient.get('/auth/me');
-    return res.data.data;
+  // Get current Supabase session.
+  async getSession() {
+    const { data } = await supabase.auth.getSession();
+    return data.session;
   },
 
-  // Logout — revoke server-side (best effort) and clear local token.
+  // Get current user from Supabase.
+  async getUser() {
+    const { data } = await supabase.auth.getUser();
+    return data.user;
+  },
+
+  // Logout from Supabase and clear local token.
   async logout(): Promise<void> {
-    try {
-      await apiClient.post('/auth/logout', {});
-    } finally {
-      clearAccessToken();
-    }
+    await supabase.auth.signOut();
+    clearAccessToken();
   },
 };
