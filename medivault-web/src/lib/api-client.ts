@@ -1,14 +1,21 @@
-// API Client Setup
-// For MVP: uses dummy data. Replace with real axios calls when backend is ready.
-
+// API Client — axios instance configured for the MediVault backend.
 import axios, { AxiosInstance } from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
+const TOKEN_KEY = 'medivault_access_token';
 
 let accessToken: string | null = null;
 
+// Restore token from localStorage on load (browser only).
+if (typeof window !== 'undefined') {
+  accessToken = window.localStorage.getItem(TOKEN_KEY);
+}
+
 export function setAccessToken(token: string) {
   accessToken = token;
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(TOKEN_KEY, token);
+  }
 }
 
 export function getAccessToken(): string | null {
@@ -17,9 +24,11 @@ export function getAccessToken(): string | null {
 
 export function clearAccessToken() {
   accessToken = null;
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(TOKEN_KEY);
+  }
 }
 
-// Create axios instance (for future real API calls)
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_URL,
   timeout: 30000,
@@ -28,7 +37,6 @@ export const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor
 apiClient.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
@@ -36,13 +44,15 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       clearAccessToken();
-      // Redirect to login in real implementation
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+        // Send the user back to the landing/login screen on auth failure.
+        window.location.href = '/';
+      }
     }
     return Promise.reject(error);
   }

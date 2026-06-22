@@ -1,54 +1,36 @@
-// Auth API Service
-// MVP: Returns dummy data. Replace fetch calls with apiClient when backend is ready.
-
-import type { LoginResponse, User } from '@/lib/types';
-import { dummyUser } from '@/data/dummy';
+// Auth API Service — talks to the MediVault backend.
+import type { LoginResponse } from '@/lib/types';
+import apiClient, { setAccessToken, clearAccessToken } from '@/lib/api-client';
 
 export const authAPI = {
-  // Send OTP to phone
+  // Send OTP to phone. In dev mode the backend returns `dev_otp`.
   async sendOTP(phone: string) {
-    // TODO: Replace with real API call
-    // return apiClient.post('/auth/otp/send', { phone });
-
-    return Promise.resolve({
-      data: {
-        phone,
-        otp_expiry_seconds: 300,
-        is_new_user: true,
-      },
-    });
+    const res = await apiClient.post('/auth/otp/send', { phone });
+    return res.data; // { success, data: { phone, otp_expiry_seconds, is_new_user, dev_otp? } }
   },
 
-  // Verify OTP and login
+  // Verify OTP, store the access token, and return login state.
   async verifyOTP(phone: string, otp: string): Promise<LoginResponse> {
-    // TODO: Replace with real API call
-    // const response = await apiClient.post('/auth/otp/verify', { phone, otp });
-    // return response.data.data;
-
-    // Dummy implementation
-    return {
-      access_token: `token_${Date.now()}`,
-      user: dummyUser,
-      is_new_user: false,
-      has_profile: true,
-      has_consent: true,
-    };
+    const res = await apiClient.post('/auth/otp/verify', { phone, otp });
+    const data = res.data.data as LoginResponse;
+    if (data.access_token) {
+      setAccessToken(data.access_token);
+    }
+    return data;
   },
 
-  // Refresh access token
-  async refreshToken(refreshToken: string): Promise<string> {
-    // TODO: Replace with real API call
-    // const response = await apiClient.post('/auth/token/refresh', { refresh_token: refreshToken });
-    // return response.data.data.access_token;
-
-    return `token_${Date.now()}`;
+  // Get the currently authenticated user.
+  async me() {
+    const res = await apiClient.get('/auth/me');
+    return res.data.data;
   },
 
-  // Logout
-  async logout(refreshToken: string): Promise<void> {
-    // TODO: Replace with real API call
-    // await apiClient.post('/auth/logout', { refresh_token: refreshToken });
-
-    return Promise.resolve();
+  // Logout — revoke server-side (best effort) and clear local token.
+  async logout(): Promise<void> {
+    try {
+      await apiClient.post('/auth/logout', {});
+    } finally {
+      clearAccessToken();
+    }
   },
 };
