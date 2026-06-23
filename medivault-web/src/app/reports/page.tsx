@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import BottomNav from '@/components/BottomNav';
+import UploadSheet from '@/components/UploadSheet';
 
 const filters = ['All', 'Blood', 'Thyroid', 'Lipid', 'Scan', 'Prescription'];
 
@@ -61,6 +62,7 @@ const reports = [
 export default function Reports() {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const filtered = reports.filter((r) => {
     const matchesSearch =
@@ -190,12 +192,13 @@ export default function Reports() {
       </div>
 
       {/* FAB */}
-      <button className="fixed bottom-20 right-4 w-14 h-14 bg-teal-600 rounded-full shadow-lg flex items-center justify-center z-30">
+      <button onClick={() => setUploadOpen(true)} className="fixed bottom-20 right-4 w-14 h-14 bg-teal-600 rounded-full shadow-lg flex items-center justify-center z-30">
         <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
         </svg>
       </button>
 
+      <UploadSheet open={uploadOpen} onClose={() => setUploadOpen(false)} />
       <BottomNav />
     </main>
   );

@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import BottomNav from '@/components/BottomNav';
 import { getStatusCfg } from '@/components/StatusBadge';
+import UploadSheet from '@/components/UploadSheet';
 
 const snapshot = [
   { name: 'Fasting Sugar', value: '142', unit: 'mg/dL', status: 'high',       trend: '▲' },
@@ -47,6 +49,7 @@ function getGreeting() {
 
 export default function Dashboard() {
   const greeting = getGreeting();
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   return (
     <main className="min-h-screen bg-gray-50 pb-20">
@@ -129,7 +132,7 @@ export default function Dashboard() {
             </svg>
             <span className="text-xs font-medium text-gray-700">Reports</span>
           </Link>
-          <button className="bg-teal-600 rounded-xl p-3 flex flex-col items-center gap-1.5 shadow-md">
+          <button onClick={() => setUploadOpen(true)} className="bg-teal-600 rounded-xl p-3 flex flex-col items-center gap-1.5 shadow-md">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
@@ -192,12 +195,13 @@ export default function Dashboard() {
       </div>
 
       {/* FAB */}
-      <button className="fixed bottom-20 right-4 w-14 h-14 bg-teal-600 rounded-full shadow-lg flex items-center justify-center z-30">
+      <button onClick={() => setUploadOpen(true)} className="fixed bottom-20 right-4 w-14 h-14 bg-teal-600 rounded-full shadow-lg flex items-center justify-center z-30">
         <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
         </svg>
       </button>
 
+      <UploadSheet open={uploadOpen} onClose={() => setUploadOpen(false)} />
       <BottomNav />
     </main>
   );
