@@ -12,7 +12,13 @@ export const authAPI = {
   },
 
   async signUp(email: string, password: string) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const emailRedirectTo =
+      typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : undefined;
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo },
+    });
     if (error) throw error;
     return data;
   },
