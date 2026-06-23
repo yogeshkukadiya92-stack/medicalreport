@@ -49,9 +49,8 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       clearAccessToken();
-      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-        // Send the user back to the landing/login screen on auth failure.
-        window.location.href = '/';
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login';
       }
     }
     return Promise.reject(error);

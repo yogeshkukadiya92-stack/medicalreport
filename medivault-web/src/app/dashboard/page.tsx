@@ -7,6 +7,7 @@ import { getStatusCfg } from '@/components/StatusBadge';
 import UploadSheet from '@/components/UploadSheet';
 import { reportsAPI } from '@/lib/api/reports';
 import { profileAPI } from '@/lib/api/profile';
+import { useRequireAuth } from '@/lib/hooks/useRequireAuth';
 import type { HealthSummary, Profile } from '@/lib/types';
 
 function greeting() {
@@ -33,6 +34,7 @@ function reportIcon(type?: string) {
 }
 
 export default function Dashboard() {
+  useRequireAuth();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [summary, setSummary] = useState<HealthSummary | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);

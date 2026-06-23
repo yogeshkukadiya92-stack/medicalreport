@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import BottomNav from '@/components/BottomNav';
 import UploadSheet from '@/components/UploadSheet';
 import { reportsAPI } from '@/lib/api/reports';
+import { useRequireAuth } from '@/lib/hooks/useRequireAuth';
 import type { MedicalReport } from '@/lib/types';
 
 const FILTER_TYPES = ['All', 'Blood Test', 'Thyroid', 'Lipid', 'Urine', 'X-Ray', 'Prescription', 'Other'];
@@ -30,6 +31,7 @@ function monthKey(d?: string) {
 }
 
 export default function Reports() {
+  useRequireAuth();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
   const [uploadOpen, setUploadOpen] = useState(false);

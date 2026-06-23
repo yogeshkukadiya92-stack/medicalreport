@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import BottomNav from '@/components/BottomNav';
 import { getStatusCfg } from '@/components/StatusBadge';
 import { reportsAPI } from '@/lib/api/reports';
+import { useRequireAuth } from '@/lib/hooks/useRequireAuth';
 import type { HealthSummary, ExtractedValue } from '@/lib/types';
 
 const TIME_RANGES = ['3M', '6M', '1Y', 'All'];
@@ -32,6 +33,7 @@ function scoreColor(s: number) {
 }
 
 export default function Analytics() {
+  useRequireAuth();
   const [range, setRange] = useState('3M');
   const [summary, setSummary] = useState<HealthSummary | null>(null);
   const [loading, setLoading] = useState(true);

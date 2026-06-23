@@ -55,7 +55,14 @@ export default function LoginPage() {
       await authAPI.signIn(email.trim(), password);
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err?.message ?? 'Sign in failed. Check your email and password.');
+      const msg: string = err?.message ?? '';
+      if (msg.toLowerCase().includes('email not confirmed')) {
+        setError('Please confirm your email first. Check your inbox for the verification link.');
+      } else if (msg.toLowerCase().includes('invalid login credentials')) {
+        setError('Incorrect email or password.');
+      } else {
+        setError(msg || 'Sign in failed. Please try again.');
+      }
     } finally {
       setBusy(false);
     }
