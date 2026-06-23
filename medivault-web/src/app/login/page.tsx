@@ -2,9 +2,10 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/api/auth';
+import { supabase } from '@/lib/supabase';
 
 type View = 'signin' | 'signup' | 'forgot' | 'forgot-sent' | 'verify-email';
 
@@ -32,6 +33,13 @@ export default function LoginPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Redirect already-authenticated users straight to dashboard.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) router.replace('/dashboard');
+    });
+  }, [router]);
 
   function resetForm() {
     setEmail('');

@@ -1,11 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import BottomNav from '@/components/BottomNav';
 import { getStatusCfg } from '@/components/StatusBadge';
 import { reportsAPI } from '@/lib/api/reports';
 import { useRequireAuth } from '@/lib/hooks/useRequireAuth';
 import type { HealthSummary, ExtractedValue } from '@/lib/types';
+
+function Spinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 
 const TIME_RANGES = ['3M', '6M', '1Y', 'All'];
 
@@ -33,13 +41,13 @@ function scoreColor(s: number) {
 }
 
 export default function Analytics() {
-  useRequireAuth();
+  const authChecking = useRequireAuth();
   const [range, setRange] = useState('3M');
   const [summary, setSummary] = useState<HealthSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -50,9 +58,13 @@ export default function Analytics() {
     } finally {
       setLoading(false);
     }
-  }
+  });
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!authChecking) load();
+  }, [authChecking, load]);
+
+  if (authChecking) return <Spinner />;
 
   const items = summary?.attention_items ?? [];
   const score = calcScore(items);

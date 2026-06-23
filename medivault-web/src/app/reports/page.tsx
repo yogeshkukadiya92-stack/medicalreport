@@ -7,6 +7,14 @@ import { reportsAPI } from '@/lib/api/reports';
 import { useRequireAuth } from '@/lib/hooks/useRequireAuth';
 import type { MedicalReport } from '@/lib/types';
 
+function Spinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
 const FILTER_TYPES = ['All', 'Blood Test', 'Thyroid', 'Lipid', 'Urine', 'X-Ray', 'Prescription', 'Other'];
 
 function reportIcon(type?: string) {
@@ -31,7 +39,7 @@ function monthKey(d?: string) {
 }
 
 export default function Reports() {
-  useRequireAuth();
+  const authChecking = useRequireAuth();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -52,7 +60,11 @@ export default function Reports() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!authChecking) load();
+  }, [authChecking, load]);
+
+  if (authChecking) return <Spinner />;
 
   const visible = reports.filter((r) => {
     const q = search.toLowerCase();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import BottomNav from '@/components/BottomNav';
 import { getStatusCfg } from '@/components/StatusBadge';
@@ -33,15 +33,23 @@ function reportIcon(type?: string) {
   return '📄';
 }
 
+function Spinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
 export default function Dashboard() {
-  useRequireAuth();
+  const authChecking = useRequireAuth();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [summary, setSummary] = useState<HealthSummary | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  async function load() {
+  const load = useCallback(async () => {
     setError('');
     try {
       const [s, p] = await Promise.all([
@@ -51,13 +59,17 @@ export default function Dashboard() {
       setSummary(s);
       setProfile(p);
     } catch (e: any) {
-      setError(e?.response?.data?.error?.message || 'Could not load data. Pull down to retry.');
+      setError(e?.response?.data?.error?.message || 'Could not load data.');
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!authChecking) load();
+  }, [authChecking, load]);
+
+  if (authChecking) return <Spinner />;
 
   const firstName = profile?.full_name?.split(' ')[0] || 'there';
   const initials = profile?.full_name
@@ -79,7 +91,6 @@ export default function Dashboard() {
           </span>
         </div>
         <div className="flex items-center gap-4">
-          {/* Notification icon — placeholder until notifications are built */}
           <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -88,13 +99,10 @@ export default function Dashboard() {
       </div>
 
       <div className="px-4 pt-4 space-y-5">
-        {/* Error banner */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between">
             <p className="text-sm text-red-700">{error}</p>
-            <button onClick={load} className="text-xs font-semibold text-red-700 underline ml-3 flex-shrink-0">
-              Retry
-            </button>
+            <button onClick={load} className="text-xs font-semibold text-red-700 underline ml-3 flex-shrink-0">Retry</button>
           </div>
         )}
 
@@ -138,7 +146,6 @@ export default function Dashboard() {
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Health Snapshot</h2>
             <Link href="/analytics" className="text-xs text-teal-600 font-medium">See all →</Link>
           </div>
-
           {loading ? (
             <div className="grid grid-cols-2 gap-3">
               {[...Array(4)].map((_, i) => (
@@ -196,7 +203,6 @@ export default function Dashboard() {
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent Reports</h2>
             <Link href="/reports" className="text-xs text-teal-600 font-medium">See all →</Link>
           </div>
-
           {loading ? (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-50">
               {[...Array(3)].map((_, i) => (
@@ -251,7 +257,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* FAB */}
       <button
         onClick={() => setUploadOpen(true)}
         className="fixed bottom-20 right-4 w-14 h-14 bg-teal-600 rounded-full shadow-lg flex items-center justify-center z-30"
