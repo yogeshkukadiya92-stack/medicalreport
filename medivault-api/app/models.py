@@ -36,7 +36,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String(36), primary_key=True, default=gen_uuid)
-    phone = Column(String(15), unique=True, nullable=False, index=True)
+    phone = Column(String(255), unique=True, nullable=True, index=True)
     email = Column(String(255), unique=True, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     role = Column(String(20), nullable=False, default="user")

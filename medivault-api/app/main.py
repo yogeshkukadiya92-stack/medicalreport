@@ -1,10 +1,12 @@
 """MediVault API — FastAPI application entrypoint."""
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import settings
@@ -14,13 +16,42 @@ from .routers import auth, consents, family, files, profile, reports
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("medivault")
 
-# Create tables on startup (simple bootstrap; use Alembic for real migrations).
-Base.metadata.create_all(bind=engine)
+
+def _run_migrations():
+    """Idempotent schema migrations that create_all cannot handle."""
+    is_sqlite = settings.sqlalchemy_url.startswith("sqlite")
+    with engine.begin() as conn:
+        if is_sqlite:
+            # SQLite does not enforce VARCHAR lengths; nothing to do.
+            return
+        # Widen phone column from VARCHAR(15) → VARCHAR(255) and make nullable
+        # so that Supabase email-auth users can be auto-created.
+        conn.execute(text(
+            "DO $$ BEGIN "
+            "ALTER TABLE users ALTER COLUMN phone TYPE VARCHAR(255); "
+            "EXCEPTION WHEN OTHERS THEN NULL; END $$;"
+        ))
+        conn.execute(text(
+            "DO $$ BEGIN "
+            "ALTER TABLE users ALTER COLUMN phone DROP NOT NULL; "
+            "EXCEPTION WHEN OTHERS THEN NULL; END $$;"
+        ))
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    try:
+        _run_migrations()
+    except Exception as exc:
+        logger.warning("Migration step failed (non-fatal): %s", exc)
+    yield
 
 app = FastAPI(
     title="MediVault API",
     description="Medical report storage backend — auth, profiles, family, reports.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

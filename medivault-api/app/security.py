@@ -91,8 +91,9 @@ def get_current_user(
 
     if user is None:
         # Auto-create on first authenticated request (Supabase user sync).
-        phone = payload.get("phone") or payload.get("email") or ""
-        user = User(id=user_id, phone=phone, last_login_at=datetime.utcnow())
+        phone = payload.get("phone") or None
+        email = payload.get("email") or None
+        user = User(id=user_id, phone=phone, email=email, last_login_at=datetime.utcnow())
         db.add(user)
         try:
             db.commit()
