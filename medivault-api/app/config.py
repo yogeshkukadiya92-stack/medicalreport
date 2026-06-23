@@ -9,7 +9,11 @@ class Settings(BaseSettings):
     # Database — falls back to local SQLite when DATABASE_URL is empty.
     database_url: str = ""
 
-    # Supabase JWT secret (Project Settings → API → JWT Secret in Supabase dashboard).
+    # Supabase project URL (e.g. https://xxxx.supabase.co).
+    # Required for JWKS-based JWT verification (new JWT Signing Keys).
+    supabase_url: str = ""
+
+    # Supabase JWT secret — legacy HS256 secret from Project Settings → API.
     # When set, Supabase-issued tokens are verified instead of our own JWTs.
     supabase_jwt_secret: str = ""
 

@@ -23,6 +23,7 @@ def config_status():
     return {
         "supabase_jwt_configured": settings.using_supabase,
         "supabase_jwt_secret_length": len(secret),
+        "supabase_url_configured": bool(settings.supabase_url.strip()),
         "database_configured": not settings.sqlalchemy_url.startswith("sqlite"),
         "environment": settings.environment,
     }
