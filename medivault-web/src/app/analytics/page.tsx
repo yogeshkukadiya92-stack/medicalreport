@@ -1,54 +1,87 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import BottomNav from '@/components/BottomNav';
 import { getStatusCfg } from '@/components/StatusBadge';
+import { reportsAPI } from '@/lib/api/reports';
+import type { HealthSummary, ExtractedValue } from '@/lib/types';
 
-const timeRanges = ['3M', '6M', '1Y', 'All'];
+const TIME_RANGES = ['3M', '6M', '1Y', 'All'];
 
-const parameters = [
-  { name: 'HbA1c',           value: '7.1',  unit: '%',     status: 'critical',   trend: '▲', change: '+0.3', insight: 'Increasing trend — consult your doctor.' },
-  { name: 'Fasting Sugar',   value: '142',  unit: 'mg/dL', status: 'high',       trend: '▲', change: '+12',  insight: 'Elevated. Monitor daily glucose levels.' },
-  { name: 'Total Cholesterol',value: '225', unit: 'mg/dL', status: 'borderline', trend: '→', change: '+5',   insight: 'Borderline. Reduce saturated fats.' },
-  { name: 'Vitamin D',       value: '18',   unit: 'ng/mL', status: 'low',        trend: '↓', change: '-2',   insight: 'Low. Consider supplementation.' },
-  { name: 'Hemoglobin',      value: '14.2', unit: 'g/dL',  status: 'normal',     trend: '→', change: '0.0',  insight: 'Within normal range.' },
-  { name: 'TSH',             value: '2.1',  unit: 'mIU/L', status: 'normal',     trend: '→', change: '-0.1', insight: 'Thyroid levels are stable.' },
-];
+function calcScore(items: ExtractedValue[]): number {
+  let score = 100;
+  for (const v of items) {
+    if (v.status === 'critical') score -= 15;
+    else if (v.status === 'high' || v.status === 'low') score -= 8;
+    else if (v.status === 'borderline') score -= 4;
+  }
+  return Math.max(0, score);
+}
 
-const score = 72;
+function scoreLabel(s: number) {
+  if (s >= 80) return 'Good';
+  if (s >= 60) return 'Fair';
+  if (s >= 40) return 'Poor';
+  return 'Critical';
+}
+
+function scoreColor(s: number) {
+  if (s >= 80) return '#10b981';
+  if (s >= 60) return '#f59e0b';
+  return '#ef4444';
+}
 
 export default function Analytics() {
   const [range, setRange] = useState('3M');
+  const [summary, setSummary] = useState<HealthSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  async function load() {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await reportsAPI.getHealthSummary();
+      setSummary(data);
+    } catch (e: any) {
+      setError(e?.response?.data?.error?.message || 'Could not load analytics.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  const items = summary?.attention_items ?? [];
+  const score = calcScore(items);
   const circumference = 2 * Math.PI * 38;
   const filled = (score / 100) * circumference;
-
-  const scoreColor = score >= 80 ? '#10b981' : score >= 60 ? '#f59e0b' : '#ef4444';
-  const scoreLabel = score >= 80 ? 'Good' : score >= 60 ? 'Fair' : 'Poor';
+  const color = scoreColor(score);
 
   return (
     <main className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
       <div className="sticky top-0 z-30 bg-white border-b border-gray-100 px-4 h-14 flex items-center justify-between">
         <h1 className="text-lg font-bold text-gray-900">Analytics</h1>
-        <button className="text-sm text-teal-600 font-medium flex items-center gap-1">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Export
-        </button>
       </div>
 
       <div className="px-4 pt-4 space-y-5">
+        {/* Error */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between">
+            <p className="text-sm text-red-700">{error}</p>
+            <button onClick={load} className="text-xs font-semibold text-red-700 underline ml-3 flex-shrink-0">Retry</button>
+          </div>
+        )}
+
         {/* Time range chips */}
         <div className="flex gap-2">
-          {timeRanges.map((r) => (
+          {TIME_RANGES.map((r) => (
             <button
               key={r}
               onClick={() => setRange(r)}
               className={`flex-1 py-1.5 rounded-full text-xs font-semibold transition ${
-                range === r
-                  ? 'bg-teal-600 text-white'
-                  : 'bg-gray-100 text-gray-600'
+                range === r ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600'
               }`}
             >
               {r}
@@ -57,63 +90,90 @@ export default function Analytics() {
         </div>
 
         {/* Health Score */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-5">
-          <svg width="90" height="90" viewBox="0 0 90 90" className="flex-shrink-0 -rotate-90">
-            <circle cx="45" cy="45" r="38" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-            <circle
-              cx="45" cy="45" r="38"
-              fill="none"
-              stroke={scoreColor}
-              strokeWidth="8"
-              strokeDasharray={`${filled} ${circumference}`}
-              strokeLinecap="round"
-            />
-          </svg>
-          <div className="flex-1">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Health Score</p>
-            <p className="text-4xl font-bold text-gray-900 mt-0.5">{score}</p>
-            <p className="text-sm font-medium mt-0.5" style={{ color: scoreColor }}>{scoreLabel}</p>
-            <p className="text-xs text-gray-400 mt-1">Based on 12 reports</p>
+        {loading ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 h-28 animate-pulse" />
+        ) : (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-5">
+            <svg width="90" height="90" viewBox="0 0 90 90" className="flex-shrink-0 -rotate-90">
+              <circle cx="45" cy="45" r="38" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+              <circle
+                cx="45" cy="45" r="38"
+                fill="none"
+                stroke={color}
+                strokeWidth="8"
+                strokeDasharray={`${filled} ${circumference}`}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Health Score</p>
+              <p className="text-4xl font-bold text-gray-900 mt-0.5">{score}</p>
+              <p className="text-sm font-semibold mt-0.5" style={{ color }}>{scoreLabel(score)}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Based on {summary?.total_reports ?? 0} report{(summary?.total_reports ?? 0) !== 1 ? 's' : ''}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Parameter cards */}
+        {/* Parameters */}
         <div>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">Parameters</h2>
-          <div className="space-y-3">
-            {parameters.map((p) => {
-              const c = getStatusCfg(p.status);
-              return (
-                <div key={p.name} className={`bg-white rounded-xl border border-gray-100 border-l-4 ${c.border} p-4 shadow-sm`}>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">{p.name}</p>
-                      <div className="flex items-baseline gap-1.5 mt-1">
-                        <span className={`text-2xl font-bold font-mono ${c.text}`}>{p.value}</span>
-                        <span className="text-xs text-gray-400">{p.unit}</span>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">
+            Values Needing Attention
+          </h2>
+
+          {loading ? (
+            <div className="space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white rounded-xl h-20 animate-pulse" />
+              ))}
+            </div>
+          ) : items.length === 0 ? (
+            <div className="bg-white rounded-xl border border-dashed border-gray-200 p-8 text-center">
+              {(summary?.total_reports ?? 0) === 0 ? (
+                <>
+                  <p className="text-5xl mb-3">📊</p>
+                  <p className="text-base font-semibold text-gray-700">No data yet</p>
+                  <p className="text-sm text-gray-400 mt-1 max-w-xs mx-auto">
+                    Upload at least one report to see your analytics here.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-5xl mb-3">✅</p>
+                  <p className="text-base font-semibold text-gray-700">All values are normal</p>
+                  <p className="text-sm text-gray-400 mt-1">Great job! No values need attention right now.</p>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {items.map((p) => {
+                const c = getStatusCfg(p.status);
+                return (
+                  <div key={p.id} className={`bg-white rounded-xl border border-gray-100 border-l-4 ${c.border} p-4 shadow-sm`}>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">{p.parameter_name}</p>
+                        <div className="flex items-baseline gap-1.5 mt-1">
+                          <span className={`text-2xl font-bold font-mono ${c.text}`}>{p.value}</span>
+                          {p.unit && <span className="text-xs text-gray-400">{p.unit}</span>}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
                       <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${c.bg} ${c.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
                         {c.label}
                       </span>
-                      <span className={`text-xs font-medium ${c.text}`}>{p.trend} {p.change}</span>
                     </div>
+                    {p.reference_range_text && (
+                      <p className="text-xs text-gray-400 mt-2">Normal: {p.reference_range_text}</p>
+                    )}
                   </div>
-                  {p.status !== 'normal' && (
-                    <p className="text-xs text-gray-500 mt-2 border-t border-gray-50 pt-2">{p.insight}</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-
-        {/* Track new */}
-        <button className="w-full border border-dashed border-teal-300 rounded-xl py-3 text-sm font-medium text-teal-600 bg-teal-50">
-          + Track New Parameter
-        </button>
       </div>
 
       <BottomNav />

@@ -4,17 +4,17 @@ const features = [
   {
     emoji: "🔒",
     title: "Secure Storage",
-    desc: "Family na badha reports ek safe jagya par — PDF, lab tests, prescriptions.",
+    desc: "All your family's reports in one safe place — PDFs, lab tests, prescriptions.",
   },
   {
     emoji: "📈",
     title: "Health Trends",
-    desc: "HbA1c, Vitamin D, cholesterol — samay sathe change kevi rite thay che te juo.",
+    desc: "Track HbA1c, Vitamin D, cholesterol and see how they change over time.",
   },
   {
     emoji: "👨‍👩‍👧",
     title: "Family Profiles",
-    desc: "Tame ane tmare gharana na badha members na reports ek account thi sambhalo.",
+    desc: "Manage reports for every family member from a single account.",
   },
 ];
 
@@ -31,7 +31,7 @@ export default function Home() {
             </svg>
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">MediVault</h1>
-          <p className="text-gray-500 text-sm">Tamara medical reports — ek jagya par, hamesha safe.</p>
+          <p className="text-gray-500 text-sm">Your medical records — organised, private, always accessible.</p>
         </div>
 
         {/* Features */}
@@ -50,22 +50,9 @@ export default function Home() {
         {/* CTA */}
         <Link href="/login">
           <button className="w-full py-3 bg-teal-600 text-white rounded-xl text-base font-semibold hover:bg-teal-700 transition shadow-md">
-            Shuru Karo — Free
+            Get Started — Free
           </button>
         </Link>
-
-        <div className="mt-4 flex gap-3">
-          <Link href="/dashboard" className="flex-1">
-            <button className="w-full py-2 text-sm text-teal-700 border border-teal-200 rounded-xl hover:bg-teal-50 transition">
-              Dashboard
-            </button>
-          </Link>
-          <Link href="/reports" className="flex-1">
-            <button className="w-full py-2 text-sm text-teal-700 border border-teal-200 rounded-xl hover:bg-teal-50 transition">
-              Reports
-            </button>
-          </Link>
-        </div>
 
         <p className="text-center text-xs text-gray-400 mt-8">
           © 2026 MediVault · Your health data, private and secure.
