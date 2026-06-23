@@ -19,8 +19,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.get("/config-status")
 def config_status():
     """Public endpoint to verify backend configuration (no auth required)."""
+    secret = settings.supabase_jwt_secret.strip()
     return {
         "supabase_jwt_configured": settings.using_supabase,
+        "supabase_jwt_secret_length": len(secret),
         "database_configured": not settings.sqlalchemy_url.startswith("sqlite"),
         "environment": settings.environment,
     }

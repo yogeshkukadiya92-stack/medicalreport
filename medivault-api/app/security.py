@@ -54,9 +54,11 @@ def _decode_supabase_token(token: str) -> dict:
       aud   → "authenticated"
       role  → "authenticated"
     """
+    secret = settings.supabase_jwt_secret.strip()
+    logger.debug("Supabase JWT verify — secret length: %d", len(secret))
     return jwt.decode(
         token,
-        settings.supabase_jwt_secret,
+        secret,
         algorithms=["HS256"],
         options={"verify_aud": False},  # aud value is "authenticated", not our API
     )
