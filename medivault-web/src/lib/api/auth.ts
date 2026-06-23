@@ -1,42 +1,47 @@
-// Auth API Service — uses Supabase for OTP + session management.
-// The Supabase access token is automatically forwarded to the backend
+// Auth API — email/password auth via Supabase.
+// The Supabase access token is synced to the backend client automatically
 // via the onAuthStateChange listener in supabase.ts.
 import { supabase } from '@/lib/supabase';
 import { clearAccessToken } from '@/lib/api-client';
 
 export const authAPI = {
-  // Step 1: Send OTP to phone via Supabase.
-  // Requires Phone Auth enabled in Supabase dashboard + SMS provider.
-  async sendOTP(phone: string) {
-    const { error } = await supabase.auth.signInWithOtp({ phone });
+  async signIn(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    return { success: true };
+    return data;
   },
 
-  // Step 2: Verify OTP — Supabase returns a session with access_token.
-  async verifyOTP(phone: string, otp: string) {
-    const { data, error } = await supabase.auth.verifyOtp({
-      phone,
-      token: otp,
-      type: 'sms',
-    });
+  async signUp(email: string, password: string) {
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
-    return data; // { user, session }
+    return data;
   },
 
-  // Get current Supabase session.
+  async forgotPassword(email: string) {
+    const redirectTo =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/reset-password`
+        : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) throw error;
+  },
+
+  async resetPassword(newPassword: string) {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+    return data;
+  },
+
   async getSession() {
     const { data } = await supabase.auth.getSession();
     return data.session;
   },
 
-  // Get current user from Supabase.
   async getUser() {
     const { data } = await supabase.auth.getUser();
     return data.user;
   },
 
-  // Logout from Supabase and clear local token.
   async logout(): Promise<void> {
     await supabase.auth.signOut();
     clearAccessToken();
