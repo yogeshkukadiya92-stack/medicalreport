@@ -8,6 +8,7 @@ Supabase tokens carry the user's UUID in `sub`, phone in `phone`, and
 email in `email`. On first request the user row is auto-created so the
 rest of the app never needs to handle missing users.
 """
+import logging
 from datetime import datetime, timedelta
 
 from fastapi import Depends, HTTPException, status
@@ -19,6 +20,7 @@ from .config import settings
 from .database import get_db
 from .models import User
 
+logger = logging.getLogger("medivault.security")
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -76,7 +78,21 @@ def get_current_user(
         if settings.using_supabase:
             payload = _decode_supabase_token(creds.credentials)
         else:
-            payload = _decode_own_token(creds.credentials)
+            # SUPABASE_JWT_SECRET not configured — try own JWT.
+            # If this also fails the token is likely a Supabase JWT sent to a
+            # backend that hasn't been configured yet.
+            try:
+                payload = _decode_own_token(creds.credentials)
+            except JWTError:
+                logger.error(
+                    "JWT verification failed. "
+                    "If you are using Supabase auth, set the SUPABASE_JWT_SECRET "
+                    "environment variable on your backend service."
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid or expired token. Backend may be missing SUPABASE_JWT_SECRET.",
+                )
         user_id: str | None = payload.get("sub")
     except JWTError:
         raise HTTPException(

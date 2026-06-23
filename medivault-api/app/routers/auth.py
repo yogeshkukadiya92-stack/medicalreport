@@ -15,6 +15,16 @@ from ..serializers import serialize_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+
+@router.get("/config-status")
+def config_status():
+    """Public endpoint to verify backend configuration (no auth required)."""
+    return {
+        "supabase_jwt_configured": settings.using_supabase,
+        "database_configured": not settings.sqlalchemy_url.startswith("sqlite"),
+        "environment": settings.environment,
+    }
+
 # In-memory OTP store (dev). For production use Redis with TTL.
 _otp_store: dict[str, str] = {}
 
