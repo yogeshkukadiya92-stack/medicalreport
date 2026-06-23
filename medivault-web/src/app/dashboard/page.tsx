@@ -52,14 +52,16 @@ export default function Dashboard() {
   const load = useCallback(async () => {
     setError('');
     try {
-      const [s, p] = await Promise.all([
+      const [s, p] = await Promise.allSettled([
         reportsAPI.getHealthSummary(),
         profileAPI.getProfile(),
       ]);
-      setSummary(s);
-      setProfile(p);
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message || 'Could not load data.');
+      if (s.status === 'fulfilled') setSummary(s.value);
+      if (p.status === 'fulfilled') setProfile(p.value);
+      // Only show error if health summary (the primary data) failed
+      if (s.status === 'rejected') {
+        setError(s.reason?.response?.data?.error?.message || 'Could not load data.');
+      }
     } finally {
       setLoading(false);
     }
