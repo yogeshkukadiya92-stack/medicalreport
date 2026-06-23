@@ -58,7 +58,7 @@ export default function Analytics() {
     } finally {
       setLoading(false);
     }
-  });
+  }, []);
 
   useEffect(() => {
     if (!authChecking) load();
