@@ -104,8 +104,12 @@ export default function ProfilePage() {
       setTimeout(() => setSaved(false), 3000);
       load();
     } catch (e: any) {
-      setError(e?.response?.data?.error?.message || 'Could not save profile.');
-    } finally {
+    const msg =
+      e?.response?.data?.error?.message ||
+      e?.response?.data?.detail ||
+      (e?.response ? `Server error ${e.response.status}` : `Network error — API unreachable`) ;
+    setError(msg);
+  } finally {
       setSaving(false);
     }
   }
