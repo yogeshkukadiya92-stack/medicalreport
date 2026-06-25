@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
@@ -16,6 +16,10 @@ export default function Upload() {
   const [lab, setLab] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setMemberId(activeMember.id);
+  }, [activeMember.id]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -33,11 +37,12 @@ export default function Upload() {
       memberId,
       title: title || fileName.replace(/\.[^.]+$/, ""),
     });
-    setMessage(`${report.title} added to reports.`);
+    setMessage(`${report.title} saved. Processing will finish automatically.`);
     setTitle("");
     setLab("");
     setFileName("");
     if (inputRef.current) inputRef.current.value = "";
+    window.setTimeout(() => router.push("/reports"), 700);
   }
 
   return (
@@ -63,7 +68,9 @@ export default function Upload() {
               <Icon name="upload" className="h-7 w-7" />
             </div>
             <h2 className="mt-5 text-[18px] font-bold text-[#162523]">{fileName || "Select a report file"}</h2>
-            <p className="mx-auto mt-2 max-w-[280px] text-[13px] leading-5 text-[#65716f]">PDF, JPG, or PNG. The report will appear instantly in your vault.</p>
+            <p className="mx-auto mt-2 max-w-[280px] text-[13px] leading-5 text-[#65716f]">
+              PDF, JPG, or PNG. Saved reports persist in this browser and processing completes automatically.
+            </p>
           </button>
           <input
             ref={inputRef}

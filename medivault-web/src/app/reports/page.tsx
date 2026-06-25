@@ -10,6 +10,12 @@ type Filter = "All" | "Starred" | "Needs review";
 
 const filters: Filter[] = ["All", "Starred", "Needs review"];
 
+function statusClass(report: AppReport) {
+  if (report.status === "Processing") return "bg-[#eef5ff] text-[#4167a8]";
+  if (report.abnormal > 0 || report.status === "Needs review") return "bg-[#fff0ec] text-[#ba563d]";
+  return "bg-[#eaf9f2] text-[#087766]";
+}
+
 export default function Reports() {
   const { activeMember, deleteReport, markReviewed, reportsForActiveMember, toggleStar } = useAppData();
   const [filter, setFilter] = useState<Filter>("All");
@@ -77,7 +83,7 @@ export default function Reports() {
                         <h2 className="truncate text-[15px] font-bold text-[#162523]">{report.title}</h2>
                         <p className="mt-1 truncate text-[12px] text-[#7b8986]">{report.lab}</p>
                       </div>
-                      <span className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold ${report.abnormal > 0 ? "bg-[#fff0ec] text-[#ba563d]" : "bg-[#eaf9f2] text-[#087766]"}`}>
+                      <span className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold ${statusClass(report)}`}>
                         {report.status}
                       </span>
                     </div>

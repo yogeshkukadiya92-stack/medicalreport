@@ -25,6 +25,7 @@ export type AppReport = {
   abnormal: number;
   status: ReportStatus;
   starred: boolean;
+  createdAt: number;
 };
 
 type NewReportInput = {
@@ -67,6 +68,7 @@ const seedReports: AppReport[] = [
     abnormal: 3,
     status: "Needs review",
     starred: false,
+    createdAt: 1718841600000,
   },
   {
     id: "thyroid",
@@ -80,6 +82,7 @@ const seedReports: AppReport[] = [
     abnormal: 0,
     status: "Reviewed",
     starred: true,
+    createdAt: 1715299200000,
   },
   {
     id: "lipid",
@@ -93,6 +96,7 @@ const seedReports: AppReport[] = [
     abnormal: 2,
     status: "Watch",
     starred: false,
+    createdAt: 1713744000000,
   },
 ];
 
@@ -101,6 +105,24 @@ const storageKey = "medivault-app-data-v1";
 
 function todayLabel() {
   return new Intl.DateTimeFormat("en", { day: "2-digit", month: "short" }).format(new Date());
+}
+
+function finishProcessing(report: AppReport): AppReport {
+  const text = `${report.title} ${report.fileName}`.toLowerCase();
+  const needsReview =
+    text.includes("blood") ||
+    text.includes("cbc") ||
+    text.includes("hba1c") ||
+    text.includes("sugar") ||
+    text.includes("vitamin") ||
+    text.includes("lipid");
+
+  return {
+    ...report,
+    abnormal: needsReview ? 2 : 0,
+    parameters: needsReview ? Math.max(report.parameters, 12) : Math.max(report.parameters, 6),
+    status: needsReview ? "Needs review" : "Reviewed",
+  };
 }
 
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
@@ -118,8 +140,16 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           familyMembers?: FamilyMember[];
           reports?: AppReport[];
         };
-        if (parsed.familyMembers?.length) setFamilyMembers(parsed.familyMembers);
-        if (parsed.reports?.length) setReports(parsed.reports);
+        if (Array.isArray(parsed.familyMembers)) setFamilyMembers(parsed.familyMembers.length ? parsed.familyMembers : seedFamilyMembers);
+        if (Array.isArray(parsed.reports)) {
+          setReports(
+            parsed.reports.map((report) =>
+              report.status === "Processing" && Date.now() - (report.createdAt ?? Number(report.id) ?? Date.now()) > 3500
+                ? finishProcessing({ ...report, createdAt: report.createdAt ?? Number(report.id) ?? Date.now() })
+                : { ...report, createdAt: report.createdAt ?? Number(report.id) ?? Date.now() },
+            ),
+          );
+        }
         if (parsed.activeMemberId) setActiveMemberId(parsed.activeMemberId);
       } catch {
         window.localStorage.removeItem(storageKey);
@@ -132,6 +162,18 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     if (!isHydrated) return;
     window.localStorage.setItem(storageKey, JSON.stringify({ activeMemberId, familyMembers, reports }));
   }, [activeMemberId, familyMembers, isHydrated, reports]);
+
+  useEffect(() => {
+    if (!isHydrated || !reports.some((report) => report.status === "Processing")) return;
+
+    const timer = window.setTimeout(() => {
+      setReports((current) =>
+        current.map((report) => (report.status === "Processing" ? finishProcessing(report) : report)),
+      );
+    }, 1800);
+
+    return () => window.clearTimeout(timer);
+  }, [isHydrated, reports]);
 
   const activeMember = familyMembers.find((member) => member.id === activeMemberId) ?? familyMembers[0];
   const reportsForActiveMember = reports.filter((report) => report.memberId === activeMember.id);
@@ -168,6 +210,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           abnormal: 0,
           status: "Processing",
           starred: false,
+          createdAt: Date.now(),
         };
         setReports((current) => [nextReport, ...current]);
         return nextReport;
