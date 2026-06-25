@@ -1,38 +1,49 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo, useState } from "react";
+import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 import { SignOutButton } from "@/components/sign-out-button";
 
-const members = [
-  { name: "Rajesh", relation: "You", score: 85, active: true },
-  { name: "Priya", relation: "Spouse", score: 92, active: false },
-  { name: "Mohan", relation: "Parent", score: 68, active: false },
-];
-
-const attentionItems = [
+const attentionFallback = [
   { label: "Vitamin D low", value: "18 ng/mL", tone: "mint", note: "Review supplement plan" },
   { label: "HbA1c high", value: "7.1%", tone: "coral", note: "Track sugar trend" },
 ];
 
-const recentReports = [
-  { title: "Complete Blood Count", lab: "Apollo Diagnostics", date: "20 Jun", status: "Reviewed" },
-  { title: "Thyroid Function Test", lab: "Lal Path Labs", date: "10 May", status: "Starred" },
-  { title: "Lipid Profile", lab: "Apollo Diagnostics", date: "22 Apr", status: "Normal" },
-];
-
 export default function Dashboard() {
+  const { activeMember, familyMembers, reportsForActiveMember, setActiveMemberId } = useAppData();
+  const [notice, setNotice] = useState("");
+  const attentionCount = reportsForActiveMember.filter((report) => report.abnormal > 0 || report.status === "Needs review").length;
+  const recentReports = reportsForActiveMember.slice(0, 3);
+
+  const attentionItems = useMemo(() => {
+    if (!attentionCount) return attentionFallback.slice(0, 1);
+    return reportsForActiveMember
+      .filter((report) => report.abnormal > 0 || report.status === "Needs review")
+      .slice(0, 2)
+      .map((report, index) => ({
+        label: report.title,
+        value: `${report.abnormal} flagged`,
+        tone: index === 0 ? "coral" : "mint",
+        note: report.status === "Needs review" ? "Needs review" : "Watch trend",
+      }));
+  }, [attentionCount, reportsForActiveMember]);
+
   return (
     <MobileShell>
       <section className="px-5 pt-6">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-[13px] font-medium text-[#6f7f7c]">MediVault</p>
             <h1 className="mt-1 text-[24px] font-bold leading-tight tracking-normal text-[#101c1c]">
-              Good morning, Rajesh
+              Good morning, {activeMember.name}
             </h1>
           </div>
           <div className="flex items-center gap-2">
             <button
               aria-label="Notifications"
+              onClick={() => setNotice(attentionCount ? `${attentionCount} report needs review.` : "All reports are up to date.")}
               className="grid h-11 w-11 place-items-center rounded-lg border border-[#dce9e5] bg-white text-[#223230] shadow-[0_8px_24px_rgba(20,67,60,0.08)]"
             >
               <Icon name="bell" className="h-5 w-5" />
@@ -41,18 +52,25 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div id="family" className="mt-5 flex gap-2 overflow-x-auto pb-1">
-          {members.map((member) => (
+        {notice ? (
+          <div className="mt-4 rounded-lg border border-[#dce9e5] bg-white p-3 text-[13px] font-bold text-[#087766]">
+            {notice}
+          </div>
+        ) : null}
+
+        <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+          {familyMembers.map((member) => (
             <button
-              key={member.name}
+              key={member.id}
+              onClick={() => setActiveMemberId(member.id)}
               className={`min-w-[104px] rounded-lg border px-3 py-3 text-left ${
-                member.active
+                member.id === activeMember.id
                   ? "border-[#0a7d6e] bg-[#0b2b2b] text-white shadow-[0_16px_32px_rgba(11,43,43,0.18)]"
                   : "border-[#dce9e5] bg-white text-[#44524f]"
               }`}
             >
               <span className="block text-[13px] font-bold">{member.name}</span>
-              <span className={`mt-1 block text-[11px] ${member.active ? "text-[#aee7d9]" : "text-[#81908d]"}`}>
+              <span className={`mt-1 block text-[11px] ${member.id === activeMember.id ? "text-[#aee7d9]" : "text-[#81908d]"}`}>
                 {member.relation} - {member.score}
               </span>
             </button>
@@ -64,41 +82,39 @@ export default function Dashboard() {
             <div>
               <p className="text-[13px] font-medium text-[#a9bfba]">Health score</p>
               <div className="mt-2 flex items-end gap-2">
-                <span className="text-[56px] font-black leading-none tracking-normal">85</span>
-                <span className="mb-2 text-[13px] font-semibold text-[#99f0db]">Good</span>
+                <span className="text-[56px] font-black leading-none tracking-normal">{activeMember.score}</span>
+                <span className="mb-2 text-[13px] font-semibold text-[#99f0db]">
+                  {activeMember.score >= 90 ? "Great" : activeMember.score >= 80 ? "Good" : "Watch"}
+                </span>
               </div>
               <p className="mt-3 max-w-[180px] text-[13px] leading-5 text-[#c5d4d1]">
-                2 need attention from your latest reports.
+                {attentionCount} need attention from {reportsForActiveMember.length} reports.
               </p>
             </div>
 
-            <div className="relative grid h-[116px] w-[116px] shrink-0 place-items-center rounded-full bg-[conic-gradient(#38d7b1_0_85%,rgba(255,255,255,0.12)_85%_100%)]">
+            <div
+              className="relative grid h-[116px] w-[116px] shrink-0 place-items-center rounded-full"
+              style={{
+                background: `conic-gradient(#38d7b1 0 ${activeMember.score}%, rgba(255,255,255,0.12) ${activeMember.score}% 100%)`,
+              }}
+            >
               <div className="grid h-[86px] w-[86px] place-items-center rounded-full bg-[#102323] text-center">
-                <span className="text-[12px] font-semibold text-[#99f0db]">85%</span>
-                <span className="-mt-2 text-[10px] text-[#a9bfba]">stable</span>
+                <span className="text-[12px] font-semibold text-[#99f0db]">{activeMember.score}%</span>
+                <span className="-mt-2 text-[10px] text-[#a9bfba]">live</span>
               </div>
             </div>
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-2">
-            <Link
-              href="/upload"
-              className="flex h-[74px] flex-col items-center justify-center gap-2 rounded-lg bg-white/9 text-[11px] font-semibold text-white hover:bg-white/14"
-            >
+            <Link href="/upload" className="flex h-[74px] flex-col items-center justify-center gap-2 rounded-lg bg-white/9 text-[11px] font-semibold text-white hover:bg-white/14">
               <Icon name="upload" className="h-5 w-5 text-[#99f0db]" />
               Upload report
             </Link>
-            <Link
-              href="/reports"
-              className="flex h-[74px] flex-col items-center justify-center gap-2 rounded-lg bg-white/9 text-[11px] font-semibold text-white hover:bg-white/14"
-            >
+            <Link href="/reports" className="flex h-[74px] flex-col items-center justify-center gap-2 rounded-lg bg-white/9 text-[11px] font-semibold text-white hover:bg-white/14">
               <Icon name="reports" className="h-5 w-5 text-[#99f0db]" />
               Reports
             </Link>
-            <Link
-              href="/analytics"
-              className="flex h-[74px] flex-col items-center justify-center gap-2 rounded-lg bg-white/9 text-[11px] font-semibold text-white hover:bg-white/14"
-            >
+            <Link href="/analytics" className="flex h-[74px] flex-col items-center justify-center gap-2 rounded-lg bg-white/9 text-[11px] font-semibold text-white hover:bg-white/14">
               <Icon name="analytics" className="h-5 w-5 text-[#99f0db]" />
               Analytics
             </Link>
@@ -115,11 +131,7 @@ export default function Dashboard() {
         <div className="mt-3 space-y-3">
           {attentionItems.map((item) => (
             <div key={item.label} className="flex items-center gap-3 rounded-lg border border-[#e2ebe8] bg-white p-4">
-              <div
-                className={`grid h-11 w-11 place-items-center rounded-lg ${
-                  item.tone === "coral" ? "bg-[#fff0ec] text-[#cc6044]" : "bg-[#eaf9f2] text-[#0a7d6e]"
-                }`}
-              >
+              <div className={`grid h-11 w-11 place-items-center rounded-lg ${item.tone === "coral" ? "bg-[#fff0ec] text-[#cc6044]" : "bg-[#eaf9f2] text-[#0a7d6e]"}`}>
                 <span className="h-2.5 w-2.5 rounded-full bg-current" />
               </div>
               <div className="min-w-0 flex-1">
@@ -140,11 +152,7 @@ export default function Dashboard() {
 
         <div className="mt-3 space-y-3">
           {recentReports.map((report) => (
-            <Link
-              key={report.title}
-              href="/reports"
-              className="flex items-center gap-3 rounded-lg border border-[#e2ebe8] bg-white p-4 hover:border-[#a5dcd0]"
-            >
+            <Link key={report.id} href="/reports" className="flex items-center gap-3 rounded-lg border border-[#e2ebe8] bg-white p-4 hover:border-[#a5dcd0]">
               <div className="grid h-12 w-12 place-items-center rounded-lg bg-[#f1f6f4] text-[#087766]">
                 <Icon name="reports" className="h-5 w-5" />
               </div>
@@ -154,9 +162,7 @@ export default function Dashboard() {
                   {report.lab} - {report.date}
                 </p>
               </div>
-              <span className="rounded-md bg-[#f1f6f4] px-2.5 py-1 text-[11px] font-bold text-[#52605d]">
-                {report.status}
-              </span>
+              <span className="rounded-md bg-[#f1f6f4] px-2.5 py-1 text-[11px] font-bold text-[#52605d]">{report.status}</span>
             </Link>
           ))}
         </div>

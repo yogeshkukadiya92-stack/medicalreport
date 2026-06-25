@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo, useState } from "react";
+import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 
 const parameters = [
@@ -55,6 +59,18 @@ function barColor(tone: string) {
 }
 
 export default function Analytics() {
+  const { activeMember, reportsForActiveMember } = useAppData();
+  const [range, setRange] = useState("90 days");
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+  const flaggedCount = reportsForActiveMember.filter((report) => report.abnormal > 0 || report.status === "Needs review").length;
+  const verifiedPercent = reportsForActiveMember.length
+    ? Math.round((reportsForActiveMember.filter((report) => report.status === "Reviewed" || report.status === "Normal").length / reportsForActiveMember.length) * 100)
+    : 0;
+  const visibleParameters = useMemo(
+    () => (showFlaggedOnly ? parameters.filter((param) => param.status === "High" || param.status === "Low") : parameters),
+    [showFlaggedOnly],
+  );
+
   return (
     <MobileShell>
       <section className="px-5 pb-5 pt-6">
@@ -73,11 +89,12 @@ export default function Analytics() {
         </div>
 
         <div className="mt-5 grid grid-cols-3 gap-2 rounded-lg border border-[#dce9e5] bg-white p-1">
-          {["90 days", "6 months", "1 year"].map((label, index) => (
+          {["90 days", "6 months", "1 year"].map((label) => (
             <button
               key={label}
+              onClick={() => setRange(label)}
               className={`h-9 rounded-md text-[12px] font-bold ${
-                index === 0 ? "bg-[#102323] text-white shadow-[0_8px_18px_rgba(16,35,35,0.18)]" : "text-[#65716f]"
+                range === label ? "bg-[#102323] text-white shadow-[0_8px_18px_rgba(16,35,35,0.18)]" : "text-[#65716f]"
               }`}
             >
               {label}
@@ -90,12 +107,14 @@ export default function Analytics() {
             <div>
               <p className="text-[13px] font-semibold text-[#a9bfba]">Overall score</p>
               <div className="mt-2 flex items-end gap-2">
-                <span className="text-[56px] font-black leading-none">85</span>
+                <span className="text-[56px] font-black leading-none">{activeMember.score}</span>
                 <span className="mb-2 rounded-md bg-[#173938] px-2 py-1 text-[11px] font-bold text-[#99f0db]">
                   +4
                 </span>
               </div>
-              <p className="mt-3 text-[13px] leading-5 text-[#c5d4d1]">Trending up, with two markers outside range.</p>
+              <p className="mt-3 text-[13px] leading-5 text-[#c5d4d1]">
+                {range} view, with {flaggedCount} markers outside range.
+              </p>
             </div>
 
             <div className="grid h-[104px] w-[104px] place-items-center rounded-full bg-[conic-gradient(#39deb8_0_85%,rgba(255,255,255,0.13)_85%_100%)]">
@@ -127,15 +146,15 @@ export default function Analytics() {
         <div className="mt-5 grid grid-cols-3 gap-2">
           <div className="rounded-lg border border-[#e2ebe8] bg-white p-3">
             <p className="text-[11px] font-bold text-[#7b8986]">Scanned</p>
-            <p className="mt-2 text-[24px] font-black text-[#162523]">12</p>
+            <p className="mt-2 text-[24px] font-black text-[#162523]">{reportsForActiveMember.length}</p>
           </div>
           <div className="rounded-lg border border-[#e2ebe8] bg-white p-3">
             <p className="text-[11px] font-bold text-[#7b8986]">Flagged</p>
-            <p className="mt-2 text-[24px] font-black text-[#ba563d]">2</p>
+            <p className="mt-2 text-[24px] font-black text-[#ba563d]">{flaggedCount}</p>
           </div>
           <div className="rounded-lg border border-[#e2ebe8] bg-white p-3">
             <p className="text-[11px] font-bold text-[#7b8986]">Verified</p>
-            <p className="mt-2 text-[24px] font-black text-[#087766]">96%</p>
+            <p className="mt-2 text-[24px] font-black text-[#087766]">{verifiedPercent}%</p>
           </div>
         </div>
 
@@ -147,7 +166,9 @@ export default function Analytics() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-[14px] font-black text-[#162523]">Doctor visit ready</h2>
-                <span className="rounded-md bg-white px-2 py-1 text-[11px] font-bold text-[#52605d]">3 reports</span>
+                <span className="rounded-md bg-white px-2 py-1 text-[11px] font-bold text-[#52605d]">
+                  {reportsForActiveMember.length} reports
+                </span>
               </div>
               <p className="mt-1 text-[13px] leading-5 text-[#65716f]">
                 CBC, HbA1c and Vitamin D are grouped for quick review.
@@ -158,11 +179,16 @@ export default function Analytics() {
 
         <div className="mt-6 flex items-center justify-between">
           <h2 className="text-[18px] font-black text-[#101c1c]">Key parameters</h2>
-          <button className="rounded-md bg-[#e8f7f2] px-3 py-2 text-[12px] font-bold text-[#087766]">Filter</button>
+          <button
+            onClick={() => setShowFlaggedOnly((current) => !current)}
+            className="rounded-md bg-[#e8f7f2] px-3 py-2 text-[12px] font-bold text-[#087766]"
+          >
+            {showFlaggedOnly ? "All" : "Flagged"}
+          </button>
         </div>
 
         <div className="mt-3 space-y-3">
-          {parameters.map((param) => (
+          {visibleParameters.map((param) => (
             <article key={param.name} className="rounded-lg border border-[#e2ebe8] bg-white p-4 shadow-[0_10px_28px_rgba(20,67,60,0.05)]">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">

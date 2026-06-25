@@ -20,9 +20,18 @@ export function SignOutButton() {
       type="button"
       onClick={handleSignOut}
       disabled={isSigningOut}
-      className="h-11 rounded-lg border border-[#dce9e5] bg-white px-3 text-[12px] font-bold text-[#223230] shadow-[0_8px_24px_rgba(20,67,60,0.08)] disabled:opacity-60"
+      aria-label="Logout"
+      title={isSigningOut ? "Signing out" : "Logout"}
+      className="grid h-11 w-11 place-items-center rounded-lg border border-[#dce9e5] bg-white text-[#223230] shadow-[0_8px_24px_rgba(20,67,60,0.08)] disabled:opacity-60"
     >
-      {isSigningOut ? "Signing out" : "Logout"}
+      {isSigningOut ? (
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#dce9e5] border-t-[#0a7d6e]" />
+      ) : (
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" viewBox="0 0 24 24">
+          <path d="M12 4.8v6.4" />
+          <path d="M7.6 7.7a7 7 0 1 0 8.8 0" />
+        </svg>
+      )}
     </button>
   );
 }

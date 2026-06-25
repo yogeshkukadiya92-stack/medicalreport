@@ -13,7 +13,7 @@ const navItems: Array<{ href: string; label: string; icon: IconName }> = [
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/reports", label: "Reports", icon: "reports" },
   { href: "/analytics", label: "Analytics", icon: "analytics" },
-  { href: "/dashboard#family", label: "Family", icon: "family" },
+  { href: "/family", label: "Family", icon: "family" },
 ];
 
 function Icon({ name, className = "h-5 w-5" }: { name: IconName; className?: string }) {
@@ -112,26 +112,12 @@ export function MobileShell({ children }: { children: ReactNode }) {
   const { isConfigured, status } = useAuth();
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (isConfigured && status === "unauthenticated") {
       router.replace("/login");
     }
-  }, [router, status]);
+  }, [isConfigured, router, status]);
 
-  if (!isConfigured) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#eef3f1] px-5 text-[#101c1c]">
-        <div className="w-full max-w-[430px] rounded-lg border border-[#dce9e5] bg-white p-5 shadow-[0_24px_70px_rgba(10,31,31,0.12)]">
-          <p className="text-[13px] font-bold text-[#ba563d]">Supabase setup missing</p>
-          <h1 className="mt-2 text-[24px] font-black">Add auth environment variables</h1>
-          <p className="mt-3 text-[14px] leading-6 text-[#65716f]">
-            Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then restart the app.
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  if (status === "loading" || status === "unauthenticated") {
+  if (isConfigured && (status === "loading" || status === "unauthenticated")) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#eef3f1] px-5 text-[#101c1c]">
         <div className="w-full max-w-[430px] rounded-lg bg-white p-5 text-center shadow-[0_24px_70px_rgba(10,31,31,0.12)]">
@@ -150,7 +136,7 @@ export function MobileShell({ children }: { children: ReactNode }) {
         <nav className="sticky bottom-0 z-20 border-t border-[#dbe7e3] bg-white/94 px-4 pb-5 pt-3 shadow-[0_-18px_42px_rgba(16,35,35,0.08)] backdrop-blur-xl">
           <div className="grid grid-cols-4 gap-2">
             {navItems.map((item) => {
-              const isActive = !item.href.includes("#") && pathname === item.href;
+              const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.label}
