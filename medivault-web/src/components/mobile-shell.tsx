@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
+import { useAuth } from "@/components/auth-provider";
 
 type IconName = "home" | "reports" | "analytics" | "family" | "upload" | "bell" | "shield" | "trend" | "calendar";
 
@@ -105,6 +108,39 @@ export { Icon };
 
 export function MobileShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { isConfigured, status } = useAuth();
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login");
+    }
+  }, [router, status]);
+
+  if (!isConfigured) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#eef3f1] px-5 text-[#101c1c]">
+        <div className="w-full max-w-[430px] rounded-lg border border-[#dce9e5] bg-white p-5 shadow-[0_24px_70px_rgba(10,31,31,0.12)]">
+          <p className="text-[13px] font-bold text-[#ba563d]">Supabase setup missing</p>
+          <h1 className="mt-2 text-[24px] font-black">Add auth environment variables</h1>
+          <p className="mt-3 text-[14px] leading-6 text-[#65716f]">
+            Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then restart the app.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (status === "loading" || status === "unauthenticated") {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#eef3f1] px-5 text-[#101c1c]">
+        <div className="w-full max-w-[430px] rounded-lg bg-white p-5 text-center shadow-[0_24px_70px_rgba(10,31,31,0.12)]">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[#dce9e5] border-t-[#0a7d6e]" />
+          <p className="mt-4 text-[13px] font-bold text-[#65716f]">Checking secure session</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#eef3f1] text-[#101c1c] md:flex md:items-center md:justify-center md:p-8">

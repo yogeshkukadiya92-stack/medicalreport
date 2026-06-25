@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon, MobileShell } from "@/components/mobile-shell";
+import { SignOutButton } from "@/components/sign-out-button";
 
 const members = [
   { name: "Rajesh", relation: "You", score: 85, active: true },
@@ -29,12 +30,15 @@ export default function Dashboard() {
               Good morning, Rajesh
             </h1>
           </div>
-          <button
-            aria-label="Notifications"
-            className="grid h-11 w-11 place-items-center rounded-lg border border-[#dce9e5] bg-white text-[#223230] shadow-[0_8px_24px_rgba(20,67,60,0.08)]"
-          >
-            <Icon name="bell" className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              aria-label="Notifications"
+              className="grid h-11 w-11 place-items-center rounded-lg border border-[#dce9e5] bg-white text-[#223230] shadow-[0_8px_24px_rgba(20,67,60,0.08)]"
+            >
+              <Icon name="bell" className="h-5 w-5" />
+            </button>
+            <SignOutButton />
+          </div>
         </div>
 
         <div id="family" className="mt-5 flex gap-2 overflow-x-auto pb-1">
