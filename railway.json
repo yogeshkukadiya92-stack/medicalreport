@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "cd medivault-web && npm ci && npm run build"
+    "buildCommand": "cd medivault-web && npm run build"
   },
   "deploy": {
     "startCommand": "cd medivault-web && npm run start",
