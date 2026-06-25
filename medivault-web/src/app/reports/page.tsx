@@ -20,6 +20,7 @@ export default function Reports() {
   const { activeMember, deleteReport, markReviewed, reportsForActiveMember, toggleStar } = useAppData();
   const [filter, setFilter] = useState<Filter>("All");
   const [selectedReport, setSelectedReport] = useState<AppReport | null>(null);
+  const hasMember = Boolean(activeMember);
 
   const filteredReports = useMemo(() => {
     if (filter === "Starred") return reportsForActiveMember.filter((report) => report.starred);
@@ -32,7 +33,7 @@ export default function Reports() {
       <section className="px-5 pt-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[13px] font-medium text-[#6f7f7c]">{activeMember.name}'s vault</p>
+            <p className="text-[13px] font-medium text-[#6f7f7c]">{hasMember ? `${activeMember?.name}'s vault` : "Empty vault"}</p>
             <h1 className="mt-1 text-[24px] font-bold leading-tight text-[#101c1c]">Reports</h1>
           </div>
           <Link href="/upload" className="grid h-11 w-11 place-items-center rounded-lg border border-[#dce9e5] bg-white text-[#223230]" aria-label="Upload">
@@ -50,7 +51,9 @@ export default function Reports() {
               <Icon name="shield" className="h-7 w-7" />
             </div>
           </div>
-          <p className="mt-4 text-[13px] leading-5 text-[#c5d4d1]">Filter, review, star, or remove reports from this vault.</p>
+          <p className="mt-4 text-[13px] leading-5 text-[#c5d4d1]">
+            {hasMember ? "Filter, review, star, or remove reports from this vault." : "Add a family member first to begin storing reports."}
+          </p>
         </div>
 
         <div className="mt-5 grid grid-cols-3 gap-2">
@@ -65,6 +68,15 @@ export default function Reports() {
           ))}
         </div>
 
+        {!hasMember ? (
+          <div className="mt-5 rounded-lg border border-dashed border-[#c5d8d3] bg-white p-5 text-center">
+            <p className="text-[16px] font-black text-[#162523]">No reports yet</p>
+            <p className="mt-2 text-[13px] text-[#65716f]">Add a family member, then upload a report.</p>
+            <Link href="/family" className="mt-4 inline-flex h-10 items-center rounded-lg bg-[#0a7d6e] px-4 text-[13px] font-bold text-white">
+              Add member
+            </Link>
+          </div>
+        ) : (
         <div className="mt-5 space-y-3">
           {filteredReports.length ? (
             filteredReports.map((report) => (
@@ -130,6 +142,7 @@ export default function Reports() {
             </div>
           )}
         </div>
+        )}
 
         {selectedReport ? (
           <div className="fixed inset-0 z-40 grid place-items-end bg-black/30 px-4 pb-4">

@@ -11,15 +11,20 @@ export default function Upload() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const { activeMember, addReport, familyMembers } = useAppData();
   const [fileName, setFileName] = useState("");
-  const [memberId, setMemberId] = useState(activeMember.id);
+  const [memberId, setMemberId] = useState("");
   const [title, setTitle] = useState("");
   const [lab, setLab] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const hasMembers = familyMembers.length > 0;
 
   useEffect(() => {
-    setMemberId(activeMember.id);
-  }, [activeMember.id]);
+    if (activeMember) {
+      setMemberId(activeMember.id);
+    } else if (familyMembers[0]) {
+      setMemberId(familyMembers[0].id);
+    }
+  }, [activeMember, familyMembers]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,6 +63,15 @@ export default function Upload() {
           </Link>
         </div>
 
+        {!hasMembers ? (
+          <div className="mt-6 rounded-lg border border-dashed border-[#c5d8d3] bg-white p-5 text-center">
+            <p className="text-[16px] font-black text-[#162523]">Add a family member first</p>
+            <p className="mt-2 text-[13px] text-[#65716f]">Reports need a member so they can be grouped correctly.</p>
+            <Link href="/family" className="mt-4 inline-flex h-10 items-center rounded-lg bg-[#0a7d6e] px-4 text-[13px] font-bold text-white">
+              Go to family
+            </Link>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <button
             type="button"
@@ -111,6 +125,7 @@ export default function Upload() {
             View reports
           </button>
         </form>
+        )}
       </section>
     </MobileShell>
   );

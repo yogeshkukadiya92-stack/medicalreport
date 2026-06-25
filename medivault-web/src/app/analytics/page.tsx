@@ -62,6 +62,8 @@ export default function Analytics() {
   const { activeMember, reportsForActiveMember } = useAppData();
   const [range, setRange] = useState("90 days");
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+  const hasMember = Boolean(activeMember);
+  const score = activeMember?.score ?? 0;
   const flaggedCount = reportsForActiveMember.filter((report) => report.abnormal > 0 || report.status === "Needs review").length;
   const verifiedPercent = reportsForActiveMember.length
     ? Math.round((reportsForActiveMember.filter((report) => report.status === "Reviewed" || report.status === "Normal").length / reportsForActiveMember.length) * 100)
@@ -107,21 +109,26 @@ export default function Analytics() {
             <div>
               <p className="text-[13px] font-semibold text-[#a9bfba]">Overall score</p>
               <div className="mt-2 flex items-end gap-2">
-                <span className="text-[56px] font-black leading-none">{activeMember.score}</span>
-                <span className="mb-2 rounded-md bg-[#173938] px-2 py-1 text-[11px] font-bold text-[#99f0db]">
-                  +4
-                </span>
+                <span className="text-[56px] font-black leading-none">{hasMember ? score : "--"}</span>
+                <span className="mb-2 rounded-md bg-[#173938] px-2 py-1 text-[11px] font-bold text-[#99f0db]">{hasMember ? "+4" : "--"}</span>
               </div>
               <p className="mt-3 text-[13px] leading-5 text-[#c5d4d1]">
-                {range} view, with {flaggedCount} markers outside range.
+                {hasMember ? `${range} view, with ${flaggedCount} markers outside range.` : "Add a member and upload reports to unlock analytics."}
               </p>
             </div>
 
-            <div className="grid h-[104px] w-[104px] place-items-center rounded-full bg-[conic-gradient(#39deb8_0_85%,rgba(255,255,255,0.13)_85%_100%)]">
-              <div className="grid h-[76px] w-[76px] place-items-center rounded-full bg-[#102323]">
-                <Icon name="trend" className="h-7 w-7 text-[#99f0db]" />
-              </div>
+          <div
+            className="grid h-[104px] w-[104px] place-items-center rounded-full"
+            style={{
+              background: hasMember
+                ? `conic-gradient(#39deb8 0 ${score}%, rgba(255,255,255,0.13) ${score}% 100%)`
+                : "conic-gradient(#2b3a3a 0 100%, rgba(255,255,255,0.13) 100% 100%)",
+            }}
+          >
+            <div className="grid h-[76px] w-[76px] place-items-center rounded-full bg-[#102323]">
+              <Icon name="trend" className="h-7 w-7 text-[#99f0db]" />
             </div>
+          </div>
           </div>
 
           <div className="mt-6 flex h-[96px] items-end gap-2 border-t border-white/10 pt-5">
@@ -171,7 +178,7 @@ export default function Analytics() {
                 </span>
               </div>
               <p className="mt-1 text-[13px] leading-5 text-[#65716f]">
-                CBC, HbA1c and Vitamin D are grouped for quick review.
+                {hasMember ? "CBC, HbA1c and Vitamin D are grouped for quick review." : "Upload reports to create this summary."}
               </p>
             </div>
           </div>
@@ -187,31 +194,38 @@ export default function Analytics() {
           </button>
         </div>
 
-        <div className="mt-3 space-y-3">
-          {visibleParameters.map((param) => (
-            <article key={param.name} className="rounded-lg border border-[#e2ebe8] bg-white p-4 shadow-[0_10px_28px_rgba(20,67,60,0.05)]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="truncate text-[15px] font-black text-[#162523]">{param.name}</h3>
-                  <p className="mt-1 text-[12px] font-medium text-[#7b8986]">{param.range}</p>
+        {hasMember ? (
+          <div className="mt-3 space-y-3">
+            {visibleParameters.map((param) => (
+              <article key={param.name} className="rounded-lg border border-[#e2ebe8] bg-white p-4 shadow-[0_10px_28px_rgba(20,67,60,0.05)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-[15px] font-black text-[#162523]">{param.name}</h3>
+                    <p className="mt-1 text-[12px] font-medium text-[#7b8986]">{param.range}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[17px] font-black text-[#162523]">{param.value}</p>
+                    <p className={`mt-1 rounded-md px-2 py-1 text-[11px] font-bold ${statusStyles(param.tone)}`}>
+                      {param.status}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-[17px] font-black text-[#162523]">{param.value}</p>
-                  <p className={`mt-1 rounded-md px-2 py-1 text-[11px] font-bold ${statusStyles(param.tone)}`}>
-                    {param.status}
-                  </p>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#edf3f1]">
+                  <div className={`h-full rounded-full ${barColor(param.tone)}`} style={{ width: param.width }} />
                 </div>
-              </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#edf3f1]">
-                <div className={`h-full rounded-full ${barColor(param.tone)}`} style={{ width: param.width }} />
-              </div>
-              <div className="mt-3 flex items-center justify-between text-[11px] font-bold text-[#8a9794]">
-                <span>Trend: {param.trend}</span>
-                <span>{param.width}</span>
-              </div>
-            </article>
-          ))}
-        </div>
+                <div className="mt-3 flex items-center justify-between text-[11px] font-bold text-[#8a9794]">
+                  <span>Trend: {param.trend}</span>
+                  <span>{param.width}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-3 rounded-lg border border-dashed border-[#c5d8d3] bg-white p-5 text-center">
+            <p className="text-[16px] font-black text-[#162523]">No analytics yet</p>
+            <p className="mt-2 text-[13px] text-[#65716f]">Add a member and upload reports to start tracking trends.</p>
+          </div>
+        )}
 
         <div className="mt-5 rounded-lg border border-[#e2ebe8] bg-white p-4">
           <div className="flex gap-3">

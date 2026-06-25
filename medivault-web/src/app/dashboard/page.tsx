@@ -16,6 +16,8 @@ export default function Dashboard() {
   const [notice, setNotice] = useState("");
   const attentionCount = reportsForActiveMember.filter((report) => report.abnormal > 0 || report.status === "Needs review").length;
   const recentReports = reportsForActiveMember.slice(0, 3);
+  const hasMembers = familyMembers.length > 0;
+  const activeMemberId = activeMember?.id ?? null;
 
   const attentionItems = useMemo(() => {
     if (!attentionCount) return attentionFallback.slice(0, 1);
@@ -37,7 +39,7 @@ export default function Dashboard() {
           <div className="min-w-0">
             <p className="text-[13px] font-medium text-[#6f7f7c]">MediVault</p>
             <h1 className="mt-1 text-[24px] font-bold leading-tight tracking-normal text-[#101c1c]">
-              Good morning, {activeMember.name}
+              {hasMembers ? `Good morning, ${activeMember?.name}` : "Add your first family member"}
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -58,57 +60,69 @@ export default function Dashboard() {
           </div>
         ) : null}
 
-        <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
-          {familyMembers.map((member) => (
-            <button
-              key={member.id}
-              onClick={() => setActiveMemberId(member.id)}
-              className={`min-w-[104px] rounded-lg border px-3 py-3 text-left ${
-                member.id === activeMember.id
-                  ? "border-[#0a7d6e] bg-[#0b2b2b] text-white shadow-[0_16px_32px_rgba(11,43,43,0.18)]"
-                  : "border-[#dce9e5] bg-white text-[#44524f]"
-              }`}
-            >
-              <span className="block text-[13px] font-bold">{member.name}</span>
-              <span className={`mt-1 block text-[11px] ${member.id === activeMember.id ? "text-[#aee7d9]" : "text-[#81908d]"}`}>
-                {member.relation} - {member.score}
-              </span>
-            </button>
-          ))}
-        </div>
+        {hasMembers ? (
+          <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+            {familyMembers.map((member) => (
+              <button
+                key={member.id}
+                onClick={() => setActiveMemberId(member.id)}
+                className={`min-w-[104px] rounded-lg border px-3 py-3 text-left ${
+                  member.id === activeMemberId
+                    ? "border-[#0a7d6e] bg-[#0b2b2b] text-white shadow-[0_16px_32px_rgba(11,43,43,0.18)]"
+                    : "border-[#dce9e5] bg-white text-[#44524f]"
+                }`}
+              >
+                <span className="block text-[13px] font-bold">{member.name}</span>
+                <span className={`mt-1 block text-[11px] ${member.id === activeMemberId ? "text-[#aee7d9]" : "text-[#81908d]"}`}>
+                  {member.relation} - {member.score}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-5 rounded-lg border border-dashed border-[#c5d8d3] bg-white p-5">
+            <p className="text-[16px] font-black text-[#162523]">Your vault is empty</p>
+            <p className="mt-2 text-[13px] text-[#65716f]">Add a family member first, then upload reports and track analytics.</p>
+            <Link href="/family" className="mt-4 inline-flex h-10 items-center rounded-lg bg-[#0a7d6e] px-4 text-[13px] font-bold text-white">
+              Add family member
+            </Link>
+          </div>
+        )}
 
         <div className="mt-5 overflow-hidden rounded-lg bg-[#102323] p-5 text-white shadow-[0_22px_52px_rgba(16,35,35,0.28)]">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[13px] font-medium text-[#a9bfba]">Health score</p>
               <div className="mt-2 flex items-end gap-2">
-                <span className="text-[56px] font-black leading-none tracking-normal">{activeMember.score}</span>
+                <span className="text-[56px] font-black leading-none tracking-normal">{hasMembers ? activeMember?.score : "--"}</span>
                 <span className="mb-2 text-[13px] font-semibold text-[#99f0db]">
-                  {activeMember.score >= 90 ? "Great" : activeMember.score >= 80 ? "Good" : "Watch"}
+                  {hasMembers ? (activeMember && activeMember.score >= 90 ? "Great" : activeMember && activeMember.score >= 80 ? "Good" : "Watch") : "Waiting"}
                 </span>
               </div>
               <p className="mt-3 max-w-[180px] text-[13px] leading-5 text-[#c5d4d1]">
-                {attentionCount} need attention from {reportsForActiveMember.length} reports.
+                {hasMembers ? `${attentionCount} need attention from ${reportsForActiveMember.length} reports.` : "Add members and reports to unlock health insights."}
               </p>
             </div>
 
             <div
               className="relative grid h-[116px] w-[116px] shrink-0 place-items-center rounded-full"
               style={{
-                background: `conic-gradient(#38d7b1 0 ${activeMember.score}%, rgba(255,255,255,0.12) ${activeMember.score}% 100%)`,
+                background: hasMembers
+                  ? `conic-gradient(#38d7b1 0 ${activeMember?.score ?? 0}%, rgba(255,255,255,0.12) ${activeMember?.score ?? 0}% 100%)`
+                  : "conic-gradient(#2b3a3a 0 100%, rgba(255,255,255,0.12) 100% 100%)",
               }}
             >
               <div className="grid h-[86px] w-[86px] place-items-center rounded-full bg-[#102323] text-center">
-                <span className="text-[12px] font-semibold text-[#99f0db]">{activeMember.score}%</span>
+                <span className="text-[12px] font-semibold text-[#99f0db]">{hasMembers ? `${activeMember?.score}%` : "0%"}</span>
                 <span className="-mt-2 text-[10px] text-[#a9bfba]">live</span>
               </div>
             </div>
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-2">
-            <Link href="/upload" className="flex h-[74px] flex-col items-center justify-center gap-2 rounded-lg bg-white/9 text-[11px] font-semibold text-white hover:bg-white/14">
+            <Link href={hasMembers ? "/upload" : "/family"} className="flex h-[74px] flex-col items-center justify-center gap-2 rounded-lg bg-white/9 text-[11px] font-semibold text-white hover:bg-white/14">
               <Icon name="upload" className="h-5 w-5 text-[#99f0db]" />
-              Upload report
+              {hasMembers ? "Upload report" : "Add member"}
             </Link>
             <Link href="/reports" className="flex h-[74px] flex-col items-center justify-center gap-2 rounded-lg bg-white/9 text-[11px] font-semibold text-white hover:bg-white/14">
               <Icon name="reports" className="h-5 w-5 text-[#99f0db]" />
@@ -150,7 +164,8 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        <div className="mt-3 space-y-3">
+        {recentReports.length ? (
+          <div className="mt-3 space-y-3">
           {recentReports.map((report) => (
             <Link key={report.id} href="/reports" className="flex items-center gap-3 rounded-lg border border-[#e2ebe8] bg-white p-4 hover:border-[#a5dcd0]">
               <div className="grid h-12 w-12 place-items-center rounded-lg bg-[#f1f6f4] text-[#087766]">
@@ -165,7 +180,13 @@ export default function Dashboard() {
               <span className="rounded-md bg-[#f1f6f4] px-2.5 py-1 text-[11px] font-bold text-[#52605d]">{report.status}</span>
             </Link>
           ))}
-        </div>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-lg border border-dashed border-[#c5d8d3] bg-white p-5">
+            <p className="text-[14px] font-black text-[#162523]">No reports yet</p>
+            <p className="mt-2 text-[13px] text-[#65716f]">Upload a report to start building this vault.</p>
+          </div>
+        )}
       </section>
     </MobileShell>
   );

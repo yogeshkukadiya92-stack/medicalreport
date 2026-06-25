@@ -36,72 +36,22 @@ type NewReportInput = {
 };
 
 type AppDataContextValue = {
-  activeMember: FamilyMember;
-  activeMemberId: string;
+  activeMember: FamilyMember | null;
+  activeMemberId: string | null;
   addMember: (name: string, relation: string) => void;
   addReport: (input: NewReportInput) => AppReport;
   deleteReport: (reportId: string) => void;
   familyMembers: FamilyMember[];
+  updateMember: (memberId: string, patch: Partial<Pick<FamilyMember, "name" | "relation" | "age" | "bloodGroup">>) => void;
   markReviewed: (reportId: string) => void;
   reports: AppReport[];
   reportsForActiveMember: AppReport[];
-  setActiveMemberId: (memberId: string) => void;
+  setActiveMemberId: (memberId: string | null) => void;
   toggleStar: (reportId: string) => void;
 };
 
-const seedFamilyMembers: FamilyMember[] = [
-  { id: "rajesh", name: "Rajesh", relation: "You", score: 85, bloodGroup: "B+", age: 45 },
-  { id: "priya", name: "Priya", relation: "Spouse", score: 92, bloodGroup: "A+", age: 40 },
-  { id: "mohan", name: "Mohan", relation: "Parent", score: 68, bloodGroup: "O+", age: 72 },
-];
-
-const seedReports: AppReport[] = [
-  {
-    id: "cbc",
-    title: "Complete Blood Count",
-    lab: "Apollo Diagnostics",
-    date: "20 Jun",
-    memberId: "rajesh",
-    memberName: "Rajesh",
-    fileName: "cbc-jun.pdf",
-    parameters: 20,
-    abnormal: 3,
-    status: "Needs review",
-    starred: false,
-    createdAt: 1718841600000,
-  },
-  {
-    id: "thyroid",
-    title: "Thyroid Function Test",
-    lab: "Lal Path Labs",
-    date: "10 May",
-    memberId: "rajesh",
-    memberName: "Rajesh",
-    fileName: "thyroid-may.pdf",
-    parameters: 3,
-    abnormal: 0,
-    status: "Reviewed",
-    starred: true,
-    createdAt: 1715299200000,
-  },
-  {
-    id: "lipid",
-    title: "Lipid Profile",
-    lab: "Apollo Diagnostics",
-    date: "22 Apr",
-    memberId: "rajesh",
-    memberName: "Rajesh",
-    fileName: "lipid-apr.pdf",
-    parameters: 5,
-    abnormal: 2,
-    status: "Watch",
-    starred: false,
-    createdAt: 1713744000000,
-  },
-];
-
 const AppDataContext = createContext<AppDataContextValue | null>(null);
-const storageKey = "medivault-app-data-v1";
+const storageKey = "medivault-app-data-v2";
 
 function todayLabel() {
   return new Intl.DateTimeFormat("en", { day: "2-digit", month: "short" }).format(new Date());
@@ -126,9 +76,9 @@ function finishProcessing(report: AppReport): AppReport {
 }
 
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
-  const [familyMembers, setFamilyMembers] = useState(seedFamilyMembers);
-  const [reports, setReports] = useState(seedReports);
-  const [activeMemberId, setActiveMemberId] = useState(seedFamilyMembers[0].id);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [reports, setReports] = useState<AppReport[]>([]);
+  const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
@@ -140,7 +90,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           familyMembers?: FamilyMember[];
           reports?: AppReport[];
         };
-        if (Array.isArray(parsed.familyMembers)) setFamilyMembers(parsed.familyMembers.length ? parsed.familyMembers : seedFamilyMembers);
+        if (Array.isArray(parsed.familyMembers)) setFamilyMembers(parsed.familyMembers);
         if (Array.isArray(parsed.reports)) {
           setReports(
             parsed.reports.map((report) =>
@@ -175,8 +125,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [isHydrated, reports]);
 
-  const activeMember = familyMembers.find((member) => member.id === activeMemberId) ?? familyMembers[0];
-  const reportsForActiveMember = reports.filter((report) => report.memberId === activeMember.id);
+  const activeMember = activeMemberId ? familyMembers.find((member) => member.id === activeMemberId) ?? null : null;
+  const reportsForActiveMember = activeMember ? reports.filter((report) => report.memberId === activeMember.id) : [];
 
   const value = useMemo<AppDataContextValue>(
     () => ({
@@ -197,7 +147,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         setActiveMemberId(nextMember.id);
       },
       addReport: (input) => {
-        const member = familyMembers.find((item) => item.id === input.memberId) ?? activeMember;
+        const member = familyMembers.find((item) => item.id === input.memberId) ?? activeMember ?? familyMembers[0];
+        if (!member) {
+          throw new Error("Cannot add report without a family member");
+        }
         const nextReport: AppReport = {
           id: `${Date.now()}`,
           title: input.title.trim() || "Medical Report",
@@ -217,6 +170,18 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       deleteReport: (reportId) => setReports((current) => current.filter((report) => report.id !== reportId)),
       familyMembers,
+      updateMember: (memberId, patch) => {
+        setFamilyMembers((current) =>
+          current.map((member) => (member.id === memberId ? { ...member, ...patch } : member)),
+        );
+        setReports((current) =>
+          current.map((report) =>
+            report.memberId === memberId && patch.name
+              ? { ...report, memberName: patch.name }
+              : report,
+          ),
+        );
+      },
       markReviewed: (reportId) =>
         setReports((current) =>
           current.map((report) =>
