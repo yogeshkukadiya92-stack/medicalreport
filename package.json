@@ -1,0 +1,11 @@
+{
+  "name": "medicalreport",
+  "private": true,
+  "scripts": {
+    "build": "cd medivault-web && npm ci && npm run build",
+    "start": "cd medivault-web && npm run start"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
