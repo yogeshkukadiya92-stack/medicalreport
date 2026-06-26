@@ -46,10 +46,12 @@ export async function POST(request: NextRequest) {
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
   const body = await request.json().catch(() => null) as {
     fileDataUrl?: string;
+    fileDataUrls?: string[];
     fileName?: string;
     lab?: string;
     memberName?: string;
     mimeType?: string;
+    originalMimeType?: string;
     title?: string;
   } | null;
 
@@ -65,29 +67,33 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const isImage = Boolean(body.mimeType?.startsWith("image/") && body.fileDataUrl);
+  const imageUrls = (Array.isArray(body.fileDataUrls) && body.fileDataUrls.length ? body.fileDataUrls : body.fileDataUrl ? [body.fileDataUrl] : [])
+    .filter((url) => typeof url === "string" && url.startsWith("data:image/"))
+    .slice(0, 2);
+  const isImage = Boolean(body.mimeType?.startsWith("image/") && imageUrls.length);
   if (!isImage) {
     return NextResponse.json(
-      fallbackAnalysis(title, "PDF upload is saved. Image-based AI extraction is live; PDF text extraction needs a PDF parser service before reliable value extraction."),
+      fallbackAnalysis(title, "This file could not be prepared for AI analysis. Upload a JPG, PNG, or readable PDF."),
       { status: 200 },
     );
   }
 
-  if (body.fileDataUrl && body.fileDataUrl.length > 5_500_000) {
+  if (imageUrls.some((url) => url.length > 5_500_000)) {
     return NextResponse.json(
-      fallbackAnalysis(title, "Image is too large for AI analysis. Crop the report area or upload a clearer screenshot under 4 MB."),
+      fallbackAnalysis(title, "File page is too large for AI analysis. Crop the report area or upload a clearer screenshot under 4 MB."),
       { status: 200 },
     );
   }
 
   const prompt = [
-    "Analyze this medical report image for a personal health vault.",
+    "Analyze these medical report page images for a personal health vault.",
     "Return only JSON with: title, category, summary, markers.",
     "markers must be an array of {name,value,range,status}; status must be Normal, High, Low, or Watch.",
     "Keep summary short, doctor-ready, and avoid diagnosis. Mention that a doctor should review abnormal results.",
     `Patient/member: ${body.memberName || "Family member"}`,
     `Uploaded title: ${title}`,
     `Lab/doctor: ${body.lab || "Unknown"}`,
+    `Original file type: ${body.originalMimeType || body.mimeType || "Unknown"}`,
   ].join("\n");
 
   let openAiResponse: Response;
@@ -105,7 +111,7 @@ export async function POST(request: NextRequest) {
           role: "user",
           content: [
             { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: body.fileDataUrl, detail: "high" } },
+            ...imageUrls.map((url) => ({ type: "image_url", image_url: { url, detail: "high" } })),
           ],
         },
       ],

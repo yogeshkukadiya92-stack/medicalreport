@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 
+type PreparedFile = {
+  dataUrls: string[];
+  mimeType: string;
+};
+
 export default function Upload() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -39,17 +44,22 @@ export default function Upload() {
     return () => window.clearInterval(timer);
   }, [isSaving]);
 
-  async function readFileAsDataUrl(file: File) {
+  async function prepareFileForAi(file: File): Promise<PreparedFile> {
     if (file.type.startsWith("image/")) {
-      return compressImageForAi(file);
+      return { dataUrls: [await compressImageForAi(file)], mimeType: "image/jpeg" };
     }
 
-    return new Promise<string>((resolve, reject) => {
+    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+      return { dataUrls: await renderPdfForAi(file), mimeType: "image/jpeg" };
+    }
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result ?? ""));
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
+    return { dataUrls: [dataUrl], mimeType: file.type };
   }
 
   async function compressImageForAi(file: File) {
@@ -76,6 +86,32 @@ export default function Upload() {
     } finally {
       URL.revokeObjectURL(sourceUrl);
     }
+  }
+
+  async function renderPdfForAi(file: File) {
+    const pdfjs = await import("pdfjs-dist");
+    pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+
+    const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+    const pageCount = Math.min(pdf.numPages, 2);
+    const pages: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const baseViewport = page.getViewport({ scale: 1 });
+      const scale = Math.min(2, 1500 / Math.max(baseViewport.width, baseViewport.height));
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("PDF rendering is not available on this device.");
+      await page.render({ canvasContext: context, viewport }).promise;
+      pages.push(canvas.toDataURL("image/jpeg", 0.82));
+    }
+
+    if (!pages.length) throw new Error("Could not read this PDF. Try uploading a clearer report image.");
+    return pages;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -109,19 +145,21 @@ export default function Upload() {
 
     try {
       setAnalysisProgress(18);
-      setAnalysisStep(file.type.startsWith("image/") ? "Preparing image" : "Preparing file");
-      const fileDataUrl = await readFileAsDataUrl(file);
+      setAnalysisStep(file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf") ? "Preparing PDF pages" : "Preparing image");
+      const preparedFile = await prepareFileForAi(file);
       setAnalysisProgress(38);
       setAnalysisStep("Uploading securely");
       const response = await fetch("/api/analyze-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fileDataUrl,
+          fileDataUrl: preparedFile.dataUrls[0],
+          fileDataUrls: preparedFile.dataUrls,
           fileName: file.name,
           lab,
           memberName: report.memberName,
-          mimeType: file.type,
+          mimeType: preparedFile.mimeType,
+          originalMimeType: file.type,
           title: report.title,
         }),
       });
