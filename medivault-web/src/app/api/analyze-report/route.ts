@@ -18,6 +18,27 @@ const fallbackMarkers: ReportMarker[] = [
   { name: "Report", value: "Uploaded", range: "Needs review", status: "Watch" },
 ];
 
+function getAiProvider() {
+  const provider = (process.env.AI_PROVIDER || "openai").toLowerCase();
+  if (provider === "nvidia") {
+    return {
+      apiKey: process.env.NVIDIA_API_KEY,
+      baseUrl: (process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com").replace(/\/$/, ""),
+      keyName: "NVIDIA_API_KEY",
+      model: process.env.NVIDIA_MODEL || "meta/llama-3.2-11b-vision-instruct",
+      providerName: "NVIDIA",
+    };
+  }
+
+  return {
+    apiKey: process.env.OPENAI_API_KEY,
+    baseUrl: "https://api.openai.com",
+    keyName: "OPENAI_API_KEY",
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    providerName: "OpenAI",
+  };
+}
+
 function fallbackAnalysis(title: string, reason: string): AnalysisResponse {
   return {
     abnormal: 1,
@@ -42,8 +63,7 @@ function cleanMarker(marker: Partial<ReportMarker>): ReportMarker {
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const aiProvider = getAiProvider();
   const body = await request.json().catch(() => null) as {
     fileDataUrl?: string;
     fileDataUrls?: string[];
@@ -60,9 +80,9 @@ export async function POST(request: NextRequest) {
   }
 
   const title = body.title || body.fileName?.replace(/\.[^.]+$/, "") || "Medical Report";
-  if (!apiKey) {
+  if (!aiProvider.apiKey) {
     return NextResponse.json(
-      fallbackAnalysis(title, "OpenAI API key is not configured yet. Add OPENAI_API_KEY in Railway Variables to enable live AI analysis."),
+      fallbackAnalysis(title, `${aiProvider.providerName} API key is not configured yet. Add ${aiProvider.keyName} in Railway Variables to enable live AI analysis.`),
       { status: 200 },
     );
   }
@@ -98,14 +118,14 @@ export async function POST(request: NextRequest) {
 
   let openAiResponse: Response;
   try {
-    openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    openAiResponse = await fetch(`${aiProvider.baseUrl}/v1/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${aiProvider.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model,
+      model: aiProvider.model,
       messages: [
         {
           role: "user",
@@ -121,7 +141,7 @@ export async function POST(request: NextRequest) {
     });
   } catch {
     return NextResponse.json(
-      fallbackAnalysis(title, "AI service connection failed. Confirm OPENAI_API_KEY is set on Railway and redeploy the app."),
+      fallbackAnalysis(title, `${aiProvider.providerName} service connection failed. Confirm ${aiProvider.keyName} is set on Railway and redeploy the app.`),
       { status: 200 },
     );
   }
@@ -129,9 +149,9 @@ export async function POST(request: NextRequest) {
   if (!openAiResponse.ok) {
     const errorText = await openAiResponse.text();
     const friendlyError = errorText.includes("model")
-      ? "AI model is not available for this key. Set OPENAI_MODEL=gpt-4o-mini or remove OPENAI_MODEL from Railway Variables."
+      ? `AI model is not available for this key. Check ${aiProvider.providerName} model setting in Railway Variables.`
       : errorText.includes("Incorrect API key") || errorText.includes("invalid_api_key")
-        ? "OpenAI API key is invalid. Update OPENAI_API_KEY in Railway Variables and redeploy."
+        ? `${aiProvider.providerName} API key is invalid. Update ${aiProvider.keyName} in Railway Variables and redeploy.`
         : `AI analysis could not finish: ${errorText.slice(0, 180)}`;
     return NextResponse.json(
       fallbackAnalysis(title, friendlyError),
