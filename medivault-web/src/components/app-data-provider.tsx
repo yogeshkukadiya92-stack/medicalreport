@@ -47,11 +47,19 @@ type NewReportInput = {
 };
 
 type ReportPatch = Partial<Pick<AppReport, "title" | "lab" | "category" | "status" | "summary" | "markers" | "abnormal" | "parameters" | "aiConfidence">>;
+type ManualReportInput = {
+  category: string;
+  lab: string;
+  markers: ReportMarker[];
+  memberId: string;
+  title: string;
+};
 
 type AppDataContextValue = {
   activeMember: FamilyMember | null;
   activeMemberId: string | null;
   addMember: (name: string, relation: string) => void;
+  addManualReport: (input: ManualReportInput) => AppReport;
   addReport: (input: NewReportInput) => AppReport;
   deleteMember: (memberId: string) => void;
   deleteReport: (reportId: string) => void;
@@ -162,6 +170,36 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         };
         setFamilyMembers((current) => [...current, nextMember]);
         setActiveMemberId(nextMember.id);
+      },
+      addManualReport: (input) => {
+        const member = familyMembers.find((item) => item.id === input.memberId) ?? activeMember ?? familyMembers[0];
+        if (!member) {
+          throw new Error("Cannot add report without a family member");
+        }
+        const markers = input.markers.filter((marker) => marker.name.trim() && marker.value.trim());
+        const abnormal = markers.filter((marker) => marker.status !== "Normal").length;
+        const nextReport: AppReport = {
+          id: `${Date.now()}`,
+          title: input.title.trim() || "Manual health values",
+          category: input.category.trim() || "Manual",
+          lab: input.lab.trim() || "Manual entry",
+          date: todayLabel(),
+          memberId: member.id,
+          memberName: member.name,
+          fileName: "Manual entry",
+          parameters: markers.length,
+          abnormal,
+          status: abnormal ? "Needs review" : "Reviewed",
+          starred: false,
+          summary: abnormal
+            ? `Manual entry has ${abnormal} value${abnormal > 1 ? "s" : ""} marked for review.`
+            : "Manual entry saved with values in normal range.",
+          markers,
+          aiConfidence: 0,
+          createdAt: Date.now(),
+        };
+        setReports((current) => [nextReport, ...current]);
+        return nextReport;
       },
       addReport: (input) => {
         const member = familyMembers.find((item) => item.id === input.memberId) ?? activeMember ?? familyMembers[0];

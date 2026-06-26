@@ -2,13 +2,49 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { AppReport } from "@/components/app-data-provider";
+import type { AppReport, ReportMarker } from "@/components/app-data-provider";
 import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 
 type Filter = "All" | "Starred" | "Needs review" | "Processing" | "Reviewed";
 
 const filters: Filter[] = ["All", "Starred", "Needs review", "Processing", "Reviewed"];
+const biomarkerSuggestions = [
+  "Vitamin D",
+  "Vitamin B12",
+  "HbA1c",
+  "Fasting Blood Sugar",
+  "Postprandial Blood Sugar",
+  "Random Blood Sugar",
+  "Hemoglobin",
+  "WBC",
+  "RBC",
+  "Platelets",
+  "TSH",
+  "T3",
+  "T4",
+  "Total Cholesterol",
+  "LDL Cholesterol",
+  "HDL Cholesterol",
+  "Triglycerides",
+  "Creatinine",
+  "Uric Acid",
+  "SGPT",
+  "SGOT",
+  "Bilirubin",
+  "Calcium",
+  "Ferritin",
+];
+
+type ManualMarkerDraft = ReportMarker & { id: string };
+
+const emptyMarker = (): ManualMarkerDraft => ({
+  id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  name: "",
+  range: "",
+  status: "Normal",
+  value: "",
+});
 
 function statusClass(report: AppReport) {
   if (report.status === "Processing") return "bg-[#eef5ff] text-[#4167a8]";
@@ -23,12 +59,19 @@ function markerClass(status: string) {
 }
 
 export default function Reports() {
-  const { activeMember, deleteReport, markReviewed, reportsForActiveMember, toggleStar, updateReport } = useAppData();
+  const { activeMember, addManualReport, deleteReport, markReviewed, reportsForActiveMember, toggleStar, updateReport } = useAppData();
   const [filter, setFilter] = useState<Filter>("All");
   const [query, setQuery] = useState("");
   const [selectedReport, setSelectedReport] = useState<AppReport | null>(null);
   const [editingReport, setEditingReport] = useState<AppReport | null>(null);
   const [editForm, setEditForm] = useState({ title: "", lab: "", category: "", summary: "" });
+  const [isManualOpen, setIsManualOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    category: "Manual",
+    lab: "Manual entry",
+    title: "Manual health values",
+  });
+  const [manualMarkers, setManualMarkers] = useState<ManualMarkerDraft[]>([emptyMarker()]);
   const hasMember = Boolean(activeMember);
 
   const filteredReports = useMemo(() => {
@@ -65,6 +108,33 @@ export default function Reports() {
     setEditingReport(null);
   }
 
+  function updateManualMarker(id: string, patch: Partial<ManualMarkerDraft>) {
+    setManualMarkers((current) => current.map((marker) => (marker.id === id ? { ...marker, ...patch } : marker)));
+  }
+
+  function saveManualReport() {
+    if (!activeMember) return;
+    const markers = manualMarkers
+      .filter((marker) => marker.name.trim() && marker.value.trim())
+      .map(({ id: _id, ...marker }) => ({
+        ...marker,
+        name: marker.name.trim(),
+        range: marker.range.trim() || "Reference range not added",
+        value: marker.value.trim(),
+      }));
+    if (!markers.length) return;
+    addManualReport({
+      category: manualForm.category,
+      lab: manualForm.lab,
+      markers,
+      memberId: activeMember.id,
+      title: manualForm.title,
+    });
+    setManualForm({ category: "Manual", lab: "Manual entry", title: "Manual health values" });
+    setManualMarkers([emptyMarker()]);
+    setIsManualOpen(false);
+  }
+
   return (
     <MobileShell>
       <section className="px-5 pt-6">
@@ -77,6 +147,16 @@ export default function Reports() {
             <Icon name="upload" className="h-5 w-5" />
           </Link>
         </div>
+
+        {hasMember ? (
+          <button
+            onClick={() => setIsManualOpen(true)}
+            className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0a7d6e] text-[14px] font-bold text-white shadow-[0_12px_30px_rgba(10,125,110,0.18)]"
+          >
+            <span className="text-[18px] leading-none">+</span>
+            Add values manually
+          </button>
+        ) : null}
 
         <div className="mt-5 rounded-lg bg-[#102323] p-5 text-white shadow-[0_18px_44px_rgba(16,35,35,0.22)]">
           <div className="flex items-center justify-between">
@@ -259,6 +339,129 @@ export default function Reports() {
                   Save changes
                 </button>
               </div>
+            </div>
+          </div>
+        ) : null}
+
+        {isManualOpen ? (
+          <div className="fixed inset-0 z-50 grid place-items-end bg-black/30 px-4 pb-4">
+            <div className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-lg bg-white p-5 shadow-[0_24px_70px_rgba(0,0,0,0.22)]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[12px] font-bold text-[#087766]">Manual entry</p>
+                  <h2 className="mt-1 text-[20px] font-black text-[#162523]">Add health values</h2>
+                </div>
+                <button onClick={() => setIsManualOpen(false)} className="h-9 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-3">
+                <input
+                  value={manualForm.title}
+                  onChange={(event) => setManualForm((current) => ({ ...current, title: event.target.value }))}
+                  className="h-11 w-full rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                  placeholder="Report title"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={manualForm.category}
+                    onChange={(event) => setManualForm((current) => ({ ...current, category: event.target.value }))}
+                    className="h-11 w-full rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                    placeholder="Category"
+                  />
+                  <input
+                    value={manualForm.lab}
+                    onChange={(event) => setManualForm((current) => ({ ...current, lab: event.target.value }))}
+                    className="h-11 w-full rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                    placeholder="Lab or source"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {manualMarkers.map((marker, index) => {
+                  const markerSuggestions = biomarkerSuggestions
+                    .filter((name) => name.toLowerCase().includes(marker.name.toLowerCase().trim()))
+                    .slice(0, 5);
+                  return (
+                    <div key={marker.id} className="rounded-lg border border-[#e2ebe8] bg-[#fbfdfc] p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[12px] font-black text-[#162523]">Value {index + 1}</p>
+                        {manualMarkers.length > 1 ? (
+                          <button onClick={() => setManualMarkers((current) => current.filter((item) => item.id !== marker.id))} className="text-[12px] font-bold text-[#ba563d]">
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+                      <label className="mt-3 block">
+                        <span className="text-[11px] font-bold text-[#52605d]">Test name</span>
+                        <input
+                          list={`biomarkers-${marker.id}`}
+                          value={marker.name}
+                          onChange={(event) => updateManualMarker(marker.id, { name: event.target.value })}
+                          className="mt-1 h-11 w-full rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold"
+                          placeholder="Type vitamin, sugar, cholesterol..."
+                        />
+                        <datalist id={`biomarkers-${marker.id}`}>
+                          {markerSuggestions.map((name) => (
+                            <option key={name} value={name} />
+                          ))}
+                        </datalist>
+                        {marker.name ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {markerSuggestions.map((name) => (
+                              <button
+                                key={name}
+                                type="button"
+                                onClick={() => updateManualMarker(marker.id, { name })}
+                                className="rounded-md bg-[#e8f7f2] px-2.5 py-1 text-[11px] font-bold text-[#087766]"
+                              >
+                                {name}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </label>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <input
+                          value={marker.value}
+                          onChange={(event) => updateManualMarker(marker.id, { value: event.target.value })}
+                          className="h-11 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold"
+                          placeholder="Value e.g. 18 ng/mL"
+                        />
+                        <select
+                          value={marker.status}
+                          onChange={(event) => updateManualMarker(marker.id, { status: event.target.value as ReportMarker["status"] })}
+                          className="h-11 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold"
+                        >
+                          <option>Normal</option>
+                          <option>High</option>
+                          <option>Low</option>
+                          <option>Watch</option>
+                        </select>
+                      </div>
+                      <input
+                        value={marker.range}
+                        onChange={(event) => updateManualMarker(marker.id, { range: event.target.value })}
+                        className="mt-2 h-11 w-full rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold"
+                        placeholder="Reference range e.g. 30-100 ng/mL"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setManualMarkers((current) => [...current, emptyMarker()])}
+                className="mt-3 h-11 w-full rounded-lg border border-[#dce9e5] bg-white text-[13px] font-bold text-[#087766]"
+              >
+                Add another value
+              </button>
+              <button onClick={saveManualReport} className="mt-3 h-11 w-full rounded-lg bg-[#0a7d6e] text-[13px] font-bold text-white">
+                Save manual report
+              </button>
             </div>
           </div>
         ) : null}
