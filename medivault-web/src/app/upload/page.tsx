@@ -28,12 +28,42 @@ export default function Upload() {
   }, [activeMember, familyMembers]);
 
   async function readFileAsDataUrl(file: File) {
+    if (file.type.startsWith("image/")) {
+      return compressImageForAi(file);
+    }
+
     return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result ?? ""));
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
+  }
+
+  async function compressImageForAi(file: File) {
+    const sourceUrl = URL.createObjectURL(file);
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Could not read this image. Try another screenshot or photo."));
+        img.src = sourceUrl;
+      });
+
+      const maxSide = 1600;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Image processing is not available on this device.");
+      context.drawImage(image, 0, 0, width, height);
+      return canvas.toDataURL("image/jpeg", 0.82);
+    } finally {
+      URL.revokeObjectURL(sourceUrl);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -75,8 +105,8 @@ export default function Upload() {
           title: report.title,
         }),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result?.error ?? "AI analysis failed");
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error ?? "AI analysis failed. Please try a clearer report image.");
       updateReport(report.id, {
         abnormal: result.abnormal,
         aiConfidence: result.aiConfidence,
@@ -92,7 +122,10 @@ export default function Upload() {
       updateReport(report.id, {
         category: "General",
         status: "Watch",
-        summary: analysisError instanceof Error ? analysisError.message : "AI analysis could not finish. Keep this report for manual review.",
+        summary:
+          analysisError instanceof Error && analysisError.message !== "Load failed"
+            ? analysisError.message
+            : "AI analysis could not connect. Check Railway OPENAI_API_KEY and try again with a clear JPG/PNG report image.",
       });
     } finally {
       setIsSaving(false);

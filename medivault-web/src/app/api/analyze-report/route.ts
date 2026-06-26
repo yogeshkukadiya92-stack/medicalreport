@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ReportMarker, ReportStatus } from "@/components/app-data-provider";
 
+export const maxDuration = 45;
+
 type AnalysisResponse = {
   abnormal: number;
   aiConfidence: number;
@@ -71,6 +73,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (body.fileDataUrl && body.fileDataUrl.length > 5_500_000) {
+    return NextResponse.json(
+      fallbackAnalysis(title, "Image is too large for AI analysis. Crop the report area or upload a clearer screenshot under 4 MB."),
+      { status: 200 },
+    );
+  }
+
   const prompt = [
     "Analyze this medical report image for a personal health vault.",
     "Return only JSON with: title, category, summary, markers.",
@@ -81,7 +90,9 @@ export async function POST(request: NextRequest) {
     `Lab/doctor: ${body.lab || "Unknown"}`,
   ].join("\n");
 
-  const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+  let openAiResponse: Response;
+  try {
+    openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -101,12 +112,23 @@ export async function POST(request: NextRequest) {
       response_format: { type: "json_object" },
       temperature: 0.1,
     }),
-  });
+    });
+  } catch {
+    return NextResponse.json(
+      fallbackAnalysis(title, "AI service connection failed. Confirm OPENAI_API_KEY is set on Railway and redeploy the app."),
+      { status: 200 },
+    );
+  }
 
   if (!openAiResponse.ok) {
     const errorText = await openAiResponse.text();
+    const friendlyError = errorText.includes("model")
+      ? "AI model is not available for this key. Set OPENAI_MODEL=gpt-4o-mini or remove OPENAI_MODEL from Railway Variables."
+      : errorText.includes("Incorrect API key") || errorText.includes("invalid_api_key")
+        ? "OpenAI API key is invalid. Update OPENAI_API_KEY in Railway Variables and redeploy."
+        : `AI analysis could not finish: ${errorText.slice(0, 180)}`;
     return NextResponse.json(
-      fallbackAnalysis(title, `AI analysis could not finish: ${errorText.slice(0, 180)}`),
+      fallbackAnalysis(title, friendlyError),
       { status: 200 },
     );
   }
