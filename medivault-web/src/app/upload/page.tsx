@@ -17,6 +17,8 @@ export default function Upload() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisStep, setAnalysisStep] = useState("");
   const hasMembers = familyMembers.length > 0;
 
   useEffect(() => {
@@ -26,6 +28,16 @@ export default function Upload() {
       setMemberId(familyMembers[0].id);
     }
   }, [activeMember, familyMembers]);
+
+  useEffect(() => {
+    if (!isSaving) return;
+
+    const timer = window.setInterval(() => {
+      setAnalysisProgress((current) => (current < 92 ? Math.min(current + 3, 92) : current));
+    }, 850);
+
+    return () => window.clearInterval(timer);
+  }, [isSaving]);
 
   async function readFileAsDataUrl(file: File) {
     if (file.type.startsWith("image/")) {
@@ -71,6 +83,8 @@ export default function Upload() {
     setError("");
     setMessage("");
     setIsSaving(false);
+    setAnalysisProgress(0);
+    setAnalysisStep("");
 
     const file = inputRef.current?.files?.[0] ?? null;
     if (!file) {
@@ -79,6 +93,8 @@ export default function Upload() {
     }
 
     setIsSaving(true);
+    setAnalysisProgress(8);
+    setAnalysisStep("Saving report");
     const report = addReport({
       fileName,
       lab,
@@ -92,7 +108,11 @@ export default function Upload() {
     if (inputRef.current) inputRef.current.value = "";
 
     try {
+      setAnalysisProgress(18);
+      setAnalysisStep(file.type.startsWith("image/") ? "Preparing image" : "Preparing file");
       const fileDataUrl = await readFileAsDataUrl(file);
+      setAnalysisProgress(38);
+      setAnalysisStep("Uploading securely");
       const response = await fetch("/api/analyze-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -105,8 +125,12 @@ export default function Upload() {
           title: report.title,
         }),
       });
+      setAnalysisProgress(76);
+      setAnalysisStep("Reading values");
       const result = await response.json().catch(() => null);
       if (!response.ok) throw new Error(result?.error ?? "AI analysis failed. Please try a clearer report image.");
+      setAnalysisProgress(94);
+      setAnalysisStep("Building summary");
       updateReport(report.id, {
         abnormal: result.abnormal,
         aiConfidence: result.aiConfidence,
@@ -117,8 +141,12 @@ export default function Upload() {
         summary: result.summary,
         title: result.title || report.title,
       });
+      setAnalysisProgress(100);
+      setAnalysisStep("Complete");
       setMessage(`${report.title} analyzed and added to reports.`);
     } catch (analysisError) {
+      setAnalysisProgress(100);
+      setAnalysisStep("Needs attention");
       updateReport(report.id, {
         category: "General",
         status: "Watch",
@@ -128,8 +156,10 @@ export default function Upload() {
             : "AI analysis could not connect. Check Railway OPENAI_API_KEY and try again with a clear JPG/PNG report image.",
       });
     } finally {
-      setIsSaving(false);
-      window.setTimeout(() => router.push("/reports"), 500);
+      window.setTimeout(() => {
+        setIsSaving(false);
+        router.push("/reports");
+      }, 650);
     }
   }
 
@@ -204,10 +234,22 @@ export default function Upload() {
             <div className="rounded-lg border border-[#dce9e5] bg-white p-4">
               <div className="flex items-center justify-between text-[12px] font-bold text-[#52605d]">
                 <span>AI analysis</span>
-                <span>Working</span>
+                <span>{analysisProgress}%</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <p className="text-[15px] font-black text-[#162523]">{analysisStep || "Working"}</p>
+                <p className="text-right text-[11px] font-bold text-[#7b8986]">
+                  Usually 10-30 sec
+                </p>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f1]">
-                <div className="h-full w-3/4 rounded-full bg-[#0a7d6e]" />
+                <div className="h-full rounded-full bg-[#0a7d6e] transition-all duration-500" style={{ width: `${analysisProgress}%` }} />
+              </div>
+              <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[10px] font-bold text-[#7b8986]">
+                <span className={analysisProgress >= 8 ? "text-[#087766]" : ""}>Saved</span>
+                <span className={analysisProgress >= 18 ? "text-[#087766]" : ""}>Prepared</span>
+                <span className={analysisProgress >= 38 ? "text-[#087766]" : ""}>Uploaded</span>
+                <span className={analysisProgress >= 94 ? "text-[#087766]" : ""}>Summary</span>
               </div>
             </div>
           ) : null}
