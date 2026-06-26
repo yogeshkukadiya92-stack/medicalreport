@@ -28,6 +28,7 @@ function getAiProvider() {
       keyName: "NVIDIA_API_KEY",
       model: process.env.NVIDIA_MODEL || "meta/llama-3.2-11b-vision-instruct",
       providerName: "NVIDIA",
+      supportsJsonMode: false,
     };
   }
 
@@ -38,6 +39,7 @@ function getAiProvider() {
     keyName: "OPENAI_API_KEY",
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     providerName: "OpenAI",
+    supportsJsonMode: true,
   };
 }
 
@@ -62,6 +64,18 @@ function cleanMarker(marker: Partial<ReportMarker>): ReportMarker {
     status,
     value: String(marker.value || "--").slice(0, 60),
   };
+}
+
+function extractJsonObject(content: string) {
+  const trimmed = content.trim();
+  const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fencedMatch?.[1] ?? trimmed;
+  const firstBrace = candidate.indexOf("{");
+  const lastBrace = candidate.lastIndexOf("}");
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    return {};
+  }
+  return JSON.parse(candidate.slice(firstBrace, lastBrace + 1));
 }
 
 export async function POST(request: NextRequest) {
@@ -118,9 +132,29 @@ export async function POST(request: NextRequest) {
     `Uploaded title: ${title}`,
     `Lab/doctor: ${body.lab || "Unknown"}`,
     `Original file type: ${body.originalMimeType || body.mimeType || "Unknown"}`,
+    "JSON shape: {\"title\":\"...\",\"category\":\"...\",\"summary\":\"...\",\"markers\":[{\"name\":\"Vitamin D\",\"value\":\"18 ng/mL\",\"range\":\"30-100 ng/mL\",\"status\":\"Low\"}]}",
   ].join("\n");
 
   let openAiResponse: Response;
+  const imageContent = imageUrls.map((url) => ({
+    type: "image_url",
+    image_url: aiProvider.providerName === "NVIDIA" ? { url } : { url, detail: "high" },
+  }));
+  const requestPayload = {
+    model: aiProvider.model,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          ...imageContent,
+        ],
+      },
+    ],
+    ...(aiProvider.supportsJsonMode ? { response_format: { type: "json_object" } } : {}),
+    temperature: 0.1,
+  };
+
   try {
     openAiResponse = await fetch(`${aiProvider.baseUrl}/v1/chat/completions`, {
     method: "POST",
@@ -128,20 +162,7 @@ export async function POST(request: NextRequest) {
       Authorization: `Bearer ${aiProvider.apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: aiProvider.model,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            ...imageUrls.map((url) => ({ type: "image_url", image_url: { url, detail: "high" } })),
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.1,
-    }),
+    body: JSON.stringify(requestPayload),
     });
   } catch {
     return NextResponse.json(
@@ -156,7 +177,7 @@ export async function POST(request: NextRequest) {
       ? `AI model is not available for this key. Check ${aiProvider.providerName} model setting in Railway Variables.`
       : errorText.includes("Incorrect API key") || errorText.includes("invalid_api_key")
         ? `${aiProvider.providerName} API key is invalid. Update ${aiProvider.keyName} in Railway Variables and redeploy.`
-        : `AI analysis could not finish: ${errorText.slice(0, 180)}`;
+        : `AI analysis could not finish (${openAiResponse.status}): ${errorText.slice(0, 180)}`;
     return NextResponse.json(
       fallbackAnalysis(title, friendlyError),
       { status: 200 },
@@ -165,7 +186,7 @@ export async function POST(request: NextRequest) {
 
   const completion = await openAiResponse.json();
   const content = completion?.choices?.[0]?.message?.content;
-  const parsed = JSON.parse(content || "{}") as Partial<AnalysisResponse>;
+  const parsed = extractJsonObject(content || "{}") as Partial<AnalysisResponse>;
   const markers = Array.isArray(parsed.markers) ? parsed.markers.slice(0, 8).map(cleanMarker) : fallbackMarkers;
   const abnormal = markers.filter((marker) => marker.status !== "Normal").length;
 
