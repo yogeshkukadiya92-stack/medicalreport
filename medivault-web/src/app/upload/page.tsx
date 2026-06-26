@@ -9,7 +9,7 @@ import { Icon, MobileShell } from "@/components/mobile-shell";
 export default function Upload() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const { activeMember, addReport, familyMembers } = useAppData();
+  const { activeMember, addReport, familyMembers, updateReport } = useAppData();
   const [fileName, setFileName] = useState("");
   const [memberId, setMemberId] = useState("");
   const [title, setTitle] = useState("");
@@ -27,13 +27,23 @@ export default function Upload() {
     }
   }, [activeMember, familyMembers]);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function readFileAsDataUrl(file: File) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setMessage("");
     setIsSaving(false);
 
-    if (!fileName) {
+    const file = inputRef.current?.files?.[0] ?? null;
+    if (!file) {
       setError("Select a PDF or image first.");
       return;
     }
@@ -50,7 +60,44 @@ export default function Upload() {
     setLab("");
     setFileName("");
     if (inputRef.current) inputRef.current.value = "";
-    window.setTimeout(() => router.push("/reports"), 900);
+
+    try {
+      const fileDataUrl = await readFileAsDataUrl(file);
+      const response = await fetch("/api/analyze-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileDataUrl,
+          fileName: file.name,
+          lab,
+          memberName: report.memberName,
+          mimeType: file.type,
+          title: report.title,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error ?? "AI analysis failed");
+      updateReport(report.id, {
+        abnormal: result.abnormal,
+        aiConfidence: result.aiConfidence,
+        category: result.category,
+        markers: result.markers,
+        parameters: result.parameters,
+        status: result.status,
+        summary: result.summary,
+        title: result.title || report.title,
+      });
+      setMessage(`${report.title} analyzed and added to reports.`);
+    } catch (analysisError) {
+      updateReport(report.id, {
+        category: "General",
+        status: "Watch",
+        summary: analysisError instanceof Error ? analysisError.message : "AI analysis could not finish. Keep this report for manual review.",
+      });
+    } finally {
+      setIsSaving(false);
+      window.setTimeout(() => router.push("/reports"), 500);
+    }
   }
 
   return (

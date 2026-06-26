@@ -46,6 +46,8 @@ type NewReportInput = {
   title: string;
 };
 
+type ReportPatch = Partial<Pick<AppReport, "title" | "lab" | "category" | "status" | "summary" | "markers" | "abnormal" | "parameters" | "aiConfidence">>;
+
 type AppDataContextValue = {
   activeMember: FamilyMember | null;
   activeMemberId: string | null;
@@ -55,7 +57,7 @@ type AppDataContextValue = {
   deleteReport: (reportId: string) => void;
   familyMembers: FamilyMember[];
   updateMember: (memberId: string, patch: Partial<Pick<FamilyMember, "name" | "relation" | "age" | "bloodGroup">>) => void;
-  updateReport: (reportId: string, patch: Partial<Pick<AppReport, "title" | "lab" | "category" | "status" | "summary">>) => void;
+  updateReport: (reportId: string, patch: ReportPatch) => void;
   markReviewed: (reportId: string) => void;
   reports: AppReport[];
   reportsForActiveMember: AppReport[];
@@ -71,52 +73,15 @@ function todayLabel() {
 }
 
 function finishProcessing(report: AppReport): AppReport {
-  const text = `${report.title} ${report.fileName}`.toLowerCase();
-  const isSugar = text.includes("hba1c") || text.includes("sugar") || text.includes("diabetes");
-  const isVitamin = text.includes("vitamin");
-  const isLipid = text.includes("lipid") || text.includes("cholesterol");
-  const isBlood = text.includes("blood") || text.includes("cbc");
-  const needsReview = isSugar || isVitamin || isLipid || isBlood;
-  const category = isSugar ? "Diabetes" : isVitamin ? "Vitamin" : isLipid ? "Lipid" : isBlood ? "Blood" : "General";
-  const markers: ReportMarker[] = isSugar
-    ? [
-        { name: "HbA1c", value: "7.1%", range: "< 5.7%", status: "High" },
-        { name: "Fasting sugar", value: "142 mg/dL", range: "70-110 mg/dL", status: "High" },
-        { name: "Creatinine", value: "0.9 mg/dL", range: "0.7-1.3 mg/dL", status: "Normal" },
-      ]
-    : isVitamin
-      ? [
-          { name: "Vitamin D", value: "18 ng/mL", range: "30-100 ng/mL", status: "Low" },
-          { name: "Calcium", value: "9.3 mg/dL", range: "8.5-10.5 mg/dL", status: "Normal" },
-        ]
-      : isLipid
-        ? [
-            { name: "LDL", value: "115 mg/dL", range: "< 100 mg/dL", status: "Watch" },
-            { name: "Triglycerides", value: "168 mg/dL", range: "< 150 mg/dL", status: "High" },
-            { name: "HDL", value: "46 mg/dL", range: "> 40 mg/dL", status: "Normal" },
-          ]
-        : isBlood
-          ? [
-              { name: "Hemoglobin", value: "11.8 g/dL", range: "12-16 g/dL", status: "Low" },
-              { name: "WBC", value: "7,800/uL", range: "4,000-11,000/uL", status: "Normal" },
-              { name: "Platelets", value: "2.4 lakh/uL", range: "1.5-4.5 lakh/uL", status: "Normal" },
-            ]
-          : [
-              { name: "Key values", value: "Detected", range: "Report range", status: "Normal" },
-            ];
-  const abnormal = markers.filter((marker) => marker.status !== "Normal").length;
-
   return {
     ...report,
-    abnormal,
-    aiConfidence: needsReview ? 91 : 78,
-    category,
-    markers,
-    parameters: Math.max(report.parameters, markers.length + 5),
-    status: abnormal ? "Needs review" : "Reviewed",
-    summary: abnormal
-      ? `${category} report has ${abnormal} value${abnormal > 1 ? "s" : ""} outside range. Keep this ready for doctor review.`
-      : `${category} report looks stable from the detected values.`,
+    abnormal: 1,
+    aiConfidence: 0,
+    category: "General",
+    markers: [{ name: "Report", value: "Uploaded", range: "AI analysis pending", status: "Watch" }],
+    parameters: 1,
+    status: "Watch",
+    summary: "AI analysis did not finish. Check OPENAI_API_KEY in Railway Variables, then upload again or review manually.",
   };
 }
 
@@ -174,18 +139,6 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       setActiveMemberId(familyMembers[0].id);
     }
   }, [activeMemberId, familyMembers, isHydrated]);
-
-  useEffect(() => {
-    if (!isHydrated || !reports.some((report) => report.status === "Processing")) return;
-
-    const timer = window.setTimeout(() => {
-      setReports((current) =>
-        current.map((report) => (report.status === "Processing" ? finishProcessing(report) : report)),
-      );
-    }, 1800);
-
-    return () => window.clearTimeout(timer);
-  }, [isHydrated, reports]);
 
   const activeMember = activeMemberId
     ? familyMembers.find((member) => member.id === activeMemberId) ?? familyMembers[0] ?? null
