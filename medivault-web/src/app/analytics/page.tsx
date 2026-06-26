@@ -2,47 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import type { ReportMarker } from "@/components/app-data-provider";
 import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
-
-const parameters = [
-  {
-    name: "HbA1c",
-    value: "7.1%",
-    range: "Target < 5.7",
-    status: "High",
-    trend: "Stable",
-    width: "72%",
-    tone: "coral",
-  },
-  {
-    name: "Blood Sugar",
-    value: "142",
-    range: "70-110 mg/dL",
-    status: "High",
-    trend: "Stable",
-    width: "68%",
-    tone: "coral",
-  },
-  {
-    name: "LDL",
-    value: "115",
-    range: "< 100 mg/dL",
-    status: "Watch",
-    trend: "Improving",
-    width: "54%",
-    tone: "mint",
-  },
-  {
-    name: "Vitamin D",
-    value: "18",
-    range: "30-100 ng/mL",
-    status: "Low",
-    trend: "Needs care",
-    width: "36%",
-    tone: "blue",
-  },
-];
 
 const scoreBars = [44, 58, 52, 66, 61, 74, 70, 85];
 
@@ -58,6 +20,19 @@ function barColor(tone: string) {
   return "bg-[#0a7d6e]";
 }
 
+function markerTone(marker: ReportMarker) {
+  if (marker.status === "High" || marker.status === "Low") return "coral";
+  if (marker.status === "Watch") return "blue";
+  return "mint";
+}
+
+function markerWidth(marker: ReportMarker, index: number) {
+  if (marker.status === "High") return "78%";
+  if (marker.status === "Low") return "42%";
+  if (marker.status === "Watch") return "62%";
+  return `${Math.max(44, 76 - index * 6)}%`;
+}
+
 export default function Analytics() {
   const { activeMember, reportsForActiveMember } = useAppData();
   const [range, setRange] = useState("90 days");
@@ -68,10 +43,24 @@ export default function Analytics() {
   const verifiedPercent = reportsForActiveMember.length
     ? Math.round((reportsForActiveMember.filter((report) => report.status === "Reviewed" || report.status === "Normal").length / reportsForActiveMember.length) * 100)
     : 0;
-  const visibleParameters = useMemo(
-    () => (showFlaggedOnly ? parameters.filter((param) => param.status === "High" || param.status === "Low") : parameters),
-    [showFlaggedOnly],
-  );
+  const parameters = useMemo(() => {
+    return reportsForActiveMember.flatMap((report) =>
+      report.markers.map((marker, index) => ({
+        name: marker.name,
+        value: marker.value,
+        range: marker.range,
+        status: marker.status,
+        trend: marker.status === "Normal" ? "Stable" : report.status === "Needs review" ? "Needs care" : "Watch",
+        width: markerWidth(marker, index),
+        tone: markerTone(marker),
+      })),
+    );
+  }, [reportsForActiveMember]);
+  const visibleParameters = useMemo(() => {
+    const list = showFlaggedOnly ? parameters.filter((param) => param.status === "High" || param.status === "Low" || param.status === "Watch") : parameters;
+    return list.slice(0, 8);
+  }, [parameters, showFlaggedOnly]);
+  const latestSummary = reportsForActiveMember.find((report) => report.summary)?.summary;
 
   return (
     <MobileShell>
@@ -113,7 +102,7 @@ export default function Analytics() {
                 <span className="mb-2 rounded-md bg-[#173938] px-2 py-1 text-[11px] font-bold text-[#99f0db]">{hasMember ? "+4" : "--"}</span>
               </div>
               <p className="mt-3 text-[13px] leading-5 text-[#c5d4d1]">
-                {hasMember ? `${range} view, with ${flaggedCount} markers outside range.` : "Add a member and upload reports to unlock analytics."}
+                {hasMember ? `${range} view, with ${flaggedCount} report${flaggedCount === 1 ? "" : "s"} needing attention.` : "Add a member and upload reports to unlock analytics."}
               </p>
             </div>
 
@@ -178,7 +167,9 @@ export default function Analytics() {
                 </span>
               </div>
               <p className="mt-1 text-[13px] leading-5 text-[#65716f]">
-                {hasMember ? "CBC, HbA1c and Vitamin D are grouped for quick review." : "Upload reports to create this summary."}
+                {hasMember && reportsForActiveMember.length
+                  ? `${reportsForActiveMember.length} report${reportsForActiveMember.length === 1 ? "" : "s"} grouped for quick review.`
+                  : "Upload reports to create this summary."}
               </p>
             </div>
           </div>
@@ -194,7 +185,7 @@ export default function Analytics() {
           </button>
         </div>
 
-        {hasMember ? (
+        {hasMember && visibleParameters.length ? (
           <div className="mt-3 space-y-3">
             {visibleParameters.map((param) => (
               <article key={param.name} className="rounded-lg border border-[#e2ebe8] bg-white p-4 shadow-[0_10px_28px_rgba(20,67,60,0.05)]">
@@ -223,7 +214,7 @@ export default function Analytics() {
         ) : (
           <div className="mt-3 rounded-lg border border-dashed border-[#c5d8d3] bg-white p-5 text-center">
             <p className="text-[16px] font-black text-[#162523]">No analytics yet</p>
-            <p className="mt-2 text-[13px] text-[#65716f]">Add a member and upload reports to start tracking trends.</p>
+            <p className="mt-2 text-[13px] text-[#65716f]">Upload reports to start tracking detected values and trends.</p>
           </div>
         )}
 
@@ -235,8 +226,7 @@ export default function Analytics() {
             <div>
               <h2 className="text-[14px] font-black text-[#162523]">Smart summary</h2>
               <p className="mt-1 text-[13px] leading-5 text-[#65716f]">
-                Sugar markers are above range. Vitamin D is low. Review the latest CBC and diabetes reports before
-                your next doctor visit.
+                {latestSummary || "AI-style report summaries will appear here after you upload and process reports."}
               </p>
             </div>
           </div>

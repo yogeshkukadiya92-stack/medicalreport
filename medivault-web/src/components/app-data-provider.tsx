@@ -169,6 +169,13 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, [activeMemberId, familyMembers, isHydrated, reports]);
 
   useEffect(() => {
+    if (!isHydrated || !familyMembers.length) return;
+    if (!activeMemberId || !familyMembers.some((member) => member.id === activeMemberId)) {
+      setActiveMemberId(familyMembers[0].id);
+    }
+  }, [activeMemberId, familyMembers, isHydrated]);
+
+  useEffect(() => {
     if (!isHydrated || !reports.some((report) => report.status === "Processing")) return;
 
     const timer = window.setTimeout(() => {
@@ -180,7 +187,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [isHydrated, reports]);
 
-  const activeMember = activeMemberId ? familyMembers.find((member) => member.id === activeMemberId) ?? null : null;
+  const activeMember = activeMemberId
+    ? familyMembers.find((member) => member.id === activeMemberId) ?? familyMembers[0] ?? null
+    : familyMembers[0] ?? null;
   const reportsForActiveMember = activeMember ? reports.filter((report) => report.memberId === activeMember.id) : [];
 
   const value = useMemo<AppDataContextValue>(
@@ -228,9 +237,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         return nextReport;
       },
       deleteMember: (memberId) => {
-        setFamilyMembers((current) => current.filter((member) => member.id !== memberId));
+        const remaining = familyMembers.filter((member) => member.id !== memberId);
+        setFamilyMembers(remaining);
+        setActiveMemberId((activeId) => (activeId === memberId ? remaining[0]?.id ?? null : activeId));
         setReports((current) => current.filter((report) => report.memberId !== memberId));
-        setActiveMemberId((current) => (current === memberId ? null : current));
       },
       deleteReport: (reportId) => setReports((current) => current.filter((report) => report.id !== reportId)),
       familyMembers,
