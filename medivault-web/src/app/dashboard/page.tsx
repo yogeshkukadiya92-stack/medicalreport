@@ -6,11 +6,6 @@ import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 import { SignOutButton } from "@/components/sign-out-button";
 
-const attentionFallback = [
-  { label: "Vitamin D low", value: "18 ng/mL", tone: "mint", note: "Review supplement plan" },
-  { label: "HbA1c high", value: "7.1%", tone: "coral", note: "Track sugar trend" },
-];
-
 export default function Dashboard() {
   const { activeMember, familyMembers, reportsForActiveMember, setActiveMemberId } = useAppData();
   const [notice, setNotice] = useState("");
@@ -20,7 +15,7 @@ export default function Dashboard() {
   const activeMemberId = activeMember?.id ?? null;
 
   const attentionItems = useMemo(() => {
-    if (!attentionCount) return attentionFallback.slice(0, 1);
+    if (!attentionCount) return [];
     return reportsForActiveMember
       .filter((report) => report.abnormal > 0 || report.status === "Needs review")
       .slice(0, 2)
@@ -28,7 +23,7 @@ export default function Dashboard() {
         label: report.title,
         value: `${report.abnormal} flagged`,
         tone: index === 0 ? "coral" : "mint",
-        note: report.status === "Needs review" ? "Needs review" : "Watch trend",
+        note: report.summary || (report.status === "Needs review" ? "Needs review" : "Watch trend"),
       }));
   }, [attentionCount, reportsForActiveMember]);
 
@@ -142,8 +137,9 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        <div className="mt-3 space-y-3">
-          {attentionItems.map((item) => (
+        {attentionItems.length ? (
+          <div className="mt-3 space-y-3">
+            {attentionItems.map((item) => (
             <div key={item.label} className="flex items-center gap-3 rounded-lg border border-[#e2ebe8] bg-white p-4">
               <div className={`grid h-11 w-11 place-items-center rounded-lg ${item.tone === "coral" ? "bg-[#fff0ec] text-[#cc6044]" : "bg-[#eaf9f2] text-[#0a7d6e]"}`}>
                 <span className="h-2.5 w-2.5 rounded-full bg-current" />
@@ -154,8 +150,14 @@ export default function Dashboard() {
               </div>
               <div className="text-right text-[13px] font-bold text-[#162523]">{item.value}</div>
             </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-3 rounded-lg border border-dashed border-[#c5d8d3] bg-white p-5">
+            <p className="text-[14px] font-black text-[#162523]">No attention items</p>
+            <p className="mt-2 text-[13px] text-[#65716f]">Upload reports and AI summaries will surface anything important here.</p>
+          </div>
+        )}
 
         <div className="mt-6 flex items-center justify-between">
           <h2 className="text-[18px] font-bold text-[#101c1c]">Recent reports</h2>

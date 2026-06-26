@@ -16,6 +16,7 @@ export default function Upload() {
   const [lab, setLab] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const hasMembers = familyMembers.length > 0;
 
   useEffect(() => {
@@ -30,24 +31,26 @@ export default function Upload() {
     event.preventDefault();
     setError("");
     setMessage("");
+    setIsSaving(false);
 
     if (!fileName) {
       setError("Select a PDF or image first.");
       return;
     }
 
+    setIsSaving(true);
     const report = addReport({
       fileName,
       lab,
       memberId,
       title: title || fileName.replace(/\.[^.]+$/, ""),
     });
-    setMessage(`${report.title} saved. Processing will finish automatically.`);
+    setMessage(`${report.title} saved. AI analysis is extracting values and building the summary.`);
     setTitle("");
     setLab("");
     setFileName("");
     if (inputRef.current) inputRef.current.value = "";
-    window.setTimeout(() => router.push("/reports"), 700);
+    window.setTimeout(() => router.push("/reports"), 900);
   }
 
   return (
@@ -83,7 +86,7 @@ export default function Upload() {
             </div>
             <h2 className="mt-5 text-[18px] font-bold text-[#162523]">{fileName || "Select a report file"}</h2>
             <p className="mx-auto mt-2 max-w-[280px] text-[13px] leading-5 text-[#65716f]">
-              PDF, JPG, or PNG. Saved reports persist in this browser and processing completes automatically.
+              PDF, JPG, or PNG. The app will save it, extract key markers, and prepare a doctor-ready summary.
             </p>
           </button>
           <input
@@ -117,9 +120,20 @@ export default function Upload() {
 
           {error ? <p className="rounded-lg bg-[#fff0ec] p-3 text-[13px] font-bold text-[#ba563d]">{error}</p> : null}
           {message ? <p className="rounded-lg bg-[#eaf9f2] p-3 text-[13px] font-bold text-[#087766]">{message}</p> : null}
+          {isSaving ? (
+            <div className="rounded-lg border border-[#dce9e5] bg-white p-4">
+              <div className="flex items-center justify-between text-[12px] font-bold text-[#52605d]">
+                <span>AI analysis</span>
+                <span>Working</span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf3f1]">
+                <div className="h-full w-3/4 rounded-full bg-[#0a7d6e]" />
+              </div>
+            </div>
+          ) : null}
 
-          <button type="submit" className="h-12 w-full rounded-lg bg-[#0a7d6e] text-[14px] font-bold text-white shadow-[0_12px_30px_rgba(10,125,110,0.2)]">
-            Save report
+          <button disabled={isSaving} type="submit" className="h-12 w-full rounded-lg bg-[#0a7d6e] text-[14px] font-bold text-white shadow-[0_12px_30px_rgba(10,125,110,0.2)] disabled:opacity-70">
+            {isSaving ? "Analyzing report" : "Save report"}
           </button>
           <button type="button" onClick={() => router.push("/reports")} className="h-12 w-full rounded-lg border border-[#dce9e5] bg-white text-[14px] font-bold text-[#102323]">
             View reports

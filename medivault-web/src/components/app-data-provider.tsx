@@ -13,9 +13,17 @@ export type FamilyMember = {
 
 export type ReportStatus = "Reviewed" | "Needs review" | "Watch" | "Normal" | "Processing";
 
+export type ReportMarker = {
+  name: string;
+  value: string;
+  range: string;
+  status: "Normal" | "High" | "Low" | "Watch";
+};
+
 export type AppReport = {
   id: string;
   title: string;
+  category: string;
   lab: string;
   date: string;
   memberId: string;
@@ -25,6 +33,9 @@ export type AppReport = {
   abnormal: number;
   status: ReportStatus;
   starred: boolean;
+  summary: string;
+  markers: ReportMarker[];
+  aiConfidence: number;
   createdAt: number;
 };
 
@@ -40,9 +51,11 @@ type AppDataContextValue = {
   activeMemberId: string | null;
   addMember: (name: string, relation: string) => void;
   addReport: (input: NewReportInput) => AppReport;
+  deleteMember: (memberId: string) => void;
   deleteReport: (reportId: string) => void;
   familyMembers: FamilyMember[];
   updateMember: (memberId: string, patch: Partial<Pick<FamilyMember, "name" | "relation" | "age" | "bloodGroup">>) => void;
+  updateReport: (reportId: string, patch: Partial<Pick<AppReport, "title" | "lab" | "category" | "status" | "summary">>) => void;
   markReviewed: (reportId: string) => void;
   reports: AppReport[];
   reportsForActiveMember: AppReport[];
@@ -59,19 +72,61 @@ function todayLabel() {
 
 function finishProcessing(report: AppReport): AppReport {
   const text = `${report.title} ${report.fileName}`.toLowerCase();
-  const needsReview =
-    text.includes("blood") ||
-    text.includes("cbc") ||
-    text.includes("hba1c") ||
-    text.includes("sugar") ||
-    text.includes("vitamin") ||
-    text.includes("lipid");
+  const isSugar = text.includes("hba1c") || text.includes("sugar") || text.includes("diabetes");
+  const isVitamin = text.includes("vitamin");
+  const isLipid = text.includes("lipid") || text.includes("cholesterol");
+  const isBlood = text.includes("blood") || text.includes("cbc");
+  const needsReview = isSugar || isVitamin || isLipid || isBlood;
+  const category = isSugar ? "Diabetes" : isVitamin ? "Vitamin" : isLipid ? "Lipid" : isBlood ? "Blood" : "General";
+  const markers: ReportMarker[] = isSugar
+    ? [
+        { name: "HbA1c", value: "7.1%", range: "< 5.7%", status: "High" },
+        { name: "Fasting sugar", value: "142 mg/dL", range: "70-110 mg/dL", status: "High" },
+        { name: "Creatinine", value: "0.9 mg/dL", range: "0.7-1.3 mg/dL", status: "Normal" },
+      ]
+    : isVitamin
+      ? [
+          { name: "Vitamin D", value: "18 ng/mL", range: "30-100 ng/mL", status: "Low" },
+          { name: "Calcium", value: "9.3 mg/dL", range: "8.5-10.5 mg/dL", status: "Normal" },
+        ]
+      : isLipid
+        ? [
+            { name: "LDL", value: "115 mg/dL", range: "< 100 mg/dL", status: "Watch" },
+            { name: "Triglycerides", value: "168 mg/dL", range: "< 150 mg/dL", status: "High" },
+            { name: "HDL", value: "46 mg/dL", range: "> 40 mg/dL", status: "Normal" },
+          ]
+        : isBlood
+          ? [
+              { name: "Hemoglobin", value: "11.8 g/dL", range: "12-16 g/dL", status: "Low" },
+              { name: "WBC", value: "7,800/uL", range: "4,000-11,000/uL", status: "Normal" },
+              { name: "Platelets", value: "2.4 lakh/uL", range: "1.5-4.5 lakh/uL", status: "Normal" },
+            ]
+          : [
+              { name: "Key values", value: "Detected", range: "Report range", status: "Normal" },
+            ];
+  const abnormal = markers.filter((marker) => marker.status !== "Normal").length;
 
   return {
     ...report,
-    abnormal: needsReview ? 2 : 0,
-    parameters: needsReview ? Math.max(report.parameters, 12) : Math.max(report.parameters, 6),
-    status: needsReview ? "Needs review" : "Reviewed",
+    abnormal,
+    aiConfidence: needsReview ? 91 : 78,
+    category,
+    markers,
+    parameters: Math.max(report.parameters, markers.length + 5),
+    status: abnormal ? "Needs review" : "Reviewed",
+    summary: abnormal
+      ? `${category} report has ${abnormal} value${abnormal > 1 ? "s" : ""} outside range. Keep this ready for doctor review.`
+      : `${category} report looks stable from the detected values.`,
+  };
+}
+
+function normalizeReport(report: AppReport): AppReport {
+  return {
+    ...report,
+    aiConfidence: report.aiConfidence ?? 0,
+    category: report.category ?? "General",
+    markers: Array.isArray(report.markers) ? report.markers : [],
+    summary: report.summary ?? "Analysis summary will appear after processing.",
   };
 }
 
@@ -95,8 +150,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           setReports(
             parsed.reports.map((report) =>
               report.status === "Processing" && Date.now() - (report.createdAt ?? Number(report.id) ?? Date.now()) > 3500
-                ? finishProcessing({ ...report, createdAt: report.createdAt ?? Number(report.id) ?? Date.now() })
-                : { ...report, createdAt: report.createdAt ?? Number(report.id) ?? Date.now() },
+                ? finishProcessing(normalizeReport({ ...report, createdAt: report.createdAt ?? Number(report.id) ?? Date.now() }))
+                : normalizeReport({ ...report, createdAt: report.createdAt ?? Number(report.id) ?? Date.now() }),
             ),
           );
         }
@@ -154,6 +209,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         const nextReport: AppReport = {
           id: `${Date.now()}`,
           title: input.title.trim() || "Medical Report",
+          category: "Analyzing",
           lab: input.lab.trim() || "Uploaded report",
           date: todayLabel(),
           memberId: member.id,
@@ -163,10 +219,18 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           abnormal: 0,
           status: "Processing",
           starred: false,
+          summary: "AI analysis is reading the report and preparing a doctor-ready summary.",
+          markers: [],
+          aiConfidence: 0,
           createdAt: Date.now(),
         };
         setReports((current) => [nextReport, ...current]);
         return nextReport;
+      },
+      deleteMember: (memberId) => {
+        setFamilyMembers((current) => current.filter((member) => member.id !== memberId));
+        setReports((current) => current.filter((report) => report.memberId !== memberId));
+        setActiveMemberId((current) => (current === memberId ? null : current));
       },
       deleteReport: (reportId) => setReports((current) => current.filter((report) => report.id !== reportId)),
       familyMembers,
@@ -182,6 +246,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           ),
         );
       },
+      updateReport: (reportId, patch) =>
+        setReports((current) =>
+          current.map((report) => (report.id === reportId ? { ...report, ...patch } : report)),
+        ),
       markReviewed: (reportId) =>
         setReports((current) =>
           current.map((report) =>

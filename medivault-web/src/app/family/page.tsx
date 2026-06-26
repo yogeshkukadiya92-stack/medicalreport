@@ -7,7 +7,7 @@ import { Icon, MobileShell } from "@/components/mobile-shell";
 const emptyForm = { name: "", relation: "", age: "", bloodGroup: "" };
 
 export default function FamilyPage() {
-  const { activeMemberId, addMember, familyMembers, reports, setActiveMemberId, updateMember } = useAppData();
+  const { activeMemberId, addMember, deleteMember, familyMembers, reports, setActiveMemberId, updateMember } = useAppData();
   const [form, setForm] = useState(emptyForm);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -59,6 +59,17 @@ export default function FamilyPage() {
     setActiveMemberId(memberId);
   }
 
+  function removeMember(memberId: string, name: string) {
+    const memberReports = reports.filter((report) => report.memberId === memberId).length;
+    const ok = window.confirm(
+      memberReports ? `Delete ${name} and ${memberReports} linked report${memberReports > 1 ? "s" : ""}?` : `Delete ${name}?`,
+    );
+    if (!ok) return;
+    deleteMember(memberId);
+    if (editingMemberId === memberId) setEditingMemberId(null);
+    setMessage(`${name} removed.`);
+  }
+
   return (
     <MobileShell>
       <section className="px-5 pt-6">
@@ -103,7 +114,7 @@ export default function FamilyPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="mt-4 grid grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => beginEdit(member.id)}
@@ -121,6 +132,15 @@ export default function FamilyPage() {
                       }`}
                     >
                       Use member
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeMember(member.id, member.name)}
+                      className={`h-9 rounded-md text-[12px] font-bold ${
+                        isActive ? "bg-[#fff0ec] text-[#ba563d]" : "bg-[#fff0ec] text-[#ba563d]"
+                      }`}
+                    >
+                      Delete
                     </button>
                   </div>
                 </div>
