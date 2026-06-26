@@ -12,6 +12,7 @@ type IconName = "home" | "reports" | "analytics" | "family" | "upload" | "bell" 
 const navItems: Array<{ href: string; label: string; icon: IconName }> = [
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/reports", label: "Reports", icon: "reports" },
+  { href: "/upload", label: "Upload", icon: "upload" },
   { href: "/analytics", label: "Analytics", icon: "analytics" },
   { href: "/family", label: "Family", icon: "family" },
 ];
@@ -129,24 +130,36 @@ export function MobileShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <main className="min-h-screen bg-[#eef3f1] text-[#101c1c] md:flex md:items-center md:justify-center md:p-8">
-      <div className="relative mx-auto min-h-screen w-full max-w-[430px] bg-[#fbfdfc] shadow-[0_24px_80px_rgba(10,31,31,0.18)] md:min-h-[860px] md:overflow-hidden md:rounded-[28px] md:border md:border-white/70">
-        <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_20%_0%,rgba(44,185,156,0.18),transparent_34%),linear-gradient(180deg,#f7fffc_0%,rgba(247,255,252,0)_100%)]" />
-        <div className="relative pb-28">{children}</div>
-        <nav className="sticky bottom-0 z-20 border-t border-[#dbe7e3] bg-white/94 px-4 pb-5 pt-3 shadow-[0_-18px_42px_rgba(16,35,35,0.08)] backdrop-blur-xl">
-          <div className="grid grid-cols-4 gap-2">
+    <main className="min-h-dvh bg-[#eaf1ef] text-[#101c1c] md:flex md:items-center md:justify-center md:p-8">
+      <div className="relative mx-auto min-h-dvh w-full max-w-[430px] overflow-x-hidden bg-[#fbfdfc] shadow-[0_24px_80px_rgba(10,31,31,0.18)] md:min-h-[860px] md:overflow-hidden md:rounded-[28px] md:border md:border-white/70">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_18%_0%,rgba(44,185,156,0.20),transparent_36%),radial-gradient(circle_at_88%_4%,rgba(65,103,168,0.12),transparent_30%),linear-gradient(180deg,#f8fffc_0%,rgba(248,255,252,0)_100%)]" />
+        <div className="pointer-events-none sticky top-0 z-30 flex justify-center pt-[max(env(safe-area-inset-top),10px)] md:hidden">
+          <div className="mt-1 h-1.5 w-12 rounded-full bg-[#c9d8d4]" />
+        </div>
+        <div className="relative pb-[calc(104px+env(safe-area-inset-bottom))]">{children}</div>
+        <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] border-t border-[#dbe7e3] bg-white/92 px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 shadow-[0_-18px_42px_rgba(16,35,35,0.10)] backdrop-blur-xl md:absolute">
+          <div className="grid grid-cols-5 items-end gap-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
+              const isUpload = item.icon === "upload";
               return (
                 <Link
                   key={item.label}
                   href={item.href}
-                  className={`flex h-14 flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-semibold ${
-                    isActive ? "bg-[#e8f7f2] text-[#087766]" : "text-[#81908d] hover:bg-[#f4f8f7] hover:text-[#31413f]"
+                  className={`flex flex-col items-center justify-center gap-1 rounded-lg text-[10px] font-bold ${
+                    isUpload
+                      ? `h-16 -translate-y-2 text-white ${isActive ? "text-white" : "text-white"}`
+                      : `h-14 ${isActive ? "bg-[#e8f7f2] text-[#087766]" : "text-[#81908d] hover:bg-[#f4f8f7] hover:text-[#31413f]"}`
                   }`}
                 >
-                  <Icon name={item.icon} className="h-5 w-5" />
-                  <span>{item.label}</span>
+                  {isUpload ? (
+                    <span className={`grid h-12 w-12 place-items-center rounded-full shadow-[0_14px_32px_rgba(10,125,110,0.28)] ${isActive ? "bg-[#0b2b2b]" : "bg-[#0a7d6e]"}`}>
+                      <Icon name={item.icon} className="h-5 w-5" />
+                    </span>
+                  ) : (
+                    <Icon name={item.icon} className="h-5 w-5" />
+                  )}
+                  <span className={isUpload ? "text-[#087766]" : ""}>{item.label}</span>
                 </Link>
               );
             })}

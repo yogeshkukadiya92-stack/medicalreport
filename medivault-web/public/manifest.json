@@ -1,0 +1,21 @@
+{
+  "name": "MediVault",
+  "short_name": "MediVault",
+  "description": "Secure family medical report vault and health dashboard.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#fbfdfc",
+  "theme_color": "#0b2b2b",
+  "orientation": "portrait",
+  "categories": ["health", "medical", "productivity"],
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
