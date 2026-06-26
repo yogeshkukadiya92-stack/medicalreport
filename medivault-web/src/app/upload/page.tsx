@@ -93,7 +93,7 @@ export default function Upload() {
     pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
 
     const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
-    const pageCount = Math.min(pdf.numPages, 2);
+    const pageCount = Math.min(pdf.numPages, 1);
     const pages: string[] = [];
 
     for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
@@ -153,7 +153,6 @@ export default function Upload() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fileDataUrl: preparedFile.dataUrls[0],
           fileDataUrls: preparedFile.dataUrls,
           fileName: file.name,
           lab,
