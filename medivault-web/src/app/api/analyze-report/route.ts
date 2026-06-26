@@ -24,6 +24,7 @@ function getAiProvider() {
     return {
       apiKey: process.env.NVIDIA_API_KEY,
       baseUrl: (process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com").replace(/\/$/, ""),
+      imageLimit: 1,
       keyName: "NVIDIA_API_KEY",
       model: process.env.NVIDIA_MODEL || "meta/llama-3.2-11b-vision-instruct",
       providerName: "NVIDIA",
@@ -33,6 +34,7 @@ function getAiProvider() {
   return {
     apiKey: process.env.OPENAI_API_KEY,
     baseUrl: "https://api.openai.com",
+    imageLimit: 2,
     keyName: "OPENAI_API_KEY",
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     providerName: "OpenAI",
@@ -89,7 +91,7 @@ export async function POST(request: NextRequest) {
 
   const imageUrls = (Array.isArray(body.fileDataUrls) && body.fileDataUrls.length ? body.fileDataUrls : body.fileDataUrl ? [body.fileDataUrl] : [])
     .filter((url) => typeof url === "string" && url.startsWith("data:image/"))
-    .slice(0, 2);
+    .slice(0, aiProvider.imageLimit);
   const isImage = Boolean(body.mimeType?.startsWith("image/") && imageUrls.length);
   if (!isImage) {
     return NextResponse.json(
@@ -106,7 +108,9 @@ export async function POST(request: NextRequest) {
   }
 
   const prompt = [
-    "Analyze these medical report page images for a personal health vault.",
+    imageUrls.length > 1
+      ? "Analyze these medical report page images for a personal health vault."
+      : "Analyze this medical report page image for a personal health vault.",
     "Return only JSON with: title, category, summary, markers.",
     "markers must be an array of {name,value,range,status}; status must be Normal, High, Low, or Watch.",
     "Keep summary short, doctor-ready, and avoid diagnosis. Mention that a doctor should review abnormal results.",
