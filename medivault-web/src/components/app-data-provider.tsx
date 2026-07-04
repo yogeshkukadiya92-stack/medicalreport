@@ -1,43 +1,10 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/components/auth-provider";
+import type { AppReport, FamilyMember, ReportMarker, ReportStatus, VaultSnapshot } from "@/lib/vault-types";
 
-export type FamilyMember = {
-  id: string;
-  name: string;
-  relation: string;
-  score: number;
-  bloodGroup: string;
-  age: number;
-};
-
-export type ReportStatus = "Reviewed" | "Needs review" | "Watch" | "Normal" | "Processing";
-
-export type ReportMarker = {
-  name: string;
-  value: string;
-  range: string;
-  status: "Normal" | "High" | "Low" | "Watch";
-};
-
-export type AppReport = {
-  id: string;
-  title: string;
-  category: string;
-  lab: string;
-  date: string;
-  memberId: string;
-  memberName: string;
-  fileName: string;
-  parameters: number;
-  abnormal: number;
-  status: ReportStatus;
-  starred: boolean;
-  summary: string;
-  markers: ReportMarker[];
-  aiConfidence: number;
-  createdAt: number;
-};
+export type { AppReport, FamilyMember, ReportMarker, ReportStatus } from "@/lib/vault-types";
 
 type NewReportInput = {
   fileName: string;
@@ -46,7 +13,7 @@ type NewReportInput = {
   title: string;
 };
 
-type ReportPatch = Partial<Pick<AppReport, "title" | "lab" | "category" | "status" | "summary" | "markers" | "abnormal" | "parameters" | "aiConfidence">>;
+type ReportPatch = Partial<Pick<AppReport, "title" | "lab" | "category" | "status" | "summary" | "markers" | "abnormal" | "parameters" | "aiConfidence" | "fileId" | "fileMimeType" | "fileSizeBytes">>;
 type ManualReportInput = {
   category: string;
   lab: string;
@@ -104,10 +71,13 @@ function normalizeReport(report: AppReport): AppReport {
 }
 
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
+  const { isConfigured: isAuthConfigured, session, status: authStatus } = useAuth();
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [reports, setReports] = useState<AppReport[]>([]);
   const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isCloudLoaded, setIsCloudLoaded] = useState(false);
+  const cloudSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(storageKey);
@@ -140,6 +110,87 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     if (!isHydrated) return;
     window.localStorage.setItem(storageKey, JSON.stringify({ activeMemberId, familyMembers, reports }));
   }, [activeMemberId, familyMembers, isHydrated, reports]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    if (!isAuthConfigured) {
+      setIsCloudLoaded(true);
+      return;
+    }
+
+    if (authStatus === "loading") return;
+
+    if (authStatus !== "authenticated" || !session?.access_token) {
+      setIsCloudLoaded(false);
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function loadCloudVault() {
+      let canSaveToCloud = false;
+      try {
+        const response = await fetch("/api/vault", {
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+        });
+        const result = (await response.json().catch(() => null)) as {
+          vault?: VaultSnapshot | null;
+        } | null;
+
+        if (isCancelled) return;
+
+        if (response.ok) {
+          canSaveToCloud = true;
+        }
+
+        if (response.ok && result?.vault) {
+          setFamilyMembers(result.vault.familyMembers);
+          setReports(result.vault.reports.map(normalizeReport));
+          setActiveMemberId(result.vault.activeMemberId);
+        }
+      } finally {
+        if (!isCancelled && canSaveToCloud) {
+          setIsCloudLoaded(true);
+        }
+      }
+    }
+
+    loadCloudVault();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [authStatus, isAuthConfigured, isHydrated, session?.access_token]);
+
+  useEffect(() => {
+    if (!isHydrated || !isCloudLoaded || authStatus !== "authenticated" || !session?.access_token) return;
+
+    if (cloudSaveTimerRef.current) {
+      clearTimeout(cloudSaveTimerRef.current);
+    }
+
+    cloudSaveTimerRef.current = setTimeout(() => {
+      fetch("/api/vault", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ activeMemberId, familyMembers, reports } satisfies VaultSnapshot),
+      }).catch(() => {
+        // Local storage remains the immediate offline fallback when cloud sync is unavailable.
+      });
+    }, 450);
+
+    return () => {
+      if (cloudSaveTimerRef.current) {
+        clearTimeout(cloudSaveTimerRef.current);
+      }
+    };
+  }, [activeMemberId, authStatus, familyMembers, isCloudLoaded, isHydrated, reports, session?.access_token]);
 
   useEffect(() => {
     if (!isHydrated || !familyMembers.length) return;

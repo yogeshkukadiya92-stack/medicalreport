@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { AppReport, ReportMarker } from "@/components/app-data-provider";
 import { useAppData } from "@/components/app-data-provider";
+import { useAuth } from "@/components/auth-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 
 type Filter = "All" | "Starred" | "Needs review" | "Processing" | "Reviewed";
@@ -59,6 +60,7 @@ function markerClass(status: string) {
 }
 
 export default function Reports() {
+  const { session } = useAuth();
   const { activeMember, addManualReport, deleteReport, markReviewed, reportsForActiveMember, toggleStar, updateReport } = useAppData();
   const [filter, setFilter] = useState<Filter>("All");
   const [query, setQuery] = useState("");
@@ -133,6 +135,37 @@ export default function Reports() {
     setManualForm({ category: "Manual", lab: "Manual entry", title: "Manual health values" });
     setManualMarkers([emptyMarker()]);
     setIsManualOpen(false);
+  }
+
+  async function openStoredFile(report: AppReport) {
+    if (!report.fileId || !session?.access_token) return;
+
+    const response = await fetch(`/api/files/${report.fileId}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (!response.ok) return;
+
+    const blob = await response.blob();
+    const fileUrl = URL.createObjectURL(blob);
+    window.open(fileUrl, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(fileUrl), 60_000);
+  }
+
+  async function removeReport(report: AppReport) {
+    if (report.fileId && session?.access_token) {
+      fetch(`/api/files/${report.fileId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      }).catch(() => {
+        // Metadata delete should still work if file cleanup is temporarily unavailable.
+      });
+    }
+    deleteReport(report.id);
   }
 
   return (
@@ -255,7 +288,7 @@ export default function Reports() {
                           Edit
                         </button>
                       </div>
-                      <button onClick={() => deleteReport(report.id)} className="mt-2 h-9 w-full rounded-md bg-[#fff0ec] text-[12px] font-bold text-[#ba563d]">
+                      <button onClick={() => removeReport(report)} className="mt-2 h-9 w-full rounded-md bg-[#fff0ec] text-[12px] font-bold text-[#ba563d]">
                         Delete report
                       </button>
                     </div>
@@ -290,10 +323,19 @@ export default function Reports() {
                 <p><strong>Member:</strong> {selectedReport.memberName}</p>
                 <p><strong>Lab:</strong> {selectedReport.lab}</p>
                 <p><strong>File:</strong> {selectedReport.fileName}</p>
+                <p><strong>Stored:</strong> {selectedReport.fileId ? "Original file saved" : "Original file not available"}</p>
                 <p><strong>Category:</strong> {selectedReport.category}</p>
                 <p><strong>Status:</strong> {selectedReport.status}</p>
                 <p><strong>AI confidence:</strong> {selectedReport.aiConfidence ? `${selectedReport.aiConfidence}%` : "Processing"}</p>
               </div>
+              {selectedReport.fileId ? (
+                <button
+                  onClick={() => openStoredFile(selectedReport)}
+                  className="mt-4 h-11 w-full rounded-lg bg-[#0a7d6e] text-[13px] font-bold text-white"
+                >
+                  View original file
+                </button>
+              ) : null}
               <div className="mt-4 rounded-lg bg-[#f7fbfa] p-4">
                 <p className="text-[12px] font-bold text-[#087766]">AI summary</p>
                 <p className="mt-2 text-[13px] leading-5 text-[#52605d]">{selectedReport.summary}</p>

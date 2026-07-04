@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { ReportMarker, ReportStatus } from "@/components/app-data-provider";
+import type { ReportMarker, ReportStatus } from "@/lib/vault-types";
 
 export const maxDuration = 45;
 

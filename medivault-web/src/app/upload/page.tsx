@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppData } from "@/components/app-data-provider";
+import { useAuth } from "@/components/auth-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 
 type PreparedFile = {
@@ -14,6 +15,7 @@ type PreparedFile = {
 export default function Upload() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { session } = useAuth();
   const { activeMember, addReport, familyMembers, updateReport } = useAppData();
   const [fileName, setFileName] = useState("");
   const [memberId, setMemberId] = useState("");
@@ -114,6 +116,31 @@ export default function Upload() {
     return pages;
   }
 
+  async function storeOriginalFile(file: File) {
+    if (!session?.access_token) return null;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch("/api/files", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: formData,
+    });
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(result?.error ?? "Original file could not be stored.");
+    }
+
+    return result as {
+      fileId: string;
+      fileMimeType: string;
+      fileSizeBytes: number;
+    };
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -145,9 +172,19 @@ export default function Upload() {
 
     try {
       setAnalysisProgress(18);
+      setAnalysisStep("Storing original file");
+      const storedFile = await storeOriginalFile(file);
+      if (storedFile) {
+        updateReport(report.id, {
+          fileId: storedFile.fileId,
+          fileMimeType: storedFile.fileMimeType,
+          fileSizeBytes: storedFile.fileSizeBytes,
+        });
+      }
+      setAnalysisProgress(28);
       setAnalysisStep(file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf") ? "Preparing PDF pages" : "Preparing image");
       const preparedFile = await prepareFileForAi(file);
-      setAnalysisProgress(38);
+      setAnalysisProgress(44);
       setAnalysisStep("Uploading securely");
       const response = await fetch("/api/analyze-report", {
         method: "POST",
