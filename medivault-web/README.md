@@ -37,6 +37,8 @@ MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/?retryWrites=true&w=
 MONGODB_DB=medivault
 ```
 
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` must be the Supabase `anon`/publishable key only. Never use the `service_role` key in any `NEXT_PUBLIC_` variable.
+
 Optional AI analysis variables:
 
 ```bash

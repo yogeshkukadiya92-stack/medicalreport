@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { safeSupabasePublicKey } from "@/lib/supabase-key";
 
 export type PublicConfig = {
   isSupabaseConfigured: boolean;
@@ -11,14 +12,14 @@ export type PublicConfig = {
 const publicConfigTimeoutMs = 8000;
 
 const buildTimeConfig: PublicConfig = {
-  isSupabaseConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  isSupabaseConfigured: false,
+  supabaseAnonKey: "",
+  supabaseUrl: "",
 };
 
 function normalizeConfig(input: Partial<PublicConfig> | null): PublicConfig {
   const supabaseUrl = typeof input?.supabaseUrl === "string" ? input.supabaseUrl : "";
-  const supabaseAnonKey = typeof input?.supabaseAnonKey === "string" ? input.supabaseAnonKey : "";
+  const supabaseAnonKey = safeSupabasePublicKey(typeof input?.supabaseAnonKey === "string" ? input.supabaseAnonKey : "");
   return {
     isSupabaseConfigured: Boolean(supabaseUrl && supabaseAnonKey),
     supabaseAnonKey,
