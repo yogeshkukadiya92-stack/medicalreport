@@ -28,7 +28,7 @@ function filtersFromUrl() {
 }
 
 export default function LabReportsPage() {
-  const { session } = useAuth();
+  const { isConfigured, session, status } = useAuth();
   const [filters, setFilters] = useState(filtersFromUrl);
   const [reports, setReports] = useState<LabReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<LabReport | null>(null);
@@ -36,28 +36,41 @@ export default function LabReportsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   async function loadReports() {
-    if (!session?.access_token) return;
+    if (!isConfigured) {
+      setIsLoading(false);
+      return;
+    }
+    if (status === "loading") return;
+    if (!session?.access_token) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError("");
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value) params.set(key, value);
     });
-    const response = await fetch(`/api/lab/reports?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-    const result = await response.json().catch(() => null);
-    if (response.ok) {
-      setReports(result?.reports ?? []);
-    } else {
-      setError(result?.error ?? "Reports could not be loaded.");
+    try {
+      const response = await fetch(`/api/lab/records?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = await response.json().catch(() => null);
+      if (response.ok) {
+        setReports(result?.reports ?? []);
+      } else {
+        setError(result?.error ?? "Reports could not be loaded.");
+      }
+    } catch {
+      setError("Reports could not be loaded. Refresh after sign-in, or allow this site in any browser content blocker.");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }
 
   useEffect(() => {
     loadReports();
-  }, [session?.access_token]);
+  }, [isConfigured, session?.access_token, status]);
 
   const reportTypes = useMemo(() => [...new Set(reports.map((report) => report.reportType).filter(Boolean))], [reports]);
 

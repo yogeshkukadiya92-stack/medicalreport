@@ -5,12 +5,13 @@ import type { LabReport } from "@/lib/vault-types";
 export const runtime = "nodejs";
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     reportId: string;
-  };
+  }>;
 };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const { reportId } = await params;
   const context = await getLabContext(request);
   if ("error" in context) {
     return NextResponse.json({ error: context.error }, { status: context.status });
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const existing = await context.db.collection<LabReport>("labReports").findOne(
     {
-      id: params.reportId,
+      id: reportId,
       labId: context.lab.id,
     },
     { projection: { _id: 0 } },

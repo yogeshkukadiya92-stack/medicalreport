@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addLabAuditLog, getLabContext } from "@/lib/lab-server";
+import { getLabDashboardData, todayDate } from "@/lib/lab-dashboard";
 import { buildLabSummary, normalizePhone, statusFromValue } from "@/lib/lab-utils";
 import type { LabClient, LabReport, LabReportValue, ReportMarker } from "@/lib/vault-types";
 
@@ -40,10 +41,6 @@ type LabReportInput = {
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function todayDate() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function validStatus(status: unknown): status is ReportMarker["status"] {
@@ -179,93 +176,12 @@ export async function GET(request: NextRequest) {
     .limit(250)
     .toArray();
 
-  const today = todayDate();
-  const missingAttachmentFilter = {
-    labId: context.lab.id,
-    $or: [{ fileId: { $exists: false } }, { fileId: "" }],
-  };
-  const [
-    todayReports,
-    totalClients,
-    unclaimedReports,
-    claimedReports,
-    publishedReports,
-    publishedToday,
-    abnormalReports,
-    abnormalToday,
-    missingAttachment,
-    recentActivity,
-    criticalAlerts,
-  ] = await Promise.all([
-    context.db.collection<LabReport>("labReports").countDocuments({ labId: context.lab.id, reportDate: today }),
-    context.db.collection<LabClient>("labClients").countDocuments({ labId: context.lab.id }),
-    context.db.collection("clientReportLinks").countDocuments({ labId: context.lab.id, state: "unclaimed" }),
-    context.db.collection("clientReportLinks").countDocuments({ labId: context.lab.id, state: "claimed" }),
-    context.db.collection<LabReport>("labReports").countDocuments({ labId: context.lab.id, status: "published" }),
-    context.db.collection<LabReport>("labReports").countDocuments({ labId: context.lab.id, reportDate: today, status: "published" }),
-    context.db.collection<LabReport>("labReports").countDocuments({ labId: context.lab.id, abnormal: { $gt: 0 } }),
-    context.db.collection<LabReport>("labReports").countDocuments({ labId: context.lab.id, reportDate: today, abnormal: { $gt: 0 } }),
-    context.db.collection<LabReport>("labReports").countDocuments(missingAttachmentFilter),
-    context.db
-      .collection("labReportAuditLogs")
-      .find({ labId: context.lab.id }, { projection: { _id: 0 } })
-      .sort({ createdAt: -1 })
-      .limit(8)
-      .toArray(),
-    context.db
-      .collection<LabReport>("labReports")
-      .aggregate([
-        { $match: { labId: context.lab.id, status: "published" } },
-        { $unwind: "$values" },
-        { $match: { "values.status": { $in: ["High", "Low"] } } },
-        { $sort: { createdAt: -1 } },
-        { $limit: 8 },
-        {
-          $project: {
-            _id: 0,
-            clientName: 1,
-            clientPhone: 1,
-            reportDate: 1,
-            reportId: "$id",
-            reportTitle: "$title",
-            reportType: 1,
-            markerName: "$values.name",
-            status: "$values.status",
-            unit: "$values.unit",
-            value: "$values.value",
-            range: "$values.referenceRange",
-          },
-        },
-      ])
-      .toArray(),
-  ]);
-  const claimPercentage = publishedReports ? Math.round((claimedReports / publishedReports) * 100) : 0;
+  const dashboard = await getLabDashboardData(context.db, context.lab);
 
   return NextResponse.json({
-    criticalAlerts,
-    kpis: {
-      abnormalReports,
-      pendingUnmatchedReports: unclaimedReports,
-      publishedReports,
-      todayReports,
-      totalClients,
-    },
+    ...dashboard,
     lab: context.lab,
-    recentActivity,
     reports,
-    syncStatus: {
-      claimPercentage,
-      claimedReports,
-      publishedTotal: publishedReports,
-      unclaimedReports,
-    },
-    workQueue: {
-      abnormalToday,
-      missingAttachment,
-      publishedToday,
-      todayReports,
-      unmatched: unclaimedReports,
-    },
   });
 }
 

@@ -7,25 +7,30 @@ import { useAuth } from "@/components/auth-provider";
 import type { LabTemplate } from "@/lib/vault-types";
 
 export default function LabTemplatesPage() {
-  const { session } = useAuth();
+  const { isConfigured, session, status } = useAuth();
   const [templates, setTemplates] = useState<LabTemplate[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!isConfigured || status === "loading") return;
     if (!session?.access_token) return;
     async function loadTemplates() {
-      const response = await fetch("/api/lab/templates", {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      });
-      const result = await response.json().catch(() => null);
-      if (response.ok) {
-        setTemplates(result?.templates ?? []);
-      } else {
-        setError(result?.error ?? "Templates could not be loaded.");
+      try {
+        const response = await fetch("/api/lab/templates", {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        });
+        const result = await response.json().catch(() => null);
+        if (response.ok) {
+          setTemplates(result?.templates ?? []);
+        } else {
+          setError(result?.error ?? "Templates could not be loaded.");
+        }
+      } catch {
+        setError("Templates could not be loaded. Refresh after sign-in, or allow this site in any browser content blocker.");
       }
     }
     loadTemplates();
-  }, [session?.access_token]);
+  }, [isConfigured, session?.access_token, status]);
 
   return (
     <LabShell>

@@ -1,10 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import { AppDataProvider } from "@/components/app-data-provider";
 import { AuthProvider } from "@/components/auth-provider";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   applicationName: "MediVault",
@@ -40,7 +37,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body>
         <AuthProvider>
           <AppDataProvider>{children}</AppDataProvider>
         </AuthProvider>

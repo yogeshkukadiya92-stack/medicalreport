@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
+import { AuthSetupRequired, SessionLoading } from "@/components/auth-gate";
 import { useAuth } from "@/components/auth-provider";
 
 type IconName = "home" | "reports" | "analytics" | "family" | "upload" | "bell" | "shield" | "trend" | "calendar";
@@ -111,6 +112,7 @@ export function MobileShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { isConfigured, status } = useAuth();
+  const requiresProductionAuth = process.env.NODE_ENV === "production";
 
   useEffect(() => {
     if (isConfigured && status === "unauthenticated") {
@@ -118,15 +120,12 @@ export function MobileShell({ children }: { children: ReactNode }) {
     }
   }, [isConfigured, router, status]);
 
+  if (!isConfigured && requiresProductionAuth) {
+    return <AuthSetupRequired surface="client app" />;
+  }
+
   if (isConfigured && (status === "loading" || status === "unauthenticated")) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#eef3f1] px-5 text-[#101c1c]">
-        <div className="w-full max-w-[430px] rounded-lg bg-white p-5 text-center shadow-[0_24px_70px_rgba(10,31,31,0.12)]">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[#dce9e5] border-t-[#0a7d6e]" />
-          <p className="mt-4 text-[13px] font-bold text-[#65716f]">Checking secure session</p>
-        </div>
-      </main>
-    );
+    return <SessionLoading />;
   }
 
   return (

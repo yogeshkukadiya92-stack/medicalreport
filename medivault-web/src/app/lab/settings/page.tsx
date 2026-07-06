@@ -8,7 +8,7 @@ import type { LabProfile, LabRole } from "@/lib/vault-types";
 const emptyForm = { address: "", name: "", phone: "" };
 
 export default function LabSettingsPage() {
-  const { session } = useAuth();
+  const { isConfigured, session, status } = useAuth();
   const [form, setForm] = useState(emptyForm);
   const [lab, setLab] = useState<LabProfile | null>(null);
   const [role, setRole] = useState<LabRole>("lab_staff");
@@ -17,27 +17,32 @@ export default function LabSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   async function loadSettings() {
+    if (!isConfigured || status === "loading") return;
     if (!session?.access_token) return;
-    const response = await fetch("/api/lab/settings", {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-    const result = await response.json().catch(() => null);
-    if (!response.ok) {
-      setError(result?.error ?? "Settings could not be loaded.");
-      return;
+    try {
+      const response = await fetch("/api/lab/settings", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(result?.error ?? "Settings could not be loaded.");
+        return;
+      }
+      setLab(result?.lab ?? null);
+      setRole(result?.role ?? "lab_staff");
+      setForm({
+        address: result?.lab?.address ?? "",
+        name: result?.lab?.name ?? "",
+        phone: result?.lab?.phone ?? "",
+      });
+    } catch {
+      setError("Settings could not be loaded. Refresh after sign-in, or allow this site in any browser content blocker.");
     }
-    setLab(result?.lab ?? null);
-    setRole(result?.role ?? "lab_staff");
-    setForm({
-      address: result?.lab?.address ?? "",
-      name: result?.lab?.name ?? "",
-      phone: result?.lab?.phone ?? "",
-    });
   }
 
   useEffect(() => {
     loadSettings();
-  }, [session?.access_token]);
+  }, [isConfigured, session?.access_token, status]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,24 +51,29 @@ export default function LabSettingsPage() {
     setError("");
     setMessage("");
 
-    const response = await fetch("/api/lab/settings", {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(form),
-    });
-    const result = await response.json().catch(() => null);
-    setIsSaving(false);
+    try {
+      const response = await fetch("/api/lab/settings", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
+      });
+      const result = await response.json().catch(() => null);
+      setIsSaving(false);
 
-    if (!response.ok) {
-      setError(result?.error ?? "Settings could not be saved.");
-      return;
+      if (!response.ok) {
+        setError(result?.error ?? "Settings could not be saved.");
+        return;
+      }
+
+      setLab(result?.lab ?? null);
+      setMessage("Lab settings saved.");
+    } catch {
+      setIsSaving(false);
+      setError("Settings could not be saved. Refresh after sign-in and try again.");
     }
-
-    setLab(result?.lab ?? null);
-    setMessage("Lab settings saved.");
   }
 
   return (

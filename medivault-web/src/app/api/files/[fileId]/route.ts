@@ -9,9 +9,9 @@ import type { LabReport, LabUser, VaultSnapshot } from "@/lib/vault-types";
 export const runtime = "nodejs";
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     fileId: string;
-  };
+  }>;
 };
 
 async function findOwnedFile(bucket: GridFSBucket, fileId: ObjectId, userId: string) {
@@ -57,6 +57,7 @@ async function canViewLabFile(fileId: string, userId: string) {
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
+  const { fileId: fileIdParam } = await params;
   const userId = await getAuthenticatedUserId(request);
 
   if (!userId) {
@@ -67,16 +68,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "MongoDB is not configured for file storage." }, { status: 503 });
   }
 
-  if (!ObjectId.isValid(params.fileId)) {
+  if (!ObjectId.isValid(fileIdParam)) {
     return NextResponse.json({ error: "Invalid file id." }, { status: 400 });
   }
 
   const db = await getMongoDb();
   const bucket = new GridFSBucket(db, { bucketName: "reportFiles" });
-  const fileId = new ObjectId(params.fileId);
+  const fileId = new ObjectId(fileIdParam);
   let file = await findOwnedFile(bucket, fileId, userId);
 
-  if (!file && (await canViewLabFile(params.fileId, userId))) {
+  if (!file && (await canViewLabFile(fileIdParam, userId))) {
     file = await bucket.find({ _id: fileId }).next();
   }
 
@@ -98,6 +99,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 }
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const { fileId: fileIdParam } = await params;
   const userId = await getAuthenticatedUserId(request);
 
   if (!userId) {
@@ -108,13 +110,13 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ deleted: false });
   }
 
-  if (!ObjectId.isValid(params.fileId)) {
+  if (!ObjectId.isValid(fileIdParam)) {
     return NextResponse.json({ error: "Invalid file id." }, { status: 400 });
   }
 
   const db = await getMongoDb();
   const bucket = new GridFSBucket(db, { bucketName: "reportFiles" });
-  const fileId = new ObjectId(params.fileId);
+  const fileId = new ObjectId(fileIdParam);
   const file = await findOwnedFile(bucket, fileId, userId);
 
   if (file) {

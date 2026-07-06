@@ -81,7 +81,7 @@ function alertClass(status: string) {
 }
 
 export default function LabDashboardPage() {
-  const { session } = useAuth();
+  const { isConfigured, session, status } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
   const [kpis, setKpis] = useState<LabKpis>(emptyKpis);
   const [workQueue, setWorkQueue] = useState<WorkQueue>(emptyWorkQueue);
@@ -94,36 +94,56 @@ export default function LabDashboardPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!session?.access_token) return;
-
     let isCancelled = false;
+
     async function loadDashboard() {
+      if (!isConfigured) {
+        setIsLoading(false);
+        return;
+      }
+
+      if (status === "loading") return;
+
+      if (!session?.access_token) {
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError("");
-      const response = await fetch("/api/lab/reports", {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      });
-      const result = await response.json().catch(() => null);
-      if (isCancelled) return;
-      if (!response.ok) {
-        setError(result?.error ?? "Lab dashboard could not be loaded.");
-      } else {
-        setCriticalAlerts(result?.criticalAlerts ?? []);
-        setKpis(result?.kpis ?? emptyKpis);
-        setLab(result?.lab ?? null);
-        setReports(result?.reports ?? []);
-        setActivity(result?.recentActivity ?? []);
-        setSyncStatus(result?.syncStatus ?? emptySyncStatus);
-        setWorkQueue(result?.workQueue ?? emptyWorkQueue);
+      try {
+        const response = await fetch("/api/lab/dashboard", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const result = await response.json().catch(() => null);
+        if (isCancelled) return;
+        if (!response.ok) {
+          setError(result?.error ?? "Lab dashboard could not be loaded.");
+        } else {
+          setCriticalAlerts(result?.criticalAlerts ?? []);
+          setKpis(result?.kpis ?? emptyKpis);
+          setLab(result?.lab ?? null);
+          setReports(result?.reports ?? []);
+          setActivity(result?.recentActivity ?? []);
+          setSyncStatus(result?.syncStatus ?? emptySyncStatus);
+          setWorkQueue(result?.workQueue ?? emptyWorkQueue);
+        }
+      } catch {
+        if (!isCancelled) {
+          setError("Lab dashboard data could not be loaded. Refresh after sign-in, or allow this site in any browser content blocker.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
     }
 
     loadDashboard();
     return () => {
       isCancelled = true;
     };
-  }, [session?.access_token]);
+  }, [isConfigured, session?.access_token, status]);
 
   const recentReports = useMemo(() => reports.slice(0, 5), [reports]);
 

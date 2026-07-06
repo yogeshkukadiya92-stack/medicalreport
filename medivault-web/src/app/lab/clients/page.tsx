@@ -8,7 +8,7 @@ import type { LabClient } from "@/lib/vault-types";
 const emptyForm = { age: "", gender: "", name: "", phone: "" };
 
 export default function LabClientsPage() {
-  const { session } = useAuth();
+  const { isConfigured, session, status } = useAuth();
   const [clients, setClients] = useState<LabClient[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [query, setQuery] = useState("");
@@ -17,21 +17,26 @@ export default function LabClientsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   async function loadClients(nextQuery = query) {
+    if (!isConfigured || status === "loading") return;
     if (!session?.access_token) return;
-    const response = await fetch(`/api/lab/clients?q=${encodeURIComponent(nextQuery)}`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-    const result = await response.json().catch(() => null);
-    if (response.ok) {
-      setClients(result?.clients ?? []);
-    } else {
-      setError(result?.error ?? "Clients could not be loaded.");
+    try {
+      const response = await fetch(`/api/lab/clients?q=${encodeURIComponent(nextQuery)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = await response.json().catch(() => null);
+      if (response.ok) {
+        setClients(result?.clients ?? []);
+      } else {
+        setError(result?.error ?? "Clients could not be loaded.");
+      }
+    } catch {
+      setError("Clients could not be loaded. Refresh after sign-in, or allow this site in any browser content blocker.");
     }
   }
 
   useEffect(() => {
     loadClients("");
-  }, [session?.access_token]);
+  }, [isConfigured, session?.access_token, status]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,25 +45,30 @@ export default function LabClientsPage() {
     setError("");
     setMessage("");
 
-    const response = await fetch("/api/lab/clients", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(form),
-    });
-    const result = await response.json().catch(() => null);
-    setIsSaving(false);
+    try {
+      const response = await fetch("/api/lab/clients", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
+      });
+      const result = await response.json().catch(() => null);
+      setIsSaving(false);
 
-    if (!response.ok) {
-      setError(result?.error ?? "Client could not be saved.");
-      return;
+      if (!response.ok) {
+        setError(result?.error ?? "Client could not be saved.");
+        return;
+      }
+
+      setMessage(result?.created ? "Client added." : "Client updated.");
+      setForm(emptyForm);
+      loadClients(query);
+    } catch {
+      setIsSaving(false);
+      setError("Client could not be saved. Refresh after sign-in and try again.");
     }
-
-    setMessage(result?.created ? "Client added." : "Client updated.");
-    setForm(emptyForm);
-    loadClients(query);
   }
 
   function editClient(client: LabClient) {

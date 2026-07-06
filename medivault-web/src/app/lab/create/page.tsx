@@ -71,7 +71,7 @@ function statusStyles(status: ReportMarker["status"]) {
 }
 
 export default function LabCreateReportPage() {
-  const { session } = useAuth();
+  const { isConfigured, session, status } = useAuth();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [mode, setMode] = useState<BuilderMode>("template");
   const [templates, setTemplates] = useState<LabTemplate[]>([]);
@@ -88,26 +88,35 @@ export default function LabCreateReportPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   async function loadInitialData() {
+    if (!isConfigured || status === "loading") return;
     if (!session?.access_token) return;
     const headers = { Authorization: `Bearer ${session.access_token}` };
-    const [templateResponse, clientResponse, reportResponse] = await Promise.all([
-      fetch("/api/lab/templates", { headers }),
-      fetch("/api/lab/clients", { headers }),
-      fetch("/api/lab/reports", { headers }),
-    ]);
-    const [templateResult, clientResult, reportResult] = await Promise.all([
-      templateResponse.json().catch(() => null),
-      clientResponse.json().catch(() => null),
-      reportResponse.json().catch(() => null),
-    ]);
-    if (templateResponse.ok) setTemplates(templateResult?.templates ?? []);
-    if (clientResponse.ok) setClients(clientResult?.clients ?? []);
-    if (reportResponse.ok) setReports(reportResult?.reports ?? []);
+    setError("");
+    try {
+      const [templateResponse, clientResponse, reportResponse] = await Promise.all([
+        fetch("/api/lab/templates", { headers }),
+        fetch("/api/lab/clients", { headers }),
+        fetch("/api/lab/records", { headers }),
+      ]);
+      const [templateResult, clientResult, reportResult] = await Promise.all([
+        templateResponse.json().catch(() => null),
+        clientResponse.json().catch(() => null),
+        reportResponse.json().catch(() => null),
+      ]);
+      if (templateResponse.ok) setTemplates(templateResult?.templates ?? []);
+      if (clientResponse.ok) setClients(clientResult?.clients ?? []);
+      if (reportResponse.ok) setReports(reportResult?.reports ?? []);
+      if (!templateResponse.ok || !clientResponse.ok || !reportResponse.ok) {
+        setError("Lab setup data could not be fully loaded. Refresh after sign-in and try again.");
+      }
+    } catch {
+      setError("Lab setup data could not be loaded. Refresh after sign-in, or allow this site in any browser content blocker.");
+    }
   }
 
   useEffect(() => {
     loadInitialData();
-  }, [session?.access_token]);
+  }, [isConfigured, session?.access_token, status]);
 
   const duplicateReport = useMemo(() => {
     const normalizedPhone = normalizePhone(clientForm.phone);
@@ -186,7 +195,7 @@ export default function LabCreateReportPage() {
       const uploadedFile = storedFile ?? (inputRef.current?.files?.[0] ? await uploadAttachment() : null);
       if (uploadedFile) setStoredFile(uploadedFile);
 
-      const response = await fetch("/api/lab/reports", {
+      const response = await fetch("/api/lab/records", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${session.access_token}`,
