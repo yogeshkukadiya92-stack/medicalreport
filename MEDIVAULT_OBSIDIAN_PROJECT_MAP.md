@@ -24,6 +24,7 @@ MediVault is a medical report vault app. The current working code is a Next.js w
 - Upload accepts PDF/JPG/PNG. Original files are stored in MongoDB GridFS through `/api/files`, then PDF/image is converted to image data in the browser and posted to `/api/analyze-report`.
 - AI analysis uses OpenAI by default, with optional NVIDIA provider support. If keys are missing or the model fails, the app returns a friendly fallback analysis.
 - Lab portal lives under `/lab`. Lab staff can manage clients, create structured reports from templates, attach original PDFs/images, auto-publish reports, and view report history without AI.
+- Lab dashboard includes Today Work Queue, Critical Alerts, and Client App Sync Status panels.
 - Client app reports now include two sources: `Uploaded by you` and `Lab Report`. Published lab reports appear in the client vault by matching family-member phone number.
 - Planned backend/mobile/analytics/security docs are mostly specifications and roadmaps, not implemented server/mobile source code in this repo.
 
@@ -235,6 +236,7 @@ Current model from `app-data-provider.tsx` and `vault-types.ts`:
 - [[FINAL_UI_IMPLEMENTATION]]: ready-to-use web and Flutter UI snippets plus design tokens.
 - [[MEDIVAULT_WEB_CODE_GENERATOR]]: web code generation guidance.
 - [[MEDIVAULT_FRONTEND_ANALYTICS_IMPLEMENTATION]]: analytics UI implementation plan.
+- [[MEDIVAULT_PHASE13_LAB_DASHBOARD_UPGRADE]]: lab dashboard queue, critical alerts, client app sync status, and report history sync filters.
 
 ### Backend/API Docs
 
@@ -271,7 +273,7 @@ Current model from `app-data-provider.tsx` and `vault-types.ts`:
 | Web app | Full MVP and many screens | Implemented core screens: login, dashboard, family, upload, reports, analytics |
 | Auth | Phone/JWT/backend flows in some docs | Supabase email/password/magic link |
 | Data storage | PostgreSQL/backend schema | MongoDB vault snapshots, GridFS original files, plus localStorage fallback |
-| Lab dashboard | Structured lab report entry and client sync | Implemented `/lab` portal, lab MongoDB collections, templates, auto publish, phone matching |
+| Lab dashboard | Structured lab report entry and client sync | Implemented `/lab` portal, lab MongoDB collections, templates, auto publish, phone matching, queue, alerts, sync status |
 | Backend | FastAPI, PostgreSQL, Redis, Celery, 40+ endpoints | No backend source here; only Next API route for AI |
 | AI/OCR | Multi-step OCR pipeline and extraction review | Direct vision model extraction through `/api/analyze-report` |
 | Analytics | SQL-backed analytics endpoints and trends | Client-side derived analytics from local reports |

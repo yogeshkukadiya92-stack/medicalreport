@@ -6,7 +6,7 @@ import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
 import type { LabReport, ReportMarker } from "@/lib/vault-types";
 
-const emptyFilters = { from: "", q: "", reportType: "", status: "", to: "" };
+const emptyFilters = { from: "", q: "", reportType: "", status: "", sync: "", to: "" };
 
 function markerClass(status: ReportMarker["status"]) {
   if (status === "High" || status === "Low") return "bg-[#fff0ec] text-[#ba563d]";
@@ -14,9 +14,22 @@ function markerClass(status: ReportMarker["status"]) {
   return "bg-[#eaf9f2] text-[#087766]";
 }
 
+function filtersFromUrl() {
+  if (typeof window === "undefined") return emptyFilters;
+  const params = new URLSearchParams(window.location.search);
+  return {
+    from: params.get("from") ?? "",
+    q: params.get("q") ?? "",
+    reportType: params.get("reportType") ?? "",
+    status: params.get("status") ?? "",
+    sync: params.get("sync") ?? "",
+    to: params.get("to") ?? "",
+  };
+}
+
 export default function LabReportsPage() {
   const { session } = useAuth();
-  const [filters, setFilters] = useState(emptyFilters);
+  const [filters, setFilters] = useState(filtersFromUrl);
   const [reports, setReports] = useState<LabReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<LabReport | null>(null);
   const [error, setError] = useState("");
@@ -73,7 +86,7 @@ export default function LabReportsPage() {
       </div>
 
       <section className="mt-5 rounded-lg border border-[#e2ebe8] bg-white p-4">
-        <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.8fr_0.7fr_0.7fr_auto]">
+        <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr_0.75fr_0.75fr_0.7fr_0.7fr_auto]">
           <input
             value={filters.q}
             onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
@@ -95,8 +108,12 @@ export default function LabReportsPage() {
           <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} className="h-10 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold">
             <option value="">Any status</option>
             <option value="published">Published</option>
-            <option value="unclaimed">Unclaimed</option>
             <option value="draft">Draft</option>
+          </select>
+          <select value={filters.sync} onChange={(event) => setFilters((current) => ({ ...current, sync: event.target.value }))} className="h-10 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold">
+            <option value="">Any sync</option>
+            <option value="claimed">Visible in app</option>
+            <option value="unclaimed">Waiting phone</option>
           </select>
           <input type="date" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} className="h-10 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold" />
           <input type="date" value={filters.to} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))} className="h-10 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold" />
