@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/mobile-shell";
+import { formatDateLabel, localDateKey } from "@/lib/date-client";
 import type { LabProfile, LabReport } from "@/lib/vault-types";
 
 type LabKpis = {
@@ -71,18 +72,13 @@ const emptySyncStatus: SyncStatus = {
   unclaimedReports: 0,
 };
 
-function formatDate(value: string) {
-  if (!value) return "--";
-  return new Intl.DateTimeFormat("en", { day: "2-digit", month: "short" }).format(new Date(value));
-}
-
 function alertClass(status: string) {
   return status === "High" ? "bg-[#fff0ec] text-[#ba563d]" : "bg-[#eef5ff] text-[#4167a8]";
 }
 
 export default function LabDashboardPage() {
   const { isConfigured, session, status } = useAuth();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateKey();
   const [kpis, setKpis] = useState<LabKpis>(emptyKpis);
   const [workQueue, setWorkQueue] = useState<WorkQueue>(emptyWorkQueue);
   const [criticalAlerts, setCriticalAlerts] = useState<CriticalAlert[]>([]);
@@ -182,7 +178,7 @@ export default function LabDashboardPage() {
           <div className="flex items-center justify-between border-b border-[#edf3f1] p-4">
             <div>
               <h2 className="text-[16px] font-black text-[#102323]">Today work queue</h2>
-              <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{formatDate(today)} operations</p>
+              <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{formatDateLabel(today)} operations</p>
             </div>
             <Link href="/lab/create" className="rounded-md bg-[#0a7d6e] px-3 py-2 text-[12px] font-bold text-white">
               New
@@ -235,7 +231,7 @@ export default function LabDashboardPage() {
                   </div>
                   <div className="text-left md:text-right">
                     <span className={`inline-flex rounded-md px-2 py-1 text-[11px] font-bold ${alertClass(alert.status)}`}>{alert.status}</span>
-                    <p className="mt-2 text-[11px] font-bold text-[#8a9794]">{alert.reportType} - {formatDate(alert.reportDate)}</p>
+                    <p className="mt-2 text-[11px] font-bold text-[#8a9794]">{alert.reportType} - {formatDateLabel(alert.reportDate)}</p>
                   </div>
                 </Link>
               ))
@@ -298,7 +294,7 @@ export default function LabDashboardPage() {
                     <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{report.clientName} - {report.clientPhone}</p>
                   </div>
                   <span className="text-[12px] font-bold text-[#52605d]">{report.reportType}</span>
-                  <span className="text-[12px] font-bold text-[#52605d]">{formatDate(report.reportDate)}</span>
+                  <span className="text-[12px] font-bold text-[#52605d]">{formatDateLabel(report.reportDate)}</span>
                   <span className={`w-fit rounded-md px-2 py-1 text-[11px] font-bold ${report.abnormal ? "bg-[#fff0ec] text-[#ba563d]" : "bg-[#eaf9f2] text-[#087766]"}`}>
                     {report.abnormal ? `${report.abnormal} flagged` : "Normal"}
                   </span>
@@ -320,7 +316,7 @@ export default function LabDashboardPage() {
                 <div key={`${item.createdAt}-${item.note}`} className="p-4">
                   <p className="text-[13px] font-black capitalize text-[#162523]">{item.action}</p>
                   <p className="mt-1 text-[12px] leading-5 text-[#65716f]">{item.note}</p>
-                  <p className="mt-2 text-[11px] font-bold text-[#8a9794]">{formatDate(item.createdAt)}</p>
+                  <p className="mt-2 text-[11px] font-bold text-[#8a9794]">{formatDateLabel(item.createdAt)}</p>
                 </div>
               ))
             ) : (

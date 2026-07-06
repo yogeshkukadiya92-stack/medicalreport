@@ -26,9 +26,11 @@ export function LabShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isConfigured && status === "unauthenticated") {
-      router.replace("/login");
+      const queryString = typeof window === "undefined" ? "" : window.location.search;
+      const nextPath = `${pathname}${queryString}`;
+      router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
     }
-  }, [isConfigured, router, status]);
+  }, [isConfigured, pathname, router, status]);
 
   if (isConfigLoading) {
     return <SessionLoading />;

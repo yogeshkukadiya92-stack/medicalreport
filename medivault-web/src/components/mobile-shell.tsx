@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { AuthSetupRequired, SessionLoading } from "@/components/auth-gate";
@@ -116,9 +115,11 @@ export function MobileShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isConfigured && status === "unauthenticated") {
-      router.replace("/login");
+      const queryString = typeof window === "undefined" ? "" : window.location.search;
+      const nextPath = `${pathname}${queryString}`;
+      router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
     }
-  }, [isConfigured, router, status]);
+  }, [isConfigured, pathname, router, status]);
 
   if (isConfigLoading) {
     return <SessionLoading />;

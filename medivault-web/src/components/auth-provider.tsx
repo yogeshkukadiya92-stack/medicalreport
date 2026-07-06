@@ -17,6 +17,16 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const authSessionTimeoutMs = 8000;
+
+function getSessionWithTimeout(client: SupabaseClient) {
+  return Promise.race([
+    client.auth.getSession(),
+    new Promise<{ data: { session: Session | null } }>((resolve) => {
+      window.setTimeout(() => resolve({ data: { session: null } }), authSessionTimeoutMs);
+    }),
+  ]);
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isConfigLoading, setIsConfigLoading] = useState(true);
@@ -45,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const { data } = await client.auth.getSession();
+      const { data } = await getSessionWithTimeout(client);
       if (!mounted) return;
       setSession(data.session);
       setStatus(data.session ? "authenticated" : "unauthenticated");

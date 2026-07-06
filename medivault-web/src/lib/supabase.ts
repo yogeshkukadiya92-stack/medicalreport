@@ -8,6 +8,8 @@ export type PublicConfig = {
   supabaseUrl: string;
 };
 
+const publicConfigTimeoutMs = 8000;
+
 const buildTimeConfig: PublicConfig = {
   isSupabaseConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
@@ -25,12 +27,16 @@ function normalizeConfig(input: Partial<PublicConfig> | null): PublicConfig {
 }
 
 export async function loadPublicConfig(): Promise<PublicConfig> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), publicConfigTimeoutMs);
   try {
-    const response = await fetch("/api/public-config", { cache: "no-store" });
+    const response = await fetch("/api/public-config", { cache: "no-store", signal: controller.signal });
     if (!response.ok) return buildTimeConfig;
     return normalizeConfig((await response.json().catch(() => null)) as Partial<PublicConfig> | null);
   } catch {
     return buildTimeConfig;
+  } finally {
+    window.clearTimeout(timeout);
   }
 }
 

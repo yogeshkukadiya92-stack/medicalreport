@@ -6,9 +6,24 @@ import { useAuth } from "@/components/auth-provider";
 
 type Mode = "signin" | "signup";
 
+function safeRedirectPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/dashboard";
+  try {
+    const url = new URL(value, "https://medivault.local");
+    if (url.origin !== "https://medivault.local") return "/dashboard";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/dashboard";
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { isConfigLoading, isConfigured, status, supabase } = useAuth();
+  const [redirectPath] = useState(() => {
+    if (typeof window === "undefined") return "/dashboard";
+    return safeRedirectPath(new URLSearchParams(window.location.search).get("next"));
+  });
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,9 +33,14 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/dashboard");
+      router.replace(redirectPath);
     }
-  }, [router, status]);
+  }, [redirectPath, router, status]);
+
+  function authRedirectUrl() {
+    if (typeof window === "undefined") return undefined;
+    return `${window.location.origin}${redirectPath}`;
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,31 +58,34 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
+    try {
+      const result =
+        mode === "signin"
+          ? await supabase.auth.signInWithPassword({ email, password })
+          : await supabase.auth.signUp({
+              email,
+              password,
+              options: {
+                emailRedirectTo: authRedirectUrl(),
+              },
+            });
 
-    const result =
-      mode === "signin"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined,
-            },
-          });
+      if (result.error) {
+        setError(result.error.message);
+        return;
+      }
 
-    setIsSubmitting(false);
+      if (mode === "signup" && !result.data.session) {
+        setMessage("Account created. Check your email to confirm, then sign in.");
+        return;
+      }
 
-    if (result.error) {
-      setError(result.error.message);
-      return;
+      router.replace(redirectPath);
+    } catch {
+      setError("We couldn't reach the authentication service. Check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (mode === "signup" && !result.data.session) {
-      setMessage("Account created. Check your email to confirm, then sign in.");
-      return;
-    }
-
-    router.replace("/dashboard");
   }
 
   async function sendMagicLink() {
@@ -80,20 +103,25 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
-    const { error: magicError } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined,
-      },
-    });
-    setIsSubmitting(false);
+    try {
+      const { error: magicError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: authRedirectUrl(),
+        },
+      });
 
-    if (magicError) {
-      setError(magicError.message);
-      return;
+      if (magicError) {
+        setError(magicError.message);
+        return;
+      }
+
+      setMessage("Magic link sent. Open it from your email to continue.");
+    } catch {
+      setError("We couldn't send the magic link. Check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setMessage("Magic link sent. Open it from your email to continue.");
   }
 
   return (
@@ -129,7 +157,7 @@ export default function LoginPage() {
             onClick={() => setMode("signup")}
             className={`h-10 rounded-md text-[13px] font-bold ${mode === "signup" ? "bg-[#102323] text-white" : "text-[#65716f]"}`}
           >
-            Create
+            Create account
           </button>
         </div>
 

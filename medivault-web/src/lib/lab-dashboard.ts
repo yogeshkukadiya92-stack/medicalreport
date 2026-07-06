@@ -46,8 +46,26 @@ export type LabDashboardPayload = {
   workQueue: WorkQueue;
 };
 
+function dateKeyForTimeZone(date = new Date(), timeZone = process.env.APP_TIME_ZONE || "Asia/Kolkata") {
+  try {
+    const parts = new Intl.DateTimeFormat("en", {
+      day: "2-digit",
+      month: "2-digit",
+      timeZone,
+      year: "numeric",
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+}
+
 export function todayDate() {
-  return new Date().toISOString().slice(0, 10);
+  return dateKeyForTimeZone();
 }
 
 export async function getLabDashboardData(db: Db, lab: Pick<LabProfile, "id">): Promise<LabDashboardPayload> {

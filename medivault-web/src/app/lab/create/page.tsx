@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
+import { localDateKey } from "@/lib/date-client";
 import { getLabTemplate } from "@/lib/lab-templates";
 import { normalizePhone, statusFromValue } from "@/lib/lab-utils";
 import type { LabClient, LabReport, LabTemplate, ReportMarker } from "@/lib/vault-types";
@@ -27,14 +28,14 @@ type StoredFile = {
 };
 
 const emptyClient = { age: "", gender: "", name: "", phone: "" };
-const emptyReport = {
+const createEmptyReport = () => ({
   accessionNumber: "",
   doctorName: "",
-  reportDate: new Date().toISOString().slice(0, 10),
+  reportDate: localDateKey(),
   reportType: "CBC",
   sampleCollectedAt: "",
   title: "",
-};
+});
 
 function newId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -80,7 +81,7 @@ export default function LabCreateReportPage() {
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("cbc");
   const [clientForm, setClientForm] = useState(emptyClient);
-  const [reportForm, setReportForm] = useState(emptyReport);
+  const [reportForm, setReportForm] = useState(createEmptyReport);
   const [values, setValues] = useState<ValueDraft[]>(draftFromTemplate("cbc"));
   const [storedFile, setStoredFile] = useState<StoredFile | null>(null);
   const [message, setMessage] = useState("");
@@ -219,7 +220,7 @@ export default function LabCreateReportPage() {
       setMessage(result?.duplicateWarning ?? "Report published to matching client app.");
       setSelectedClientId("");
       setClientForm(emptyClient);
-      setReportForm(emptyReport);
+      setReportForm(createEmptyReport());
       setSelectedTemplateId("cbc");
       setValues(draftFromTemplate("cbc"));
       setStoredFile(null);
