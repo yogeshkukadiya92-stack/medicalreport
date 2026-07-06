@@ -7,7 +7,7 @@ export function AuthSetupRequired({ surface }: { surface: string }) {
         <p className="text-[13px] font-black text-[#ba563d]">Production auth setup required</p>
         <h1 className="mt-2 text-[26px] font-black leading-tight text-[#102323]">Supabase is not available in this build</h1>
         <p className="mt-3 text-[14px] leading-6 text-[#65716f]">
-          Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Railway, then redeploy before using the {surface}.
+          Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Railway, then redeploy or restart before using the {surface}.
         </p>
         <Link href="/login" className="mt-5 inline-flex h-11 items-center justify-center rounded-lg bg-[#0a7d6e] px-4 text-[13px] font-bold text-white">
           Go to login

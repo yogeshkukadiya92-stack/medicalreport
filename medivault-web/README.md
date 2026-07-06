@@ -23,7 +23,7 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-Local development can run without Supabase, but production builds require Supabase public variables so protected app screens do not fall back to an offline-only mode.
+Local development can run without Supabase, but production needs Supabase public variables so protected app screens can authenticate real users.
 
 ## Required Environment Variables
 
@@ -48,7 +48,7 @@ NVIDIA_MODEL=meta/llama-3.2-11b-vision-instruct
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com
 ```
 
-After changing `NEXT_PUBLIC_*` variables on Railway, trigger a fresh deployment because Next.js embeds those values during build.
+MediVault reads Supabase public config at runtime from `/api/public-config`. After changing Railway variables, let Railway redeploy or restart the service so the runtime process sees the new values.
 
 ## Production Checks
 

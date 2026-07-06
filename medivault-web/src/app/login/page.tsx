@@ -3,13 +3,12 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 type Mode = "signin" | "signup";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { status } = useAuth();
+  const { isConfigLoading, isConfigured, status, supabase } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -134,7 +133,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {!isSupabaseConfigured ? (
+        {!isConfigLoading && !isConfigured ? (
           <div className="mt-5 rounded-lg border border-[#f0d4ca] bg-[#fff7f4] p-4">
             <p className="text-[13px] font-black text-[#ba563d]">Supabase env missing</p>
             <p className="mt-2 text-[13px] leading-5 text-[#65716f]">
@@ -171,17 +170,17 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={isSubmitting || !isSupabaseConfigured}
+            disabled={isSubmitting || isConfigLoading || !isConfigured}
             className="h-12 w-full rounded-lg bg-[#0a7d6e] text-[14px] font-black text-white shadow-[0_14px_30px_rgba(10,125,110,0.22)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Please wait" : mode === "signin" ? "Sign in securely" : "Create account"}
+            {isConfigLoading ? "Checking setup" : isSubmitting ? "Please wait" : mode === "signin" ? "Sign in securely" : "Create account"}
           </button>
         </form>
 
         <button
           type="button"
           onClick={sendMagicLink}
-          disabled={isSubmitting || !isSupabaseConfigured}
+          disabled={isSubmitting || isConfigLoading || !isConfigured}
           className="mt-3 h-12 w-full rounded-lg border border-[#dce9e5] bg-white text-[14px] font-black text-[#102323] disabled:cursor-not-allowed disabled:opacity-60"
         >
           Send magic link

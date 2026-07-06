@@ -85,7 +85,7 @@ function localReportsOnly(reports: AppReport[]) {
 }
 
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
-  const { isConfigured: isAuthConfigured, session, status: authStatus } = useAuth();
+  const { isConfigLoading, isConfigured: isAuthConfigured, session, status: authStatus } = useAuth();
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [reports, setReports] = useState<AppReport[]>([]);
   const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
@@ -128,7 +128,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, [activeMemberId, familyMembers, isHydrated, reports]);
 
   useEffect(() => {
-    if (!isHydrated) return;
+    if (!isHydrated || isConfigLoading) return;
 
     if (!isAuthConfigured) {
       setIsCloudLoaded(true);
@@ -179,7 +179,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     return () => {
       isCancelled = true;
     };
-  }, [authStatus, isAuthConfigured, isHydrated, session?.access_token]);
+  }, [authStatus, isAuthConfigured, isConfigLoading, isHydrated, session?.access_token]);
 
   useEffect(() => {
     if (!isHydrated || !isCloudLoaded || authStatus !== "authenticated" || !session?.access_token) return;

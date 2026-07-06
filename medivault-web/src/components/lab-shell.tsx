@@ -21,7 +21,7 @@ const labNav = [
 export function LabShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isConfigured, status } = useAuth();
+  const { isConfigLoading, isConfigured, status } = useAuth();
   const requiresProductionAuth = process.env.NODE_ENV === "production";
 
   useEffect(() => {
@@ -29,6 +29,10 @@ export function LabShell({ children }: { children: ReactNode }) {
       router.replace("/login");
     }
   }, [isConfigured, router, status]);
+
+  if (isConfigLoading) {
+    return <SessionLoading />;
+  }
 
   if (!isConfigured && requiresProductionAuth) {
     return <AuthSetupRequired surface="lab dashboard" />;
