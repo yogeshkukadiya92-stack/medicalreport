@@ -53,6 +53,10 @@ function statusClass(report: AppReport) {
   return "bg-[#eaf9f2] text-[#087766]";
 }
 
+function sourceClass(report: AppReport) {
+  return report.source === "lab" ? "bg-[#eef5ff] text-[#4167a8]" : "bg-[#f1f6f4] text-[#52605d]";
+}
+
 function markerClass(status: string) {
   if (status === "High" || status === "Low") return "bg-[#fff0ec] text-[#ba563d]";
   if (status === "Watch") return "bg-[#fff7d8] text-[#8a6500]";
@@ -90,6 +94,7 @@ export default function Reports() {
   }, [filter, query, reportsForActiveMember]);
 
   function beginEdit(report: AppReport) {
+    if (report.source === "lab") return;
     setEditingReport(report);
     setEditForm({
       title: report.title,
@@ -155,6 +160,7 @@ export default function Reports() {
   }
 
   async function removeReport(report: AppReport) {
+    if (report.source === "lab") return;
     if (report.fileId && session?.access_token) {
       fetch(`/api/files/${report.fileId}`, {
         method: "DELETE",
@@ -243,20 +249,25 @@ export default function Reports() {
                 <article key={report.id} className="rounded-lg border border-[#e2ebe8] bg-white p-4">
                   <div className="flex items-start gap-3">
                     <button
-                      onClick={() => toggleStar(report.id)}
+                      onClick={() => (report.source === "lab" ? undefined : toggleStar(report.id))}
                       className={`grid h-12 w-12 shrink-0 place-items-center rounded-lg ${report.starred ? "bg-[#fff7d8] text-[#a36a00]" : "bg-[#f1f6f4] text-[#087766]"}`}
-                      aria-label={report.starred ? "Unstar report" : "Star report"}
+                      aria-label={report.source === "lab" ? "Lab report" : report.starred ? "Unstar report" : "Star report"}
                     >
-                      {report.starred ? "*" : <Icon name="reports" className="h-5 w-5" />}
+                      {report.source === "lab" ? <Icon name="shield" className="h-5 w-5" /> : report.starred ? "*" : <Icon name="reports" className="h-5 w-5" />}
                     </button>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <h2 className="truncate text-[15px] font-bold text-[#162523]">{report.title}</h2>
                           <p className="mt-1 truncate text-[12px] text-[#7b8986]">{report.lab}</p>
-                          <span className="mt-2 inline-flex rounded-md bg-[#f1f6f4] px-2 py-1 text-[11px] font-bold text-[#52605d]">
-                            {report.category}
-                          </span>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <span className="inline-flex rounded-md bg-[#f1f6f4] px-2 py-1 text-[11px] font-bold text-[#52605d]">
+                              {report.category}
+                            </span>
+                            <span className={`inline-flex rounded-md px-2 py-1 text-[11px] font-bold ${sourceClass(report)}`}>
+                              {report.source === "lab" ? "Lab Report" : "Uploaded by you"}
+                            </span>
+                          </div>
                         </div>
                         <span className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold ${statusClass(report)}`}>
                           {report.status}
@@ -273,24 +284,30 @@ export default function Reports() {
                           <p className="mt-1 font-bold text-[#263432]">{report.abnormal}</p>
                         </div>
                         <div>
-                          <p className="text-[#8a9794]">AI</p>
-                          <p className="mt-1 font-bold text-[#263432]">{report.aiConfidence ? `${report.aiConfidence}%` : "--"}</p>
+                          <p className="text-[#8a9794]">{report.source === "lab" ? "Source" : "AI"}</p>
+                          <p className="mt-1 font-bold text-[#263432]">{report.source === "lab" ? "Lab" : report.aiConfidence ? `${report.aiConfidence}%` : "--"}</p>
                         </div>
                       </div>
-                      <div className="mt-4 grid grid-cols-3 gap-2">
+                      <div className={`mt-4 grid gap-2 ${report.source === "lab" ? "grid-cols-1" : "grid-cols-3"}`}>
                         <button onClick={() => setSelectedReport(report)} aria-label={`View ${report.title}`} className="h-9 rounded-md bg-[#e8f7f2] text-[12px] font-bold text-[#087766]">
                           View
                         </button>
-                        <button onClick={() => markReviewed(report.id)} className="h-9 rounded-md border border-[#dce9e5] text-[12px] font-bold text-[#52605d]">
-                          Reviewed
-                        </button>
-                        <button onClick={() => beginEdit(report)} className="h-9 rounded-md border border-[#dce9e5] text-[12px] font-bold text-[#52605d]">
-                          Edit
-                        </button>
+                        {report.source !== "lab" ? (
+                          <>
+                            <button onClick={() => markReviewed(report.id)} className="h-9 rounded-md border border-[#dce9e5] text-[12px] font-bold text-[#52605d]">
+                              Reviewed
+                            </button>
+                            <button onClick={() => beginEdit(report)} className="h-9 rounded-md border border-[#dce9e5] text-[12px] font-bold text-[#52605d]">
+                              Edit
+                            </button>
+                          </>
+                        ) : null}
                       </div>
-                      <button onClick={() => removeReport(report)} className="mt-2 h-9 w-full rounded-md bg-[#fff0ec] text-[12px] font-bold text-[#ba563d]">
-                        Delete report
-                      </button>
+                      {report.source !== "lab" ? (
+                        <button onClick={() => removeReport(report)} className="mt-2 h-9 w-full rounded-md bg-[#fff0ec] text-[12px] font-bold text-[#ba563d]">
+                          Delete report
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </article>
@@ -321,12 +338,19 @@ export default function Reports() {
               </div>
               <div className="mt-4 space-y-2 text-[13px] text-[#52605d]">
                 <p><strong>Member:</strong> {selectedReport.memberName}</p>
+                <p><strong>Source:</strong> {selectedReport.source === "lab" ? "Published by lab" : "Uploaded by you"}</p>
                 <p><strong>Lab:</strong> {selectedReport.lab}</p>
+                {selectedReport.labReportId ? <p><strong>Lab report ID:</strong> {selectedReport.labReportId}</p> : null}
+                {selectedReport.doctorName ? <p><strong>Doctor:</strong> {selectedReport.doctorName}</p> : null}
+                {selectedReport.accessionNumber ? <p><strong>Accession:</strong> {selectedReport.accessionNumber}</p> : null}
+                {selectedReport.sampleCollectedAt ? <p><strong>Sample collected:</strong> {selectedReport.sampleCollectedAt}</p> : null}
                 <p><strong>File:</strong> {selectedReport.fileName}</p>
                 <p><strong>Stored:</strong> {selectedReport.fileId ? "Original file saved" : "Original file not available"}</p>
                 <p><strong>Category:</strong> {selectedReport.category}</p>
                 <p><strong>Status:</strong> {selectedReport.status}</p>
-                <p><strong>AI confidence:</strong> {selectedReport.aiConfidence ? `${selectedReport.aiConfidence}%` : "Processing"}</p>
+                {selectedReport.source !== "lab" ? (
+                  <p><strong>AI confidence:</strong> {selectedReport.aiConfidence ? `${selectedReport.aiConfidence}%` : "Processing"}</p>
+                ) : null}
               </div>
               {selectedReport.fileId ? (
                 <button
@@ -337,7 +361,7 @@ export default function Reports() {
                 </button>
               ) : null}
               <div className="mt-4 rounded-lg bg-[#f7fbfa] p-4">
-                <p className="text-[12px] font-bold text-[#087766]">AI summary</p>
+                <p className="text-[12px] font-bold text-[#087766]">{selectedReport.source === "lab" ? "Rule summary" : "AI summary"}</p>
                 <p className="mt-2 text-[13px] leading-5 text-[#52605d]">{selectedReport.summary}</p>
               </div>
               {selectedReport.markers.length ? (

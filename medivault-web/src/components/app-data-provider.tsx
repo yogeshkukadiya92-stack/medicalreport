@@ -22,16 +22,18 @@ type ManualReportInput = {
   title: string;
 };
 
+type MemberDetails = Partial<Pick<FamilyMember, "age" | "bloodGroup" | "phone">>;
+
 type AppDataContextValue = {
   activeMember: FamilyMember | null;
   activeMemberId: string | null;
-  addMember: (name: string, relation: string) => void;
+  addMember: (name: string, relation: string, details?: MemberDetails) => void;
   addManualReport: (input: ManualReportInput) => AppReport;
   addReport: (input: NewReportInput) => AppReport;
   deleteMember: (memberId: string) => void;
   deleteReport: (reportId: string) => void;
   familyMembers: FamilyMember[];
-  updateMember: (memberId: string, patch: Partial<Pick<FamilyMember, "name" | "relation" | "age" | "bloodGroup">>) => void;
+  updateMember: (memberId: string, patch: Partial<Pick<FamilyMember, "name" | "relation" | "age" | "bloodGroup" | "phone">>) => void;
   updateReport: (reportId: string, patch: ReportPatch) => void;
   markReviewed: (reportId: string) => void;
   reports: AppReport[];
@@ -66,8 +68,20 @@ function normalizeReport(report: AppReport): AppReport {
     aiConfidence: report.aiConfidence ?? 0,
     category: report.category ?? "General",
     markers: Array.isArray(report.markers) ? report.markers : [],
+    source: report.source ?? "self_upload",
     summary: report.summary ?? "Analysis summary will appear after processing.",
   };
+}
+
+function normalizeMember(member: FamilyMember): FamilyMember {
+  return {
+    ...member,
+    phone: typeof member.phone === "string" ? member.phone : "",
+  };
+}
+
+function localReportsOnly(reports: AppReport[]) {
+  return reports.filter((report) => report.source !== "lab");
 }
 
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
@@ -88,14 +102,16 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           familyMembers?: FamilyMember[];
           reports?: AppReport[];
         };
-        if (Array.isArray(parsed.familyMembers)) setFamilyMembers(parsed.familyMembers);
+        if (Array.isArray(parsed.familyMembers)) setFamilyMembers(parsed.familyMembers.map(normalizeMember));
         if (Array.isArray(parsed.reports)) {
           setReports(
-            parsed.reports.map((report) =>
-              report.status === "Processing" && Date.now() - (report.createdAt ?? Number(report.id) ?? Date.now()) > 3500
-                ? finishProcessing(normalizeReport({ ...report, createdAt: report.createdAt ?? Number(report.id) ?? Date.now() }))
-                : normalizeReport({ ...report, createdAt: report.createdAt ?? Number(report.id) ?? Date.now() }),
-            ),
+            parsed.reports
+              .filter((report) => report.source !== "lab")
+              .map((report) =>
+                report.status === "Processing" && Date.now() - (report.createdAt ?? Number(report.id) ?? Date.now()) > 3500
+                  ? finishProcessing(normalizeReport({ ...report, createdAt: report.createdAt ?? Number(report.id) ?? Date.now() }))
+                  : normalizeReport({ ...report, createdAt: report.createdAt ?? Number(report.id) ?? Date.now() }),
+              ),
           );
         }
         if (parsed.activeMemberId) setActiveMemberId(parsed.activeMemberId);
@@ -108,7 +124,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isHydrated) return;
-    window.localStorage.setItem(storageKey, JSON.stringify({ activeMemberId, familyMembers, reports }));
+    window.localStorage.setItem(storageKey, JSON.stringify({ activeMemberId, familyMembers, reports: localReportsOnly(reports) }));
   }, [activeMemberId, familyMembers, isHydrated, reports]);
 
   useEffect(() => {
@@ -147,7 +163,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (response.ok && result?.vault) {
-          setFamilyMembers(result.vault.familyMembers);
+          setFamilyMembers(result.vault.familyMembers.map(normalizeMember));
           setReports(result.vault.reports.map(normalizeReport));
           setActiveMemberId(result.vault.activeMemberId);
         }
@@ -179,7 +195,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           Authorization: `Bearer ${session.access_token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ activeMemberId, familyMembers, reports } satisfies VaultSnapshot),
+        body: JSON.stringify({ activeMemberId, familyMembers, reports: localReportsOnly(reports) } satisfies VaultSnapshot),
       }).catch(() => {
         // Local storage remains the immediate offline fallback when cloud sync is unavailable.
       });
@@ -208,7 +224,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     () => ({
       activeMember,
       activeMemberId,
-      addMember: (name, relation) => {
+      addMember: (name, relation, details) => {
         const cleanName = name.trim();
         if (!cleanName) return;
         const nextMember: FamilyMember = {
@@ -216,8 +232,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           name: cleanName,
           relation: relation.trim() || "Family",
           score: 80,
-          bloodGroup: "Unknown",
-          age: 0,
+          bloodGroup: details?.bloodGroup?.trim() || "Unknown",
+          age: details?.age ?? 0,
+          phone: details?.phone?.trim() || "",
         };
         setFamilyMembers((current) => [...current, nextMember]);
         setActiveMemberId(nextMember.id);
@@ -238,6 +255,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           memberId: member.id,
           memberName: member.name,
           fileName: "Manual entry",
+          source: "self_upload",
           parameters: markers.length,
           abnormal,
           status: abnormal ? "Needs review" : "Reviewed",
@@ -266,6 +284,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           memberId: member.id,
           memberName: member.name,
           fileName: input.fileName,
+          source: "self_upload",
           parameters: 8,
           abnormal: 0,
           status: "Processing",
@@ -284,7 +303,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         setActiveMemberId((activeId) => (activeId === memberId ? remaining[0]?.id ?? null : activeId));
         setReports((current) => current.filter((report) => report.memberId !== memberId));
       },
-      deleteReport: (reportId) => setReports((current) => current.filter((report) => report.id !== reportId)),
+      deleteReport: (reportId) => setReports((current) => current.filter((report) => report.id !== reportId || report.source === "lab")),
       familyMembers,
       updateMember: (memberId, patch) => {
         setFamilyMembers((current) =>
@@ -300,12 +319,12 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       updateReport: (reportId, patch) =>
         setReports((current) =>
-          current.map((report) => (report.id === reportId ? { ...report, ...patch } : report)),
+          current.map((report) => (report.id === reportId && report.source !== "lab" ? { ...report, ...patch } : report)),
         ),
       markReviewed: (reportId) =>
         setReports((current) =>
           current.map((report) =>
-            report.id === reportId ? { ...report, abnormal: 0, status: "Reviewed" as ReportStatus } : report,
+            report.id === reportId && report.source !== "lab" ? { ...report, abnormal: 0, status: "Reviewed" as ReportStatus } : report,
           ),
         ),
       reports,
@@ -313,7 +332,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       setActiveMemberId,
       toggleStar: (reportId) =>
         setReports((current) =>
-          current.map((report) => (report.id === reportId ? { ...report, starred: !report.starred } : report)),
+          current.map((report) => (report.id === reportId && report.source !== "lab" ? { ...report, starred: !report.starred } : report)),
         ),
     }),
     [activeMember, activeMemberId, familyMembers, reports, reportsForActiveMember],

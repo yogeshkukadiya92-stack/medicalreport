@@ -2,7 +2,7 @@
 title: MediVault Project Map
 type: project-map
 project: MediVault / medicalreport-main
-last_reviewed: 2026-07-04
+last_reviewed: 2026-07-06
 status: active-context
 ---
 
@@ -12,7 +12,7 @@ Use this note as the first context file before changing the project. It maps the
 
 ## One-Line Summary
 
-MediVault is a medical report vault app. The current working code is a Next.js web app with Supabase auth, MongoDB cloud sync for family/report data, MongoDB GridFS storage for original uploaded PDFs/images, local browser storage fallback, report upload, optional AI-based medical report extraction, manual health value entry, reports management, and analytics screens. The root documentation describes a broader product roadmap: FastAPI backend, PostgreSQL, Redis/Celery, AI/OCR, Flutter mobile app, analytics, testing, deployment, security, and compliance.
+MediVault is a medical report vault app. The current working code is a Next.js web app with Supabase auth, MongoDB cloud sync for family/report data, MongoDB GridFS storage for original uploaded PDFs/images, local browser storage fallback, report upload, optional AI-based medical report extraction, manual health value entry, lab-created structured reports, reports management, and analytics screens. The root documentation describes a broader product roadmap: FastAPI backend, PostgreSQL, Redis/Celery, AI/OCR, Flutter mobile app, analytics, testing, deployment, security, and compliance.
 
 ## Current Reality
 
@@ -23,6 +23,8 @@ MediVault is a medical report vault app. The current working code is a Next.js w
 - Family members and reports are stored in MongoDB through `/api/vault` after login, with `window.localStorage` as the instant/offline fallback.
 - Upload accepts PDF/JPG/PNG. Original files are stored in MongoDB GridFS through `/api/files`, then PDF/image is converted to image data in the browser and posted to `/api/analyze-report`.
 - AI analysis uses OpenAI by default, with optional NVIDIA provider support. If keys are missing or the model fails, the app returns a friendly fallback analysis.
+- Lab portal lives under `/lab`. Lab staff can manage clients, create structured reports from templates, attach original PDFs/images, auto-publish reports, and view report history without AI.
+- Client app reports now include two sources: `Uploaded by you` and `Lab Report`. Published lab reports appear in the client vault by matching family-member phone number.
 - Planned backend/mobile/analytics/security docs are mostly specifications and roadmaps, not implemented server/mobile source code in this repo.
 
 ## App Flow
@@ -42,6 +44,23 @@ flowchart TD
   I --> J["MongoDB cloud sync + localStorage fallback"]
   J --> K["/reports manage/view/edit/manual values"]
   J --> L["/analytics score, flagged values, summary"]
+```
+
+## Lab Report Flow
+
+```mermaid
+flowchart TD
+  A["/lab Supabase-auth lab portal"] --> B["/lab/clients client master"]
+  A --> C["/lab/create structured report builder"]
+  C --> D["Template values: CBC, Lipid, Thyroid, Diabetes, Vitamin, Liver, Kidney, Urine, Custom"]
+  C --> E["Optional original PDF/image"]
+  E --> F["/api/files GridFS reportFiles"]
+  C --> G["/api/lab/reports saves metadata + values"]
+  G --> H["labReports + labReportValues + audit logs"]
+  H --> I["Auto publish"]
+  I --> J["clientReportLinks unclaimed/claimed"]
+  J --> K["/api/vault merges published lab reports by normalized phone"]
+  K --> L["Client /reports + /analytics"]
 ```
 
 ## Tech Stack
@@ -104,16 +123,29 @@ Note: `npm run lint` exists but uses `next lint`, which may require matching Nex
 - [[medivault-web/src/app/upload/page.tsx]]: upload PDF/image, prepare image data, call AI route, update report status.
 - [[medivault-web/src/app/reports/page.tsx]]: report list, search, filters, star, reviewed, edit, delete, details modal, manual value entry.
 - [[medivault-web/src/app/analytics/page.tsx]]: score, scanned/flagged/verified cards, key parameter list, flagged toggle, smart summary.
+- [[medivault-web/src/app/lab/page.tsx]]: lab dashboard with KPIs, recent reports, and recent activity.
+- [[medivault-web/src/app/lab/clients/page.tsx]]: lab client master, phone-first add/update/search.
+- [[medivault-web/src/app/lab/create/page.tsx]]: structured lab report builder with template/custom/attachment modes.
+- [[medivault-web/src/app/lab/reports/page.tsx]]: lab report history, filters, detail modal, original file access.
+- [[medivault-web/src/app/lab/templates/page.tsx]]: standard report templates and default units/reference ranges.
+- [[medivault-web/src/app/lab/settings/page.tsx]]: lab profile settings.
 - [[medivault-web/src/app/api/analyze-report/route.ts]]: AI extraction API route with provider selection, fallback handling, JSON parsing, marker cleanup.
 - [[medivault-web/src/app/api/files/route.ts]]: authenticated original file upload route using MongoDB GridFS.
-- [[medivault-web/src/app/api/files/[fileId]/route.ts]]: authenticated original file view/delete route.
-- [[medivault-web/src/app/api/vault/route.ts]]: authenticated MongoDB vault load/save route.
+- [[medivault-web/src/app/api/files/[fileId]/route.ts]]: authenticated original file view/delete route; also allows matched client access to published lab report files.
+- [[medivault-web/src/app/api/vault/route.ts]]: authenticated MongoDB vault load/save route; merges published lab reports by normalized family phone.
+- [[medivault-web/src/app/api/lab/clients/route.ts]]: lab client list/create/update-by-phone API.
+- [[medivault-web/src/app/api/lab/reports/route.ts]]: lab report list/create API, duplicate warning, auto publish, audit logs.
+- [[medivault-web/src/app/api/lab/reports/[reportId]/route.ts]]: scoped lab report patch API.
+- [[medivault-web/src/app/api/lab/reports/[reportId]/publish/route.ts]]: idempotent publish API.
+- [[medivault-web/src/app/api/lab/templates/route.ts]]: standard template API.
+- [[medivault-web/src/app/api/lab/settings/route.ts]]: lab profile API.
 
 ### Shared Components
 
 - [[medivault-web/src/components/app-data-provider.tsx]]: core local app state. Owns `FamilyMember`, `AppReport`, `ReportMarker`, add/update/delete methods, localStorage hydration/persistence, active member, report filtering.
 - [[medivault-web/src/components/auth-provider.tsx]]: Supabase session tracking and `signOut`.
 - [[medivault-web/src/components/mobile-shell.tsx]]: app shell, bottom navigation, icons.
+- [[medivault-web/src/components/lab-shell.tsx]]: lab portal shell and navigation.
 - [[medivault-web/src/components/sign-out-button.tsx]]: auth sign-out UI.
 
 ### Libraries And API Layer
@@ -121,6 +153,9 @@ Note: `npm run lint` exists but uses `next lint`, which may require matching Nex
 - [[medivault-web/src/lib/supabase.ts]]: creates Supabase client only when public env vars are present.
 - [[medivault-web/src/lib/api-client.ts]]: Axios instance for future backend API calls, token setter/clearer, auth header interceptor.
 - [[medivault-web/src/lib/mongodb.ts]]: shared MongoDB connection helper with serverless-safe cached client.
+- [[medivault-web/src/lib/lab-templates.ts]]: standard lab panels, units, and reference ranges.
+- [[medivault-web/src/lib/lab-utils.ts]]: phone normalization, value status classification, lab summary builder, lab-report-to-app-report mapper.
+- [[medivault-web/src/lib/lab-server.ts]]: lab auth/context helper, default lab onboarding, indexes, audit log helper.
 - [[medivault-web/src/lib/types.ts]]: broader planned domain types for users, profiles, family members, reports, files, extracted values, auth responses, API responses, pagination, health summary.
 - [[medivault-web/src/lib/utils.ts]]: helper functions.
 - [[medivault-web/src/lib/vault-types.ts]]: shared current app vault types for family members, reports, markers, and snapshots.
@@ -154,14 +189,18 @@ Note: `npm run lint` exists but uses `next lint`, which may require matching Nex
 
 Current model from `app-data-provider.tsx` and `vault-types.ts`:
 
-- `FamilyMember`: `id`, `name`, `relation`, `score`, `bloodGroup`, `age`.
-- `AppReport`: `id`, `title`, `category`, `lab`, `date`, `memberId`, `memberName`, `fileName`, `parameters`, `abnormal`, `status`, `starred`, `summary`, `markers`, `aiConfidence`, `createdAt`.
+- `FamilyMember`: `id`, `name`, `relation`, `score`, `bloodGroup`, `age`, optional `phone`.
+- `AppReport`: `id`, `title`, `category`, `lab`, `date`, `memberId`, `memberName`, `fileName`, optional file metadata, optional lab metadata, `source`, `parameters`, `abnormal`, `status`, `starred`, `summary`, `markers`, `aiConfidence`, `createdAt`.
+- Report sources: `self_upload`, `lab`.
 - `ReportMarker`: `name`, `value`, `range`, `status`.
 - Report statuses: `Reviewed`, `Needs review`, `Watch`, `Normal`, `Processing`.
 - Marker statuses: `Normal`, `High`, `Low`, `Watch`.
 - MongoDB collection: `vaults`.
 - MongoDB document shape: `{ userId, snapshot: { activeMemberId, familyMembers, reports }, createdAt, updatedAt }`.
 - MongoDB GridFS bucket: `reportFiles`; report metadata stores `fileId`, `fileMimeType`, and `fileSizeBytes`.
+- Lab MongoDB collections: `labs`, `labUsers`, `labClients`, `labReports`, `labReportValues`, `labReportAuditLogs`, `clientReportLinks`.
+- Lab-created reports are authoritative in lab collections. `/api/vault` merges them into the client app at read time and filters them out during vault save.
+- Phone matching uses normalized digits. India `+91` 12-digit numbers are reduced to the last 10 digits; longer inputs also use the last 10 digits.
 - localStorage fallback key: `medivault-app-data-v2`.
 
 ## AI Extraction Behavior
@@ -232,6 +271,7 @@ Current model from `app-data-provider.tsx` and `vault-types.ts`:
 | Web app | Full MVP and many screens | Implemented core screens: login, dashboard, family, upload, reports, analytics |
 | Auth | Phone/JWT/backend flows in some docs | Supabase email/password/magic link |
 | Data storage | PostgreSQL/backend schema | MongoDB vault snapshots, GridFS original files, plus localStorage fallback |
+| Lab dashboard | Structured lab report entry and client sync | Implemented `/lab` portal, lab MongoDB collections, templates, auto publish, phone matching |
 | Backend | FastAPI, PostgreSQL, Redis, Celery, 40+ endpoints | No backend source here; only Next API route for AI |
 | AI/OCR | Multi-step OCR pipeline and extraction review | Direct vision model extraction through `/api/analyze-report` |
 | Analytics | SQL-backed analytics endpoints and trends | Client-side derived analytics from local reports |
@@ -241,11 +281,11 @@ Current model from `app-data-provider.tsx` and `vault-types.ts`:
 ## Recommended Next Development Paths
 
 1. Stabilize current web MVP: verify auth, upload, AI fallback, report edit/delete/manual entry, analytics empty states.
-2. Harden MongoDB persistence: indexes, migration from localStorage, server-side validation, backup policy.
-3. Add real file storage for uploaded PDFs/images.
-4. Add real file storage: Supabase Storage, S3, or equivalent, with signed URLs.
+2. Add lab staff invitation/admin management so one lab can add multiple staff accounts intentionally.
+3. Harden MongoDB persistence: indexes, migration from localStorage, server-side validation, backup policy.
+4. Add production file-storage policy if GridFS should later move to S3/Supabase Storage with signed URLs.
 5. Expand AI extraction: multi-page PDFs, confidence per marker, user review step, audit trail.
-6. Add tests for the highest-risk paths: upload, AI route fallback, report CRUD, family deletion, auth redirects.
+6. Add tests for the highest-risk paths: upload, AI route fallback, lab report create/match, file authorization, report CRUD, family deletion, auth redirects.
 7. Reconcile docs with actual implementation so status docs stop overstating implemented backend/mobile pieces.
 
 ## Quick Orientation For Future Codex Sessions
@@ -257,6 +297,7 @@ Before editing:
 - Treat root docs as product specs/roadmap unless the task asks to update documentation.
 - Do not assume FastAPI/mobile backend source exists in this repo.
 - Preserve the mobile-first app-shell style unless the user asks for a redesign.
+- Preserve the separate lab portal style under `/lab`; do not mix lab staff workflows into the client mobile shell unless requested.
 - Keep MongoDB cloud sync plus localStorage fallback unless replacing persistence is explicitly part of the task.
 - If touching AI upload, inspect both [[medivault-web/src/app/upload/page.tsx]] and [[medivault-web/src/app/api/analyze-report/route.ts]].
 - If touching report data or analytics, inspect [[medivault-web/src/components/app-data-provider.tsx]], [[medivault-web/src/app/reports/page.tsx]], and [[medivault-web/src/app/analytics/page.tsx]].

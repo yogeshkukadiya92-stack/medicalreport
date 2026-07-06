@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 
-const emptyForm = { name: "", relation: "", age: "", bloodGroup: "" };
+const emptyForm = { name: "", relation: "", age: "", bloodGroup: "", phone: "" };
 
 export default function FamilyPage() {
   const { activeMemberId, addMember, deleteMember, familyMembers, reports, setActiveMemberId, updateMember } = useAppData();
@@ -28,6 +28,7 @@ export default function FamilyPage() {
       relation: editingMember.relation,
       age: editingMember.age ? String(editingMember.age) : "",
       bloodGroup: editingMember.bloodGroup,
+      phone: editingMember.phone ?? "",
     });
   }, [editingMember]);
 
@@ -42,10 +43,15 @@ export default function FamilyPage() {
         relation: form.relation.trim() || "Family",
         age: form.age ? Number(form.age) : 0,
         bloodGroup: form.bloodGroup.trim() || "Unknown",
+        phone: form.phone.trim(),
       });
       setMessage(`${name} updated.`);
     } else {
-      addMember(name, form.relation.trim() || "Family");
+      addMember(name, form.relation.trim() || "Family", {
+        age: form.age ? Number(form.age) : 0,
+        bloodGroup: form.bloodGroup.trim() || "Unknown",
+        phone: form.phone.trim(),
+      });
       setMessage(`${name} added to your family vault.`);
     }
 
@@ -105,6 +111,9 @@ export default function FamilyPage() {
                       <p className="text-[16px] font-black">{member.name}</p>
                       <p className={`mt-1 text-[12px] ${isActive ? "text-[#aee7d9]" : "text-[#7b8986]"}`}>
                         {member.relation} - {member.age || "Age not set"} - {member.bloodGroup}
+                      </p>
+                      <p className={`mt-1 text-[11px] ${isActive ? "text-[#aee7d9]" : "text-[#7b8986]"}`}>
+                        {member.phone ? `Phone ${member.phone}` : "Phone not linked"}
                       </p>
                     </button>
                     <div className="text-right">
@@ -174,6 +183,15 @@ export default function FamilyPage() {
               onChange={(event) => setForm((current) => ({ ...current, relation: event.target.value }))}
               className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] px-4 text-[14px] font-bold"
               placeholder="Father, spouse, child"
+            />
+          </label>
+          <label className="mt-3 block">
+            <span className="text-[12px] font-bold text-[#52605d]">Phone for lab report matching</span>
+            <input
+              value={form.phone}
+              onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+              className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] px-4 text-[14px] font-bold"
+              placeholder="+91 98765 43210"
             />
           </label>
           <div className="mt-3 grid grid-cols-2 gap-3">

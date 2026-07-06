@@ -1,6 +1,6 @@
 # MediVault MongoDB Live Setup
 
-MediVault now supports MongoDB persistence for the web app vault data.
+MediVault now supports MongoDB persistence for the web app vault data, original report files, and lab-created structured reports.
 
 ## What MongoDB Saves
 
@@ -27,7 +27,19 @@ Original uploaded PDFs/images are stored separately in MongoDB GridFS:
 - Metadata owner field: `metadata.userId`
 - Report metadata stores: `fileId`, `fileMimeType`, `fileSizeBytes`
 
+Lab dashboard data uses the same MongoDB database:
+
+- `labs`: lab profile and branding.
+- `labUsers`: Supabase user to lab role mapping.
+- `labClients`: lab client master records by normalized phone.
+- `labReports`: structured lab report metadata and publish state.
+- `labReportValues`: entered biomarker/test values.
+- `labReportAuditLogs`: create/update/publish history.
+- `clientReportLinks`: unclaimed/claimed phone matching state.
+
 The browser still keeps `localStorage` as an instant/offline fallback, but after login the app loads and saves the vault through `/api/vault`. Original files require MongoDB and signed-in Supabase auth.
+
+Published lab reports are merged into `/api/vault` by matching a client app family member phone number with the lab report phone number. If no app user has that phone yet, the lab report remains stored in MongoDB and stays unclaimed until the phone is added later.
 
 ## Required Live Variables
 
@@ -79,3 +91,4 @@ Then:
 4. Check MongoDB Atlas collection `medivault.vaults`.
 5. For uploaded PDFs/images, check GridFS collections `medivault.reportFiles.files` and `medivault.reportFiles.chunks`.
 6. Open the report details screen and use `View original file`.
+7. Open `/lab`, create a client using the same phone as a family member, create a structured report, then reload `/reports` in the client app.
