@@ -9,20 +9,54 @@ import { buildScoreTrend, calculateHealthScore, filterReportsByRange } from "@/l
 
 function statusStyles(tone: string) {
   if (tone === "coral") return "bg-[#fff0ec] text-[#ba563d]";
-  if (tone === "blue") return "bg-[#eef5ff] text-[#4167a8]";
+  if (tone === "yellow") return "bg-[#fff8dc] text-[#9a6b00]";
   return "bg-[#eaf9f2] text-[#087766]";
 }
 
 function barColor(tone: string) {
   if (tone === "coral") return "bg-[#ec795c]";
-  if (tone === "blue") return "bg-[#5c83c9]";
+  if (tone === "yellow") return "bg-[#e5a900]";
   return "bg-[#0a7d6e]";
 }
 
 function markerTone(marker: ReportMarker) {
   if (marker.status === "High" || marker.status === "Low") return "coral";
-  if (marker.status === "Watch") return "blue";
+  if (marker.status === "Watch") return "yellow";
   return "mint";
+}
+
+function graphPalette(status: ReportMarker["status"]) {
+  if (status === "High" || status === "Low") {
+    return {
+      badge: "bg-[#fff0ec] text-[#ba563d]",
+      border: "border-[#f2c6bb]",
+      card: "bg-[#fff7f4]",
+      line: "#ec795c",
+      ring: "ring-[#f4d1c8]",
+      soft: "#fff0ec",
+      text: "text-[#ba563d]",
+    };
+  }
+  if (status === "Watch") {
+    return {
+      badge: "bg-[#fff8dc] text-[#9a6b00]",
+      border: "border-[#efd88b]",
+      card: "bg-[#fffaf0]",
+      line: "#e5a900",
+      ring: "ring-[#f2dda0]",
+      soft: "#fff8dc",
+      text: "text-[#9a6b00]",
+    };
+  }
+  return {
+    badge: "bg-[#eaf9f2] text-[#087766]",
+    border: "border-[#bfe9df]",
+    card: "bg-[#f4fffb]",
+    line: "#0a7d6e",
+    ring: "ring-[#bfe9df]",
+    soft: "#eaf9f2",
+    text: "text-[#087766]",
+  };
 }
 
 function markerWidth(marker: ReportMarker, index: number) {
@@ -272,23 +306,21 @@ export default function Analytics() {
         {hasMember && featuredTrends.length ? (
           <div className="mt-3 grid grid-cols-2 gap-2">
             {featuredTrends.map((trend) => {
-              const isDown = trend.delta < 0;
-              const isUp = trend.delta > 0;
-              const toneClass = isDown ? "bg-[#fff0ec] text-[#ba563d]" : isUp ? "bg-[#eaf9f2] text-[#087766]" : "bg-[#f1f5f4] text-[#52605d]";
+              const palette = graphPalette(trend.latest.status);
               return (
                 <button
                   key={trend.name}
                   onClick={() => selectParameter(trend.name)}
-                  className="rounded-lg border border-[#e2ebe8] bg-white p-3 text-left shadow-[0_10px_24px_rgba(20,67,60,0.04)] transition hover:border-[#0a7d6e]"
+                  className={`rounded-lg border ${palette.border} ${palette.card} p-3 text-left shadow-[0_10px_24px_rgba(20,67,60,0.04)] transition hover:ring-2 ${palette.ring}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-[12px] font-black text-[#162523]">{trend.name}</p>
                       <p className="mt-1 text-[11px] font-bold text-[#7b8986]">{trend.points.length} readings</p>
                     </div>
-                    <span className={`rounded-md px-2 py-1 text-[10px] font-black ${toneClass}`}>{trend.changeText}</span>
+                    <span className={`rounded-md px-2 py-1 text-[10px] font-black ${palette.badge}`}>{trend.changeText}</span>
                   </div>
-                  <p className="mt-3 text-[11px] font-bold text-[#087766]">Open graph</p>
+                  <p className={`mt-3 text-[11px] font-bold ${palette.text}`}>Open graph</p>
                 </button>
               );
             })}
@@ -369,9 +401,7 @@ export default function Analytics() {
           <div className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[18px] bg-white shadow-[0_28px_80px_rgba(6,30,28,0.35)]">
             {(() => {
               const trend = selectedTrend;
-              const isUp = trend.delta > 0;
-              const isDown = trend.delta < 0;
-              const toneClass = isDown ? "bg-[#fff0ec] text-[#ba563d]" : isUp ? "bg-[#eaf9f2] text-[#087766]" : "bg-[#f1f5f4] text-[#52605d]";
+              const palette = graphPalette(trend.latest.status);
               return (
                 <>
                   <div className="bg-[#102323] p-4 text-white">
@@ -394,22 +424,23 @@ export default function Analytics() {
                         Latest {trend.latest.value}
                         {trend.latest.unit ? ` ${trend.latest.unit}` : ""} from {trend.latest.date}
                       </p>
-                      <span className={`shrink-0 rounded-md px-2 py-1 text-[12px] font-black ${toneClass}`}>{trend.changeText}</span>
+                      <span className={`shrink-0 rounded-md px-2 py-1 text-[12px] font-black ${palette.badge}`}>{trend.changeText}</span>
                     </div>
                   </div>
 
                   <div className="p-4">
-                    <div className="rounded-lg bg-[#f6faf9] p-3 ring-1 ring-[#e4efec]">
+                    <div className={`rounded-lg p-3 ring-1 ${palette.ring}`} style={{ backgroundColor: palette.soft }}>
                       <svg viewBox="0 0 96 56" className="h-40 w-full" role="img" aria-label={`${trend.name} past value graph`}>
                         <path d="M8 48H88" stroke="#d8e6e2" strokeWidth="2" strokeLinecap="round" />
                         <path d="M8 30H88" stroke="#e7efed" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 5" />
                         <path d="M8 12H88" stroke="#e7efed" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 5" />
-                        <path d={trend.path} fill="none" stroke={isDown ? "#ec795c" : "#0a7d6e"} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d={trend.path} fill="none" stroke={palette.line} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
                         {trend.points.map((point, index) => {
+                          const pointPalette = graphPalette(point.status);
                           const spread = trend.max - trend.min || 1;
                           const x = trend.points.length === 1 ? 88 : 8 + (index / (trend.points.length - 1)) * 80;
                           const y = 48 - ((point.value - trend.min) / spread) * 36;
-                          return <circle key={`${point.timestamp}-${index}`} cx={x} cy={y} r="3.2" fill="#ffffff" stroke={isDown ? "#ec795c" : "#0a7d6e"} strokeWidth="2.4" />;
+                          return <circle key={`${point.timestamp}-${index}`} cx={x} cy={y} r="3.2" fill="#ffffff" stroke={pointPalette.line} strokeWidth="2.4" />;
                         })}
                       </svg>
                       <div className="mt-1 flex items-center justify-between text-[11px] font-bold text-[#8a9794]">
@@ -421,7 +452,7 @@ export default function Analytics() {
 
                     <div className="mt-4 space-y-2">
                       {trend.points.map((point, index) => (
-                        <div key={`${point.timestamp}-${index}`} className="flex items-center justify-between rounded-lg border border-[#e2ebe8] bg-white px-3 py-2">
+                        <div key={`${point.timestamp}-${index}`} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${graphPalette(point.status).border} ${graphPalette(point.status).card}`}>
                           <div>
                             <p className="text-[12px] font-black text-[#162523]">
                               {point.value}
@@ -429,7 +460,7 @@ export default function Analytics() {
                             </p>
                             <p className="mt-1 text-[11px] font-bold text-[#7b8986]">{point.date}</p>
                           </div>
-                          <span className={`rounded-md px-2 py-1 text-[10px] font-black ${statusStyles(markerTone({ name: trend.name, range: "", status: point.status, value: `${point.value}` }))}`}>
+                          <span className={`rounded-md px-2 py-1 text-[10px] font-black ${graphPalette(point.status).badge}`}>
                             {point.status}
                           </span>
                         </div>
