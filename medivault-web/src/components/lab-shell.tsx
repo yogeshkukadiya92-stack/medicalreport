@@ -12,12 +12,11 @@ import { SignOutButton } from "@/components/sign-out-button";
 const labNav = [
   { href: "/lab", icon: "analytics", label: "Dashboard" },
   { href: "/lab/clients", icon: "family", label: "Clients" },
-  { href: "/lab/bookings", icon: "calendar", label: "Bookings" },
-  { href: "/lab/services", icon: "trend", label: "Services" },
   { href: "/lab/create", icon: "upload", label: "Create report" },
   { href: "/lab/reports", icon: "reports", label: "History" },
   { href: "/lab/templates", icon: "shield", label: "Templates" },
   { href: "/lab/settings", icon: "home", label: "Settings" },
+  { href: "/admin", icon: "trend", label: "Admin" },
 ] as const;
 
 export function LabShell({ children }: { children: ReactNode }) {
@@ -47,17 +46,17 @@ export function LabShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <main className="min-h-screen bg-[#eef3f1] text-[#101c1c]">
+    <main className="min-h-screen bg-[#e8efed] text-[#101c1c]">
       <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col lg:flex-row">
-        <aside className="border-b border-[#dce9e5] bg-white px-4 py-4 lg:min-h-screen lg:w-[260px] lg:border-b-0 lg:border-r lg:px-5">
+        <aside className="border-b border-[#dce9e5] bg-white px-4 py-4 lg:sticky lg:top-0 lg:min-h-screen lg:w-[280px] lg:border-b-0 lg:border-r lg:px-5">
           <div className="flex items-center justify-between gap-3 lg:block">
             <Link href="/lab" className="flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-lg bg-[#102323] text-[#99f0db]">
+              <span className="grid h-11 w-11 place-items-center rounded-lg bg-[#102323] text-[#99f0db] shadow-[0_14px_30px_rgba(16,35,35,0.16)]">
                 <Icon name="shield" className="h-5 w-5" />
               </span>
               <span>
                 <span className="block text-[15px] font-black text-[#102323]">MediVault Lab</span>
-                <span className="block text-[12px] font-bold text-[#6f7f7c]">Structured reports</span>
+                <span className="block text-[12px] font-bold text-[#6f7f7c]">Operations workspace</span>
               </span>
             </Link>
             <div className="lg:hidden">
@@ -67,13 +66,13 @@ export function LabShell({ children }: { children: ReactNode }) {
 
           <nav className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:mt-8 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0">
             {labNav.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || (item.href !== "/lab" && pathname.startsWith(item.href));
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={`flex h-11 min-w-max items-center gap-3 rounded-lg px-3 text-[13px] font-bold ${
-                    isActive ? "bg-[#0a7d6e] text-white" : "text-[#52605d] hover:bg-[#f1f6f4] hover:text-[#102323]"
+                    isActive ? "bg-[#0a7d6e] text-white shadow-[0_10px_24px_rgba(10,125,110,0.18)]" : "text-[#52605d] hover:bg-[#f1f6f4] hover:text-[#102323]"
                   }`}
                 >
                   <Icon name={item.icon} className="h-4 w-4" />
@@ -83,7 +82,13 @@ export function LabShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <div className="mt-8 hidden lg:block">
+          <div className="mt-8 hidden rounded-lg border border-[#dce9e5] bg-[#f7fbfa] p-3 lg:block">
+            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[#087766]">Current role</p>
+            <p className="mt-2 text-[14px] font-black text-[#102323]">Pathologist admin</p>
+            <p className="mt-1 text-[12px] font-semibold text-[#6f7f7c]">Branch: Main lab</p>
+          </div>
+
+          <div className="mt-4 hidden lg:block">
             <SignOutButton />
             <Link href="/dashboard" className="mt-3 flex h-10 items-center justify-center rounded-lg border border-[#dce9e5] text-[12px] font-bold text-[#52605d]">
               Client app

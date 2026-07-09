@@ -17,6 +17,7 @@ export default function Dashboard() {
   const hasReports = reportsForActiveMember.length > 0;
   const activeMemberId = activeMember?.id ?? null;
   const healthScore = calculateHealthScore(reportsForActiveMember);
+  const lastSyncLabel = recentReports[0]?.date ?? "No sync";
 
   const attentionItems = useMemo(() => {
     if (!attentionCount) return [];
@@ -37,10 +38,11 @@ export default function Dashboard() {
       <section className="px-5 pt-6">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[13px] font-medium text-[#6f7f7c]">MediVault</p>
+            <p className="text-[12px] font-black uppercase tracking-[0.12em] text-[#087766]">Unified health timeline</p>
             <h1 className="mt-1 text-[24px] font-bold leading-tight tracking-normal text-[#101c1c]">
               {hasMembers ? `Good morning, ${activeMember?.name}` : "Add your first family member"}
             </h1>
+            <p className="mt-1 text-[12px] font-semibold text-[#6f7f7c]">Last sync: {lastSyncLabel}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -87,7 +89,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="mt-5 overflow-hidden rounded-lg bg-[#102323] p-5 text-white shadow-[0_22px_52px_rgba(16,35,35,0.28)]">
+        <div className="mt-5 overflow-hidden rounded-lg bg-[#102323] p-5 text-white shadow-[0_22px_52px_rgba(16,35,35,0.24)]">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[13px] font-medium text-[#a9bfba]">Health score</p>
@@ -133,8 +135,22 @@ export default function Dashboard() {
           </div>
         </div>
 
+        <div className="mt-5 grid grid-cols-3 gap-2">
+          {[
+            ["Labs", new Set(reportsForActiveMember.map((report) => report.lab)).size || 0, "Connected"],
+            ["Tracking", reportsForActiveMember.length, "Reports"],
+            ["Share", attentionCount, "Needs care"],
+          ].map(([label, value, note]) => (
+            <div key={label} className="rounded-lg border border-[#e2ebe8] bg-white p-3">
+              <p className="text-[11px] font-bold text-[#7b8986]">{label}</p>
+              <p className="mt-2 text-[24px] font-black text-[#162523]">{value}</p>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#087766]">{note}</p>
+            </div>
+          ))}
+        </div>
+
         <div className="mt-6 flex items-center justify-between">
-          <h2 className="text-[18px] font-bold text-[#101c1c]">Needs attention</h2>
+          <h2 className="text-[18px] font-bold text-[#101c1c]">Priority timeline</h2>
           <Link href="/reports?filter=Needs%20review" className="text-[13px] font-bold text-[#087766]">
             View all
           </Link>
@@ -163,7 +179,7 @@ export default function Dashboard() {
         )}
 
         <div className="mt-6 flex items-center justify-between">
-          <h2 className="text-[18px] font-bold text-[#101c1c]">Recent reports</h2>
+          <h2 className="text-[18px] font-bold text-[#101c1c]">Connected lab reports</h2>
           <Link href="/reports" className="text-[13px] font-bold text-[#087766]">
             See all
           </Link>

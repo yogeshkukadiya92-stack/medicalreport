@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReportMarker } from "@/components/app-data-provider";
 import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
@@ -96,6 +96,7 @@ export default function Analytics() {
   const [range, setRange] = useState("90 days");
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
   const [selectedParameterName, setSelectedParameterName] = useState<string | null>(null);
+  const closeGraphButtonRef = useRef<HTMLButtonElement>(null);
   const hasMember = Boolean(activeMember);
   const rangedReports = useMemo(() => filterReportsByRange(reportsForActiveMember, range), [range, reportsForActiveMember]);
   const score = calculateHealthScore(rangedReports);
@@ -184,6 +185,24 @@ export default function Analytics() {
   const selectParameter = (name: string) => {
     setSelectedParameterName(name);
   };
+
+  useEffect(() => {
+    if (!selectedTrend) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeGraphButtonRef.current?.focus();
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setSelectedParameterName(null);
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [selectedTrend]);
 
   return (
     <MobileShell>
@@ -397,8 +416,18 @@ export default function Analytics() {
       </section>
 
       {selectedTrend ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-[#102323]/55 px-4 pb-4 pt-10 backdrop-blur-sm sm:items-center sm:justify-center">
-          <div className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[18px] bg-white shadow-[0_28px_80px_rgba(6,30,28,0.35)]">
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-[#102323]/55 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10 backdrop-blur-sm sm:items-center sm:justify-center"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelectedParameterName(null);
+          }}
+        >
+          <div
+            aria-labelledby="analytics-graph-title"
+            aria-modal="true"
+            className="max-h-[min(88dvh,760px)] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-[18px] bg-white shadow-[0_28px_80px_rgba(6,30,28,0.35)]"
+            role="dialog"
+          >
             {(() => {
               const trend = selectedTrend;
               const palette = graphPalette(trend.latest.status);
@@ -408,10 +437,11 @@ export default function Analytics() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#99f0db]">Past result graph</p>
-                        <h3 className="mt-1 truncate text-[22px] font-black">{trend.name}</h3>
+                        <h3 id="analytics-graph-title" className="mt-1 truncate text-[22px] font-black">{trend.name}</h3>
                       </div>
                       <button
                         type="button"
+                        ref={closeGraphButtonRef}
                         onClick={() => setSelectedParameterName(null)}
                         className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/10 text-white"
                         aria-label="Close graph"
