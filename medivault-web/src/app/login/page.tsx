@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -184,13 +185,35 @@ export default function LoginPage() {
 
           <label className="block">
             <span className="text-[12px] font-bold text-[#52605d]">Password</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Minimum 6 characters"
-              className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
-            />
+            <div className="relative mt-2">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Minimum 6 characters"
+                className="h-12 w-full rounded-lg border border-[#dce9e5] bg-white py-0 pl-4 pr-12 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((current) => !current)}
+                className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-md text-[#52605d] hover:bg-[#f1f6f4] hover:text-[#102323]"
+              >
+                {showPassword ? (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" viewBox="0 0 24 24">
+                    <path d="M3.8 12.1s3-5.8 8.2-5.8 8.2 5.8 8.2 5.8-3 5.8-8.2 5.8-8.2-5.8-8.2-5.8Z" />
+                    <path d="M14.1 10a3 3 0 0 1-4.1 4.1" />
+                    <path d="m4.5 4.5 15 15" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" viewBox="0 0 24 24">
+                    <path d="M3.8 12.1s3-5.8 8.2-5.8 8.2 5.8 8.2 5.8-3 5.8-8.2 5.8-8.2-5.8-8.2-5.8Z" />
+                    <path d="M12 14.8a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6Z" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </label>
 
           {error ? <p className="rounded-lg bg-[#fff0ec] p-3 text-[13px] font-bold text-[#ba563d]">{error}</p> : null}
