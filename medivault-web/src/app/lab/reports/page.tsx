@@ -318,18 +318,56 @@ export default function LabReportsPage() {
               </div>
             ) : null}
             {fileError ? <p className="mx-5 mt-3 rounded-lg bg-[#fff0ec] p-3 text-[12px] font-bold text-[#ba563d]">{fileError}</p> : null}
-            <div className="space-y-2 p-5">
-              {selectedReport.values.map((value) => (
-                <div key={value.id} className="grid gap-3 rounded-lg border border-[#e2ebe8] p-3 md:grid-cols-[1.2fr_0.8fr_1fr_120px] md:items-center">
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-black text-[#162523]">{value.name}</p>
-                    {value.notes ? <p className="mt-1 text-[11px] text-[#7b8986]">{value.notes}</p> : null}
-                  </div>
-                  <p className="text-[13px] font-black text-[#162523]">{value.value} {value.unit}</p>
-                  <p className="text-[12px] font-bold text-[#6f7f7c]">{value.referenceRange || "No range"}</p>
-                  <p className={`w-fit rounded-md px-2 py-1 text-[11px] font-bold ${markerClass(value.status)}`}>{value.status}</p>
+            <div className="p-5">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-[15px] font-black text-[#162523]">Report parameters</h3>
+                  <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">
+                    {selectedReport.values.length ? `${selectedReport.values.length} value${selectedReport.values.length === 1 ? "" : "s"} recorded` : "No values recorded yet"}
+                  </p>
                 </div>
-              ))}
+                <Link
+                  href={`/lab/create?clientId=${encodeURIComponent(selectedReport.clientId)}`}
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold text-[#087766]"
+                >
+                  Add new report
+                </Link>
+              </div>
+
+              {selectedReport.values.length ? (
+                <div className="overflow-hidden rounded-lg border border-[#e2ebe8]">
+                  <div className="hidden grid-cols-[1.2fr_0.8fr_1fr_120px] gap-3 border-b border-[#edf3f1] bg-[#f7fbfa] p-3 text-[11px] font-black uppercase text-[#6f7f7c] md:grid">
+                    <span>Test</span>
+                    <span>Result</span>
+                    <span>Reference</span>
+                    <span>Status</span>
+                  </div>
+                  <div className="divide-y divide-[#edf3f1]">
+                    {selectedReport.values.map((value) => (
+                      <div key={value.id} className="grid gap-3 p-3 md:grid-cols-[1.2fr_0.8fr_1fr_120px] md:items-center">
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-black text-[#162523]">{value.name}</p>
+                          {value.notes ? <p className="mt-1 text-[11px] text-[#7b8986]">{value.notes}</p> : null}
+                        </div>
+                        <p className="text-[13px] font-black text-[#162523]">{value.value} {value.unit}</p>
+                        <p className="text-[12px] font-bold text-[#6f7f7c]">{value.referenceRange || "No range"}</p>
+                        <p className={`w-fit rounded-md px-2 py-1 text-[11px] font-bold ${markerClass(value.status)}`}>{value.status}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-[#c5d8d3] bg-[#f7fbfa] p-5 text-center">
+                  <p className="text-[14px] font-black text-[#162523]">This report has no parameters yet.</p>
+                  <p className="mt-2 text-[12px] font-bold text-[#6f7f7c]">Create a new structured report for this client and enter test values to show them here and in the client app.</p>
+                  <Link
+                    href={`/lab/create?clientId=${encodeURIComponent(selectedReport.clientId)}`}
+                    className="mt-4 inline-flex h-10 items-center justify-center rounded-lg bg-[#0a7d6e] px-4 text-[12px] font-bold text-white"
+                  >
+                    Create report with values
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
