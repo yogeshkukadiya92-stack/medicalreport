@@ -32,6 +32,31 @@ function markerWidth(marker: ReportMarker, index: number) {
   return `${Math.max(44, 76 - index * 6)}%`;
 }
 
+function reportTimestamp(report: { createdAt?: number; date: string }) {
+  if (typeof report.createdAt === "number" && Number.isFinite(report.createdAt)) return report.createdAt;
+  const parsed = Date.parse(report.date);
+  return Number.isFinite(parsed) ? parsed : Date.now();
+}
+
+function numericMarkerValue(value: string) {
+  const match = value.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+function trendPath(values: number[]) {
+  if (!values.length) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const spread = max - min || 1;
+  return values
+    .map((value, index) => {
+      const x = values.length === 1 ? 88 : 8 + (index / (values.length - 1)) * 80;
+      const y = 48 - ((value - min) / spread) * 36;
+      return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+}
+
 export default function Analytics() {
   const { activeMember, reportsForActiveMember } = useAppData();
   const [range, setRange] = useState("90 days");
@@ -61,6 +86,64 @@ export default function Analytics() {
     const list = showFlaggedOnly ? parameters.filter((param) => param.status === "High" || param.status === "Low" || param.status === "Watch") : parameters;
     return list.slice(0, 8);
   }, [parameters, showFlaggedOnly]);
+  const historyTrends = useMemo(() => {
+    const grouped = new Map<
+      string,
+      Array<{
+        date: string;
+        reportTitle: string;
+        status: ReportMarker["status"];
+        timestamp: number;
+        unit: string;
+        value: number;
+      }>
+    >();
+
+    rangedReports.forEach((report) => {
+      report.markers.forEach((marker) => {
+        const value = numericMarkerValue(marker.value);
+        if (value === null || !Number.isFinite(value)) return;
+        const unit = marker.value.replace(/[-\d.,\s]/g, "").trim();
+        const nextPoint = {
+          date: report.date,
+          reportTitle: report.title,
+          status: marker.status,
+          timestamp: reportTimestamp(report),
+          unit,
+          value,
+        };
+        grouped.set(marker.name, [...(grouped.get(marker.name) ?? []), nextPoint]);
+      });
+    });
+
+    return Array.from(grouped.entries())
+      .map(([name, points]) => {
+        const sortedPoints = points.sort((a, b) => a.timestamp - b.timestamp);
+        const latest = sortedPoints[sortedPoints.length - 1];
+        const previous = sortedPoints[sortedPoints.length - 2];
+        const delta = previous ? latest.value - previous.value : 0;
+        const values = sortedPoints.map((point) => point.value);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        return {
+          name,
+          changeText: previous ? `${delta >= 0 ? "+" : "-"}${Math.abs(delta).toFixed(delta % 1 === 0 ? 0 : 1)}${latest.unit ? ` ${latest.unit}` : ""}` : "New",
+          delta,
+          latest,
+          max,
+          min,
+          path: trendPath(values),
+          points: sortedPoints,
+        };
+      })
+      .sort((a, b) => {
+        const aPriority = a.points.length > 1 ? 1 : 0;
+        const bPriority = b.points.length > 1 ? 1 : 0;
+        if (aPriority !== bPriority) return bPriority - aPriority;
+        return Math.abs(b.delta) - Math.abs(a.delta);
+      })
+      .slice(0, 4);
+  }, [rangedReports]);
   const latestSummary = rangedReports.find((report) => report.summary)?.summary;
 
   return (
@@ -175,6 +258,63 @@ export default function Analytics() {
             </div>
           </div>
         </div>
+
+        <div className="mt-6 flex items-center justify-between">
+          <h2 className="text-[18px] font-black text-[#101c1c]">Past history</h2>
+          <span className="rounded-md bg-white px-2 py-1 text-[11px] font-bold text-[#65716f]">{range}</span>
+        </div>
+
+        {hasMember && historyTrends.length ? (
+          <div className="mt-3 space-y-3">
+            {historyTrends.map((trend) => {
+              const isUp = trend.delta > 0;
+              const isDown = trend.delta < 0;
+              const toneClass = isDown ? "text-[#ba563d] bg-[#fff0ec]" : isUp ? "text-[#087766] bg-[#eaf9f2]" : "text-[#52605d] bg-[#f1f5f4]";
+              return (
+                <article key={trend.name} className="rounded-lg border border-[#e2ebe8] bg-white p-4 shadow-[0_10px_28px_rgba(20,67,60,0.05)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-[15px] font-black text-[#162523]">{trend.name}</h3>
+                      <p className="mt-1 text-[12px] font-medium text-[#7b8986]">
+                        Latest {trend.latest.value}
+                        {trend.latest.unit ? ` ${trend.latest.unit}` : ""} from {trend.latest.date}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 rounded-md px-2 py-1 text-[12px] font-black ${toneClass}`}>
+                      {isUp ? "+" : isDown ? "-" : ""}
+                      {trend.changeText.replace(/^[-+]/, "")}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 rounded-lg bg-[#f6faf9] p-3">
+                    <svg viewBox="0 0 96 56" className="h-24 w-full" role="img" aria-label={`${trend.name} past value graph`}>
+                      <path d="M8 48H88" stroke="#d8e6e2" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M8 30H88" stroke="#e7efed" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 5" />
+                      <path d="M8 12H88" stroke="#e7efed" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 5" />
+                      <path d={trend.path} fill="none" stroke={isDown ? "#ec795c" : "#0a7d6e"} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                      {trend.points.map((point, index) => {
+                        const spread = trend.max - trend.min || 1;
+                        const x = trend.points.length === 1 ? 88 : 8 + (index / (trend.points.length - 1)) * 80;
+                        const y = 48 - ((point.value - trend.min) / spread) * 36;
+                        return <circle key={`${point.timestamp}-${index}`} cx={x} cy={y} r="3.2" fill="#ffffff" stroke={isDown ? "#ec795c" : "#0a7d6e"} strokeWidth="2.4" />;
+                      })}
+                    </svg>
+                    <div className="mt-1 flex items-center justify-between text-[11px] font-bold text-[#8a9794]">
+                      <span>{trend.points[0]?.date}</span>
+                      <span>{trend.points.length} values</span>
+                      <span>{trend.latest.date}</span>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-3 rounded-lg border border-dashed border-[#c5d8d3] bg-white p-5 text-center">
+            <p className="text-[16px] font-black text-[#162523]">Past history will build here</p>
+            <p className="mt-2 text-[13px] text-[#65716f]">Upload repeat reports with the same test names to see plus-minus movement and graphs.</p>
+          </div>
+        )}
 
         <div className="mt-6 flex items-center justify-between">
           <h2 className="text-[18px] font-black text-[#101c1c]">Key parameters</h2>
