@@ -19,7 +19,7 @@ function safeRedirectPath(value: string | null) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isConfigLoading, isConfigured, status, supabase } = useAuth();
+  const { isConfigLoading, isConfigured, login, signup, status } = useAuth();
   const [redirectPath] = useState(() => {
     if (typeof window === "undefined") return "/dashboard";
     return safeRedirectPath(new URLSearchParams(window.location.search).get("next"));
@@ -38,18 +38,13 @@ export default function LoginPage() {
     }
   }, [redirectPath, router, status]);
 
-  function authRedirectUrl() {
-    if (typeof window === "undefined") return undefined;
-    return `${window.location.origin}${redirectPath}`;
-  }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setMessage("");
 
-    if (!supabase) {
-      setError("Supabase environment variables are missing.");
+    if (!isConfigured) {
+      setError("MongoDB is not configured yet.");
       return;
     }
 
@@ -60,66 +55,14 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      const result =
-        mode === "signin"
-          ? await supabase.auth.signInWithPassword({ email, password })
-          : await supabase.auth.signUp({
-              email,
-              password,
-              options: {
-                emailRedirectTo: authRedirectUrl(),
-              },
-            });
-
-      if (result.error) {
-        setError(result.error.message);
-        return;
+      if (mode === "signin") {
+        await login(email, password);
+      } else {
+        await signup(email, password);
       }
-
-      if (mode === "signup" && !result.data.session) {
-        setMessage("Account created. Check your email to confirm, then sign in.");
-        return;
-      }
-
       router.replace(redirectPath);
-    } catch {
-      setError("We couldn't reach the authentication service. Check your connection and try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function sendMagicLink() {
-    setError("");
-    setMessage("");
-
-    if (!supabase) {
-      setError("Supabase environment variables are missing.");
-      return;
-    }
-
-    if (!email) {
-      setError("Enter your email first.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const { error: magicError } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: authRedirectUrl(),
-        },
-      });
-
-      if (magicError) {
-        setError(magicError.message);
-        return;
-      }
-
-      setMessage("Magic link sent. Open it from your email to continue.");
-    } catch {
-      setError("We couldn't send the magic link. Check your connection and try again.");
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : "We couldn't reach the authentication service. Check your connection and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -164,9 +107,9 @@ export default function LoginPage() {
 
         {!isConfigLoading && !isConfigured ? (
           <div className="mt-5 rounded-lg border border-[#f0d4ca] bg-[#fff7f4] p-4">
-            <p className="text-[13px] font-black text-[#ba563d]">Supabase env missing</p>
+            <p className="text-[13px] font-black text-[#ba563d]">MongoDB env missing</p>
             <p className="mt-2 text-[13px] leading-5 text-[#65716f]">
-              Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY locally and on Railway.
+              Add MONGODB_URI and MONGODB_DB locally and on Railway.
             </p>
           </div>
         ) : null}
@@ -228,19 +171,10 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <button
-          type="button"
-          onClick={sendMagicLink}
-          disabled={isSubmitting || isConfigLoading || !isConfigured}
-          className="mt-3 h-12 w-full rounded-lg border border-[#dce9e5] bg-white text-[14px] font-black text-[#102323] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Send magic link
-        </button>
-
         <div className="mt-6 rounded-lg bg-[#f7fbfa] p-4">
-          <p className="text-[12px] font-bold text-[#087766]">Protected by Supabase Auth</p>
+          <p className="text-[12px] font-bold text-[#087766]">Protected by MongoDB sessions</p>
           <p className="mt-2 text-[12px] leading-5 text-[#65716f]">
-            Sessions persist automatically and refresh in the background.
+            Accounts, sessions, reports, files, lab data, and consents are stored in MongoDB.
           </p>
         </div>
       </section>

@@ -5,9 +5,9 @@ This inventory groups repeated controls by screen/component. All listed items we
 
 | Area | File | Control | Live Behavior | Backend/API/Route | Auth/Role | Status |
 |---|---|---|---|---|---|---|
-| Client shell | `src/components/mobile-shell.tsx` | Bottom nav | Navigates to Dashboard, Reports, Upload, Analytics, Family | App routes | Supabase session in production | Done |
-| Client auth | `src/app/login/page.tsx` | Sign in, create account, magic link | Uses Supabase email/password and OTP magic link, preserves `next` redirect | Supabase Auth | Public auth page | Done |
-| Client auth | `src/components/sign-out-button.tsx` | Logout | Signs out Supabase session, clears API bearer token, redirects to login | Supabase Auth | Signed-in user | Done |
+| Client shell | `src/components/mobile-shell.tsx` | Bottom nav | Navigates to Dashboard, Reports, Upload, Analytics, Family | App routes | MongoDB session in production | Done |
+| Client auth | `src/app/login/page.tsx` | Sign in, create account | Uses MongoDB email/password accounts, preserves `next` redirect | MongoDB auth APIs | Public auth page | Done |
+| Client auth | `src/components/sign-out-button.tsx` | Logout | Clears MongoDB session cookie, clears API bearer token, redirects to login | `POST /api/auth/logout` | Signed-in user | Done |
 | Dashboard | `src/app/dashboard/page.tsx` | Notification button | Opens filtered reports needing review, or all reports when clear | `/reports?filter=Needs review` | Signed-in user | Done |
 | Dashboard | `src/app/dashboard/page.tsx` | Member chips | Switches active member and recalculates score from live reports | Local vault state synced to `/api/vault` | Signed-in user | Done |
 | Dashboard | `src/app/dashboard/page.tsx` | Upload, Reports, Analytics quick actions | Routes to real app pages; upload redirects to Family if no member exists | App routes | Signed-in user | Done |
@@ -27,7 +27,7 @@ This inventory groups repeated controls by screen/component. All listed items we
 | Family | `src/app/family/page.tsx` | Delete member | Confirms destructive action, removes linked self-upload reports | `PUT /api/vault` | Signed-in user | Done |
 | Analytics | `src/app/analytics/page.tsx` | Date range tabs | Filters metrics, score, chart bars, summary, and parameters by selected range | Client vault data from `/api/vault` | Signed-in user | Done |
 | Analytics | `src/app/analytics/page.tsx` | Flagged toggle | Switches between all markers and flagged markers | Client vault data | Signed-in user | Done |
-| Lab shell | `src/components/lab-shell.tsx` | Lab nav and client app link | Routes to live lab pages and client app | App routes | Supabase session | Done |
+| Lab shell | `src/components/lab-shell.tsx` | Lab nav and client app link | Routes to live lab pages and client app | App routes | MongoDB session | Done |
 | Lab dashboard | `src/app/lab/page.tsx` | KPI cards | Open filtered lab report history | `/lab/reports` query params | Lab user | Done |
 | Lab dashboard | `src/app/lab/page.tsx` | Today work queue actions | Open create/history/unmatched/missing attachment views | `/lab/create`, `/lab/reports` query params | Lab user | Done |
 | Lab dashboard | `src/app/lab/page.tsx` | Critical alerts | Opens exact lab report detail | `/lab/reports?reportId=...` | Lab user, lab scoped | Done |
@@ -45,9 +45,10 @@ This inventory groups repeated controls by screen/component. All listed items we
 | Lab reports | `src/app/lab/reports/page.tsx` | Open original file | Fetches authorized GridFS file with loading/error state | `GET /api/files/:fileId` | Lab user for same lab | Done |
 | Lab templates | `src/app/lab/templates/page.tsx` | Create from template, Use | Opens report builder with selected template | `/lab/create?template=...` | Lab user | Done |
 | Lab settings | `src/app/lab/settings/page.tsx` | Save settings | Updates lab profile and existing report lab names | `PATCH /api/lab/settings` | `lab_admin` only | Done |
-| API wrappers | `src/lib/api/*.ts` | Legacy API service functions | No longer return dummy data; call `/api/vault`, `/api/files`, `/api/consents`, or fail clearly when unsupported | Live app APIs | Supabase bearer token | Done |
+| API wrappers | `src/lib/api/*.ts` | Legacy API service functions | No longer return dummy data; call `/api/vault`, `/api/files`, `/api/consents`, or fail clearly when unsupported | Live app APIs | MongoDB session cookie | Done |
+| MongoDB auth | `src/app/api/auth/*` | Login, signup, logout, session | Stores users and sessions in MongoDB with httpOnly cookie auth | `authUsers`, `authSessions` collections | Public login, signed-in session | Done |
 | Consents API | `src/app/api/consents/route.ts` | GET/POST consents | Stores consent grant/revoke records in MongoDB | `consents` collection | Signed-in user | Done |
 
 ## Blocked By Environment
-- Railway must use a real Supabase anon/publishable key in `NEXT_PUBLIC_SUPABASE_ANON_KEY`; a service-role key is intentionally rejected by the app.
+- Railway must have `MONGODB_URI` and `MONGODB_DB`; old external auth variables are no longer used.
 - Real AI extraction for client self-upload requires `OPENAI_API_KEY` or the configured NVIDIA key.

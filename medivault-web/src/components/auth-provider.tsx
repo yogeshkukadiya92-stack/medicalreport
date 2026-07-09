@@ -1,93 +1,105 @@
 "use client";
 
-import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { clearAccessToken, setAccessToken } from "@/lib/api-client";
-import { createSupabaseBrowserClient, loadPublicConfig } from "@/lib/supabase";
+import type { AuthUser } from "@/lib/auth-server";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+
+type MongoSession = {
+  access_token: string;
+  user: AuthUser;
+};
 
 type AuthContextValue = {
   isConfigLoading: boolean;
   isConfigured: boolean;
-  session: Session | null;
+  session: MongoSession | null;
   status: AuthStatus;
-  supabase: SupabaseClient | null;
-  user: User | null;
+  user: AuthUser | null;
+  login: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  signup: (email: string, password: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const authSessionTimeoutMs = 8000;
+const cookieBackedToken = "mongo-cookie-session";
 
-function getSessionWithTimeout(client: SupabaseClient) {
-  return Promise.race([
-    client.auth.getSession(),
-    new Promise<{ data: { session: Session | null } }>((resolve) => {
-      window.setTimeout(() => resolve({ data: { session: null } }), authSessionTimeoutMs);
-    }),
-  ]);
+type SessionResponse = {
+  error?: string;
+  isConfigured?: boolean;
+  user?: AuthUser | null;
+};
+
+function buildSession(user: AuthUser): MongoSession {
+  return {
+    access_token: cookieBackedToken,
+    user,
+  };
+}
+
+async function readJsonResponse(response: Response) {
+  return (await response.json().catch(() => null)) as SessionResponse | null;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isConfigLoading, setIsConfigLoading] = useState(true);
   const [isConfigured, setIsConfigured] = useState(false);
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<MongoSession | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    let unsubscribe: (() => void) | undefined;
-
-    async function configureAuth() {
-      setIsConfigLoading(true);
-      const config = await loadPublicConfig();
-      if (!mounted) return;
-
-      const client = createSupabaseBrowserClient(config);
-      setIsConfigured(Boolean(client));
-      setSupabase(client);
-      setIsConfigLoading(false);
-
-      if (!client) {
-        clearAccessToken();
-        setSession(null);
-        setStatus("unauthenticated");
-        return;
-      }
-
-      const { data } = await getSessionWithTimeout(client);
-      if (!mounted) return;
-      setSession(data.session);
-      if (data.session?.access_token) {
-        setAccessToken(data.session.access_token);
-      } else {
-        clearAccessToken();
-      }
-      setStatus(data.session ? "authenticated" : "unauthenticated");
-
-      const {
-        data: { subscription },
-      } = client.auth.onAuthStateChange((_event, nextSession) => {
-        setSession(nextSession);
-        if (nextSession?.access_token) {
-          setAccessToken(nextSession.access_token);
-        } else {
-          clearAccessToken();
-        }
-        setStatus(nextSession ? "authenticated" : "unauthenticated");
+  async function refreshSession() {
+    setIsConfigLoading(true);
+    try {
+      const response = await fetch("/api/auth/session", {
+        cache: "no-store",
       });
+      const result = await readJsonResponse(response);
+      const configured = Boolean(result?.isConfigured);
+      setIsConfigured(configured);
 
-      unsubscribe = () => subscription.unsubscribe();
+      if (response.ok && configured && result?.user) {
+        const nextSession = buildSession(result.user);
+        setSession(nextSession);
+        setAccessToken(nextSession.access_token);
+        setStatus("authenticated");
+      } else {
+        setSession(null);
+        clearAccessToken();
+        setStatus("unauthenticated");
+      }
+    } catch {
+      setIsConfigured(false);
+      setSession(null);
+      clearAccessToken();
+      setStatus("unauthenticated");
+    } finally {
+      setIsConfigLoading(false);
+    }
+  }
+
+  async function submitAuth(endpoint: "/api/auth/login" | "/api/auth/signup", email: string, password: string) {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
+    const result = await readJsonResponse(response);
+    if (!response.ok || !result?.user) {
+      throw new Error(result?.error ?? "Authentication failed.");
     }
 
-    configureAuth();
+    const nextSession = buildSession(result.user);
+    setIsConfigured(true);
+    setSession(nextSession);
+    setAccessToken(nextSession.access_token);
+    setStatus("authenticated");
+  }
 
-    return () => {
-      mounted = false;
-      unsubscribe?.();
-    };
+  useEffect(() => {
+    refreshSession();
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -96,16 +108,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isConfigured,
       session,
       status,
-      supabase,
       user: session?.user ?? null,
+      login: async (email, password) => submitAuth("/api/auth/login", email, password),
+      signup: async (email, password) => submitAuth("/api/auth/signup", email, password),
       signOut: async () => {
-        if (supabase) {
-          await supabase.auth.signOut();
-        }
+        await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
+        setSession(null);
         clearAccessToken();
+        setStatus("unauthenticated");
       },
     }),
-    [isConfigLoading, isConfigured, session, status, supabase],
+    [isConfigLoading, isConfigured, session, status],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
