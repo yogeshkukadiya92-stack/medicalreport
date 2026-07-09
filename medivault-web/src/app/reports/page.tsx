@@ -491,22 +491,42 @@ export default function Reports() {
                 <p className="text-[12px] font-bold text-[#087766]">{selectedReport.source === "lab" ? "Rule summary" : "AI summary"}</p>
                 <p className="mt-2 text-[13px] leading-5 text-[#52605d]">{selectedReport.summary}</p>
               </div>
-              {selectedReport.markers.length ? (
-                <div className="mt-4 space-y-2">
-                  {selectedReport.markers.map((marker) => (
-                    <div key={marker.name} className="flex items-center justify-between gap-3 rounded-lg border border-[#e2ebe8] p-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-black text-[#162523]">{marker.name}</p>
-                        <p className="mt-1 text-[11px] text-[#7b8986]">{marker.range}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[13px] font-black text-[#162523]">{marker.value}</p>
-                        <p className={`mt-1 rounded-md px-2 py-1 text-[11px] font-bold ${markerClass(marker.status)}`}>{marker.status}</p>
-                      </div>
-                    </div>
-                  ))}
+              <div className="mt-4">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[13px] font-black text-[#162523]">Report parameters</p>
+                    <p className="mt-1 text-[11px] font-bold text-[#7b8986]">
+                      {selectedReport.markers.length ? `${selectedReport.markers.length} value${selectedReport.markers.length === 1 ? "" : "s"} available` : "No values available"}
+                    </p>
+                  </div>
+                  <span className={`rounded-md px-2 py-1 text-[11px] font-bold ${sourceClass(selectedReport)}`}>
+                    {selectedReport.source === "lab" ? "Lab Report" : "Uploaded"}
+                  </span>
                 </div>
-              ) : null}
+                {selectedReport.markers.length ? (
+                  <div className="space-y-2">
+                    {selectedReport.markers.map((marker) => (
+                      <div key={`${marker.name}-${marker.value}`} className="flex items-center justify-between gap-3 rounded-lg border border-[#e2ebe8] p-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-black text-[#162523]">{marker.name}</p>
+                          <p className="mt-1 text-[11px] text-[#7b8986]">{marker.range}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[13px] font-black text-[#162523]">{marker.value}</p>
+                          <p className={`mt-1 rounded-md px-2 py-1 text-[11px] font-bold ${markerClass(marker.status)}`}>{marker.status}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-[#c5d8d3] bg-[#f7fbfa] p-4 text-center">
+                    <p className="text-[13px] font-black text-[#162523]">No parameters were entered for this report.</p>
+                    <p className="mt-2 text-[12px] leading-5 text-[#65716f]">
+                      Ask the lab to create the report with structured values, then this section will show test result, reference range, and status.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ) : null}
