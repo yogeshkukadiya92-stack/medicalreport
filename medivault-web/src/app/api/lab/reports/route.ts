@@ -19,10 +19,12 @@ type LabReportInput = {
   accessionNumber?: string;
   client?: {
     age?: number | string;
+    countryCode?: string;
     gender?: string;
     name?: string;
     phone?: string;
   };
+  clientCountryCode?: string;
   clientId?: string;
   clientName?: string;
   clientPhone?: string;
@@ -53,8 +55,9 @@ function cleanText(value: unknown) {
 
 async function upsertClient(context: Exclude<Awaited<ReturnType<typeof getLabContext>>, { error: string; status: number }>, input: LabReportInput) {
   const clientName = cleanText(input.client?.name) || cleanText(input.clientName);
+  const clientCountryCode = cleanText(input.client?.countryCode) || cleanText(input.clientCountryCode) || "+91";
   const clientPhone = cleanText(input.client?.phone) || cleanText(input.clientPhone);
-  const normalizedPhone = normalizePhone(clientPhone);
+  const normalizedPhone = normalizePhone(clientPhone, clientCountryCode);
   const ageInput = input.client?.age;
   const parsedAge = ageInput === "" || ageInput === undefined ? undefined : Number(ageInput);
   const gender = cleanText(input.client?.gender) || undefined;
@@ -80,6 +83,7 @@ async function upsertClient(context: Exclude<Awaited<ReturnType<typeof getLabCon
     id: existing?.id ?? newId("client"),
     labId: context.lab.id,
     name: clientName,
+    countryCode: clientCountryCode,
     phone: clientPhone,
     normalizedPhone,
     age: typeof parsedAge === "number" && Number.isFinite(parsedAge) ? parsedAge : existing?.age,
@@ -245,6 +249,7 @@ export async function POST(request: NextRequest) {
     labReportId,
     clientId: clientResult.client.id,
     clientName: clientResult.client.name,
+    clientCountryCode: clientResult.client.countryCode,
     clientPhone: clientResult.client.phone,
     normalizedClientPhone: clientResult.client.normalizedPhone,
     reportType,

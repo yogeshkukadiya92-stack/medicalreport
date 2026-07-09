@@ -27,7 +27,7 @@ type StoredFile = {
   fileSizeBytes: number;
 };
 
-const emptyClient = { age: "", gender: "", name: "", phone: "" };
+const emptyClient = { age: "", countryCode: "+91", gender: "", name: "", phone: "" };
 const createEmptyReport = () => ({
   accessionNumber: "",
   doctorName: "",
@@ -131,7 +131,7 @@ export default function LabCreateReportPage() {
   }, [isConfigured, session?.access_token, status]);
 
   const duplicateReport = useMemo(() => {
-    const normalizedPhone = normalizePhone(clientForm.phone);
+    const normalizedPhone = normalizePhone(clientForm.phone, clientForm.countryCode);
     if (!normalizedPhone || !reportForm.reportType || !reportForm.reportDate) return null;
     return reports.find(
       (report) =>
@@ -139,7 +139,7 @@ export default function LabCreateReportPage() {
         report.reportType === reportForm.reportType &&
         report.reportDate === reportForm.reportDate,
     );
-  }, [clientForm.phone, reportForm.reportDate, reportForm.reportType, reports]);
+  }, [clientForm.countryCode, clientForm.phone, reportForm.reportDate, reportForm.reportType, reports]);
 
   const summary = useMemo(() => {
     const completeValues = values.filter((value) => value.name.trim() && value.value.trim());
@@ -169,6 +169,7 @@ export default function LabCreateReportPage() {
         setSelectedClientId(linkedClient.id);
         setClientForm({
           age: linkedClient.age ? String(linkedClient.age) : "",
+          countryCode: linkedClient.countryCode ?? "+91",
           gender: linkedClient.gender ?? "",
           name: linkedClient.name,
           phone: linkedClient.phone,
@@ -187,6 +188,7 @@ export default function LabCreateReportPage() {
     if (!client) return;
     setClientForm({
       age: client.age ? String(client.age) : "",
+      countryCode: client.countryCode ?? "+91",
       gender: client.gender ?? "",
       name: client.name,
       phone: client.phone,
@@ -320,7 +322,7 @@ export default function LabCreateReportPage() {
                 <option value="">New client</option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
-                    {client.name} - {client.phone}
+                    {client.name} - {client.countryCode ?? "+91"} {client.phone}
                   </option>
                 ))}
               </select>
@@ -332,12 +334,20 @@ export default function LabCreateReportPage() {
                 className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
                 placeholder="Client name"
               />
-              <input
-                value={clientForm.phone}
-                onChange={(event) => setClientForm((current) => ({ ...current, phone: event.target.value }))}
-                className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
-                placeholder="Phone"
-              />
+              <div className="grid grid-cols-[90px_1fr] gap-2">
+                <input
+                  value={clientForm.countryCode}
+                  onChange={(event) => setClientForm((current) => ({ ...current, countryCode: event.target.value }))}
+                  className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                  placeholder="+91"
+                />
+                <input
+                  value={clientForm.phone}
+                  onChange={(event) => setClientForm((current) => ({ ...current, phone: event.target.value }))}
+                  className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                  placeholder="Mobile number"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <input
                   type="number"

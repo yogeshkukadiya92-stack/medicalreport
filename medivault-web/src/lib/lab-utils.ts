@@ -1,10 +1,29 @@
 import type { AppReport, LabReport, LabReportValue, ReportMarker } from "@/lib/vault-types";
 
-export function normalizePhone(phone: string) {
+export function normalizeCountryCode(countryCode = "+91") {
+  const digits = countryCode.replace(/\D/g, "");
+  return digits || "91";
+}
+
+export function normalizeLocalPhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
   if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
   if (digits.length > 10) return digits.slice(-10);
   return digits;
+}
+
+export function normalizePhone(phone: string, countryCode = "+91") {
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return "";
+  if (phone.trim().startsWith("+")) return digits;
+  if (digits.length > 10) return digits;
+  return `${normalizeCountryCode(countryCode)}${digits}`;
+}
+
+export function phoneMatchKeys(phone: string, countryCode = "+91") {
+  const full = normalizePhone(phone, countryCode);
+  const local = normalizeLocalPhone(phone);
+  return [...new Set([full, local].filter((value) => value.length >= 8))];
 }
 
 function numberFromText(value: string) {
@@ -86,6 +105,7 @@ export function labReportToAppReport(report: LabReport, memberId: string, member
     labId: report.labId,
     labName: report.labName,
     labReportId: report.id,
+    clientCountryCode: report.clientCountryCode,
     clientPhone: report.clientPhone,
     publishedAt: report.publishedAt,
     createdByLabUserId: report.createdByLabUserId,

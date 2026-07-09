@@ -22,6 +22,7 @@ type LabReportValueInput = {
 
 type PatchInput = {
   accessionNumber?: string;
+  clientCountryCode?: string;
   clientName?: string;
   clientPhone?: string;
   doctorName?: string;
@@ -125,13 +126,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const clientName = cleanText(body.clientName);
+  const clientCountryCode = cleanText(body.clientCountryCode);
   const clientPhone = cleanText(body.clientPhone);
   if (clientName) patch.clientName = clientName;
   if (clientPhone) {
-    const normalizedPhone = normalizePhone(clientPhone);
+    const normalizedPhone = normalizePhone(clientPhone, clientCountryCode || existing.clientCountryCode || "+91");
     if (normalizedPhone.length < 8) {
       return NextResponse.json({ error: "A valid client phone number is required." }, { status: 400 });
     }
+    patch.clientCountryCode = clientCountryCode || existing.clientCountryCode || "+91";
     patch.clientPhone = clientPhone;
     patch.normalizedClientPhone = normalizedPhone;
   }

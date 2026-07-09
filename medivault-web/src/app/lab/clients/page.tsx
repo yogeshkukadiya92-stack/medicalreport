@@ -6,7 +6,7 @@ import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
 import type { LabClient } from "@/lib/vault-types";
 
-const emptyForm = { age: "", gender: "", name: "", phone: "" };
+const emptyForm = { age: "", countryCode: "+91", gender: "", name: "", phone: "" };
 
 export default function LabClientsPage() {
   const { isConfigured, session, status } = useAuth();
@@ -75,6 +75,7 @@ export default function LabClientsPage() {
   function editClient(client: LabClient) {
     setForm({
       age: client.age ? String(client.age) : "",
+      countryCode: client.countryCode ?? "+91",
       gender: client.gender ?? "",
       name: client.name,
       phone: client.phone,
@@ -98,15 +99,26 @@ export default function LabClientsPage() {
                 placeholder="Client full name"
               />
             </label>
-            <label className="block">
-              <span className="text-[12px] font-bold text-[#52605d]">Phone</span>
-              <input
-                value={form.phone}
-                onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-                className="mt-2 h-11 w-full rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
-                placeholder="+91 98765 43210"
-              />
-            </label>
+            <div className="grid grid-cols-[96px_1fr] gap-3">
+              <label className="block">
+                <span className="text-[12px] font-bold text-[#52605d]">Code</span>
+                <input
+                  value={form.countryCode}
+                  onChange={(event) => setForm((current) => ({ ...current, countryCode: event.target.value }))}
+                  className="mt-2 h-11 w-full rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                  placeholder="+91"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[12px] font-bold text-[#52605d]">Mobile number</span>
+                <input
+                  value={form.phone}
+                  onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+                  className="mt-2 h-11 w-full rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                  placeholder="98765 43210"
+                />
+              </label>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="text-[12px] font-bold text-[#52605d]">Age</span>
@@ -159,7 +171,7 @@ export default function LabClientsPage() {
                 <div key={client.id} className="grid gap-3 p-4 md:grid-cols-[1fr_150px_120px_170px] md:items-center">
                   <div className="min-w-0">
                     <p className="truncate text-[14px] font-black text-[#162523]">{client.name}</p>
-                    <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{client.phone}</p>
+                    <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{client.countryCode ?? "+91"} {client.phone}</p>
                   </div>
                   <span className="text-[12px] font-bold text-[#52605d]">{client.gender || "Gender not set"}</span>
                   <span className="text-[12px] font-bold text-[#52605d]">{client.age ? `${client.age} years` : "Age not set"}</span>

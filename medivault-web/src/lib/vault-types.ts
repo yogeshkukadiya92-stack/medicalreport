@@ -5,6 +5,7 @@ export type FamilyMember = {
   score: number;
   bloodGroup: string;
   age: number;
+  countryCode?: string;
   phone?: string;
 };
 
@@ -34,6 +35,7 @@ export type AppReport = {
   labId?: string;
   labName?: string;
   labReportId?: string;
+  clientCountryCode?: string;
   clientPhone?: string;
   publishedAt?: string;
   createdByLabUserId?: string;
@@ -84,6 +86,7 @@ export type LabClient = {
   id: string;
   labId: string;
   name: string;
+  countryCode?: string;
   phone: string;
   normalizedPhone: string;
   age?: number;
@@ -115,6 +118,7 @@ export type LabReport = {
   labReportId: string;
   clientId: string;
   clientName: string;
+  clientCountryCode?: string;
   clientPhone: string;
   normalizedClientPhone: string;
   reportType: string;

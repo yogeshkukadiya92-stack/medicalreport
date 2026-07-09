@@ -22,7 +22,7 @@ type ManualReportInput = {
   title: string;
 };
 
-type MemberDetails = Partial<Pick<FamilyMember, "age" | "bloodGroup" | "phone">>;
+type MemberDetails = Partial<Pick<FamilyMember, "age" | "bloodGroup" | "countryCode" | "phone">>;
 
 type AppDataContextValue = {
   activeMember: FamilyMember | null;
@@ -33,7 +33,7 @@ type AppDataContextValue = {
   deleteMember: (memberId: string) => void;
   deleteReport: (reportId: string) => void;
   familyMembers: FamilyMember[];
-  updateMember: (memberId: string, patch: Partial<Pick<FamilyMember, "name" | "relation" | "age" | "bloodGroup" | "phone">>) => void;
+  updateMember: (memberId: string, patch: Partial<Pick<FamilyMember, "name" | "relation" | "age" | "bloodGroup" | "countryCode" | "phone">>) => void;
   updateReport: (reportId: string, patch: ReportPatch) => void;
   markReviewed: (reportId: string) => void;
   reports: AppReport[];
@@ -76,6 +76,7 @@ function normalizeReport(report: AppReport): AppReport {
 function normalizeMember(member: FamilyMember): FamilyMember {
   return {
     ...member,
+    countryCode: typeof member.countryCode === "string" ? member.countryCode : "+91",
     phone: typeof member.phone === "string" ? member.phone : "",
   };
 }
@@ -281,6 +282,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           score: 0,
           bloodGroup: details?.bloodGroup?.trim() || "Unknown",
           age: details?.age ?? 0,
+          countryCode: details?.countryCode?.trim() || "+91",
           phone: details?.phone?.trim() || "",
         };
         setFamilyMembers((current) => [...current, nextMember]);

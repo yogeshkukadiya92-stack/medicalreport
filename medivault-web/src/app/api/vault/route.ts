@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
-import { labReportToAppReport, normalizePhone } from "@/lib/lab-utils";
+import { labReportToAppReport, normalizePhone, phoneMatchKeys } from "@/lib/lab-utils";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
 import type { FamilyMember, LabReport, VaultSnapshot } from "@/lib/vault-types";
 
@@ -30,11 +30,12 @@ function cleanFamilyMember(member: FamilyMember): FamilyMember {
 async function mergePublishedLabReports(userId: string, snapshot: VaultSnapshot): Promise<VaultSnapshot> {
   const db = await getMongoDb();
   const phoneMatches = snapshot.familyMembers
-    .map((member) => ({
-      member,
-      normalizedPhone: normalizePhone(member.phone ?? ""),
-    }))
-    .filter((entry) => entry.normalizedPhone.length >= 8);
+    .flatMap((member) =>
+      phoneMatchKeys(member.phone ?? "", member.countryCode).map((normalizedPhone) => ({
+        member,
+        normalizedPhone,
+      })),
+    );
 
   if (!phoneMatches.length) {
     return snapshot;
@@ -73,7 +74,7 @@ async function mergePublishedLabReports(userId: string, snapshot: VaultSnapshot)
             $set: {
               claimedAt: now,
               memberId: report.memberId,
-              normalizedPhone: normalizePhone(report.clientPhone ?? ""),
+              normalizedPhone: normalizePhone(report.clientPhone ?? "", report.clientCountryCode),
               state: "claimed",
               updatedAt: now,
               userId,
