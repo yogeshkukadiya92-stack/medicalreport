@@ -133,28 +133,41 @@ export async function GET(request: NextRequest) {
 
   const params = request.nextUrl.searchParams;
   const q = params.get("q")?.trim() || "";
+  const reportId = params.get("reportId")?.trim() || "";
   const reportType = params.get("reportType")?.trim() || "";
   const status = params.get("status")?.trim() || "";
   const sync = params.get("sync")?.trim() || "";
   const staff = params.get("staff")?.trim() || "";
+  const abnormal = params.get("abnormal")?.trim() || "";
+  const attachment = params.get("attachment")?.trim() || "";
   const from = params.get("from")?.trim() || "";
   const to = params.get("to")?.trim() || "";
   const filter: Record<string, unknown> = { labId: context.lab.id };
+  const andFilters: Record<string, unknown>[] = [];
 
   if (q) {
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    filter.$or = [
-      { clientName: { $regex: escaped, $options: "i" } },
-      { clientPhone: { $regex: escaped, $options: "i" } },
-      { normalizedClientPhone: { $regex: normalizePhone(q), $options: "i" } },
-      { title: { $regex: escaped, $options: "i" } },
-      { labReportId: { $regex: escaped, $options: "i" } },
-      { accessionNumber: { $regex: escaped, $options: "i" } },
-    ];
+    andFilters.push({
+      $or: [
+        { clientName: { $regex: escaped, $options: "i" } },
+        { clientPhone: { $regex: escaped, $options: "i" } },
+        { normalizedClientPhone: { $regex: normalizePhone(q), $options: "i" } },
+        { title: { $regex: escaped, $options: "i" } },
+        { labReportId: { $regex: escaped, $options: "i" } },
+        { accessionNumber: { $regex: escaped, $options: "i" } },
+      ],
+    });
   }
   if (reportType) filter.reportType = reportType;
   if (status) filter.status = status;
   if (staff) filter.createdByLabUserId = staff;
+  if (abnormal === "1" || abnormal === "true") filter.abnormal = { $gt: 0 };
+  if (attachment === "missing") {
+    andFilters.push({ $or: [{ fileId: { $exists: false } }, { fileId: "" }, { fileId: null }] });
+  }
+  if (attachment === "attached") {
+    andFilters.push({ fileId: { $exists: true, $nin: ["", null] } });
+  }
   if (sync === "claimed" || sync === "unclaimed") {
     const links = await context.db
       .collection("clientReportLinks")
@@ -162,12 +175,14 @@ export async function GET(request: NextRequest) {
       .toArray();
     filter.id = { $in: links.map((link) => link.labReportId) };
   }
+  if (reportId) filter.id = reportId;
   if (from || to) {
     filter.reportDate = {
       ...(from ? { $gte: from } : {}),
       ...(to ? { $lte: to } : {}),
     };
   }
+  if (andFilters.length) filter.$and = andFilters;
 
   const reports = await context.db
     .collection<LabReport>("labReports")

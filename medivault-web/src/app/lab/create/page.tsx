@@ -87,10 +87,19 @@ export default function LabCreateReportPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
+  const [hasAppliedUrlPrefill, setHasAppliedUrlPrefill] = useState(false);
 
   async function loadInitialData() {
-    if (!isConfigured || status === "loading") return;
-    if (!session?.access_token) return;
+    if (!isConfigured) {
+      setIsInitialDataLoaded(true);
+      return;
+    }
+    if (status === "loading") return;
+    if (!session?.access_token) {
+      setIsInitialDataLoaded(true);
+      return;
+    }
     const headers = { Authorization: `Bearer ${session.access_token}` };
     setError("");
     try {
@@ -112,6 +121,8 @@ export default function LabCreateReportPage() {
       }
     } catch {
       setError("Lab setup data could not be loaded. Refresh after sign-in, or allow this site in any browser content blocker.");
+    } finally {
+      setIsInitialDataLoaded(true);
     }
   }
 
@@ -135,6 +146,40 @@ export default function LabCreateReportPage() {
     const flagged = completeValues.filter((value) => value.status !== "Normal").length;
     return { complete: completeValues.length, flagged };
   }, [values]);
+
+  useEffect(() => {
+    if (!isInitialDataLoaded || hasAppliedUrlPrefill || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const templateId = params.get("template") ?? "";
+    const clientId = params.get("clientId") ?? "";
+    const phone = params.get("phone") ?? "";
+
+    if (templateId) {
+      const template = templates.find((item) => item.id === templateId) ?? getLabTemplate(templateId);
+      setMode("template");
+      setSelectedTemplateId(template.id);
+      setReportForm((current) => ({ ...current, reportType: template.name, title: `${template.name} Report` }));
+      setValues(template.tests.length ? draftFromTemplate(template.id) : [emptyValue()]);
+    }
+
+    if (clientId || phone) {
+      const normalizedPhone = normalizePhone(phone);
+      const linkedClient = clients.find((client) => client.id === clientId || (normalizedPhone && client.normalizedPhone === normalizedPhone));
+      if (linkedClient) {
+        setSelectedClientId(linkedClient.id);
+        setClientForm({
+          age: linkedClient.age ? String(linkedClient.age) : "",
+          gender: linkedClient.gender ?? "",
+          name: linkedClient.name,
+          phone: linkedClient.phone,
+        });
+      } else if (phone) {
+        setClientForm((current) => ({ ...current, phone }));
+      }
+    }
+
+    setHasAppliedUrlPrefill(true);
+  }, [clients, hasAppliedUrlPrefill, isInitialDataLoaded, templates]);
 
   function selectClient(clientId: string) {
     setSelectedClientId(clientId);
@@ -399,12 +444,12 @@ export default function LabCreateReportPage() {
                     </button>
                   ) : null}
                 </div>
-                <div className="mt-3 grid gap-2 lg:grid-cols-[1.3fr_0.8fr_0.7fr_1fr_130px]">
-                  <input value={item.name} onChange={(event) => updateValue(item.id, { name: event.target.value })} className="h-10 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Test name" />
-                  <input value={item.value} onChange={(event) => updateValue(item.id, { value: event.target.value })} className="h-10 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Value" />
-                  <input value={item.unit} onChange={(event) => updateValue(item.id, { unit: event.target.value })} className="h-10 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Unit" />
-                  <input value={item.referenceRange} onChange={(event) => updateValue(item.id, { referenceRange: event.target.value })} className="h-10 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Reference range" />
-                  <select value={item.status} onChange={(event) => updateValue(item.id, { status: event.target.value as ReportMarker["status"] })} className={`h-10 rounded-lg border border-[#dce9e5] px-3 text-[12px] font-bold ${statusStyles(item.status)}`}>
+                <div className="mt-3 grid min-w-0 gap-2 lg:grid-cols-2 2xl:grid-cols-[1.3fr_0.8fr_0.7fr_1fr_130px]">
+                  <input value={item.name} onChange={(event) => updateValue(item.id, { name: event.target.value })} className="h-10 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Test name" />
+                  <input value={item.value} onChange={(event) => updateValue(item.id, { value: event.target.value })} className="h-10 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Value" />
+                  <input value={item.unit} onChange={(event) => updateValue(item.id, { unit: event.target.value })} className="h-10 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Unit" />
+                  <input value={item.referenceRange} onChange={(event) => updateValue(item.id, { referenceRange: event.target.value })} className="h-10 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Reference range" />
+                  <select value={item.status} onChange={(event) => updateValue(item.id, { status: event.target.value as ReportMarker["status"] })} className={`h-10 min-w-0 rounded-lg border border-[#dce9e5] px-3 text-[12px] font-bold ${statusStyles(item.status)}`}>
                     <option>Normal</option>
                     <option>High</option>
                     <option>Low</option>

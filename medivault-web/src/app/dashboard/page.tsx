@@ -20,6 +20,7 @@ export default function Dashboard() {
       .filter((report) => report.abnormal > 0 || report.status === "Needs review")
       .slice(0, 2)
       .map((report, index) => ({
+        id: report.id,
         label: report.title,
         value: `${report.abnormal} flagged`,
         tone: index === 0 ? "coral" : "mint",
@@ -140,7 +141,7 @@ export default function Dashboard() {
         {attentionItems.length ? (
           <div className="mt-3 space-y-3">
             {attentionItems.map((item) => (
-            <div key={item.label} className="flex items-center gap-3 rounded-lg border border-[#e2ebe8] bg-white p-4">
+            <Link key={item.id} href={`/reports?reportId=${encodeURIComponent(item.id)}`} className="flex items-center gap-3 rounded-lg border border-[#e2ebe8] bg-white p-4 hover:border-[#a5dcd0]">
               <div className={`grid h-11 w-11 place-items-center rounded-lg ${item.tone === "coral" ? "bg-[#fff0ec] text-[#cc6044]" : "bg-[#eaf9f2] text-[#0a7d6e]"}`}>
                 <span className="h-2.5 w-2.5 rounded-full bg-current" />
               </div>
@@ -149,7 +150,7 @@ export default function Dashboard() {
                 <p className="mt-1 text-[12px] text-[#7b8986]">{item.note}</p>
               </div>
               <div className="text-right text-[13px] font-bold text-[#162523]">{item.value}</div>
-            </div>
+            </Link>
             ))}
           </div>
         ) : (
@@ -169,7 +170,7 @@ export default function Dashboard() {
         {recentReports.length ? (
           <div className="mt-3 space-y-3">
           {recentReports.map((report) => (
-            <Link key={report.id} href="/reports" className="flex items-center gap-3 rounded-lg border border-[#e2ebe8] bg-white p-4 hover:border-[#a5dcd0]">
+            <Link key={report.id} href={`/reports?reportId=${encodeURIComponent(report.id)}`} className="flex items-center gap-3 rounded-lg border border-[#e2ebe8] bg-white p-4 hover:border-[#a5dcd0]">
               <div className="grid h-12 w-12 place-items-center rounded-lg bg-[#f1f6f4] text-[#087766]">
                 <Icon name="reports" className="h-5 w-5" />
               </div>

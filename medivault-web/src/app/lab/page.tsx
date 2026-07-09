@@ -76,6 +76,10 @@ function alertClass(status: string) {
   return status === "High" ? "bg-[#fff0ec] text-[#ba563d]" : "bg-[#eef5ff] text-[#4167a8]";
 }
 
+function reportHref(reportId: string) {
+  return `/lab/reports?reportId=${encodeURIComponent(reportId)}`;
+}
+
 export default function LabDashboardPage() {
   const { isConfigured, session, status } = useAuth();
   const today = localDateKey();
@@ -142,6 +146,13 @@ export default function LabDashboardPage() {
   }, [isConfigured, session?.access_token, status]);
 
   const recentReports = useMemo(() => reports.slice(0, 5), [reports]);
+  const kpiCards = [
+    { href: `/lab/reports?from=${today}&to=${today}`, label: "Today reports", value: kpis.todayReports },
+    { href: "/lab/clients", label: "Total clients", value: kpis.totalClients },
+    { href: "/lab/reports?sync=unclaimed", label: "Pending unmatched", value: kpis.pendingUnmatchedReports },
+    { href: "/lab/reports?status=published", label: "Published", value: kpis.publishedReports },
+    { href: "/lab/reports?abnormal=1", label: "Abnormal", value: kpis.abnormalReports },
+  ];
 
   return (
     <LabShell>
@@ -159,17 +170,12 @@ export default function LabDashboardPage() {
       {error ? <div className="mt-5 rounded-lg border border-[#ffd6ca] bg-[#fff0ec] p-4 text-[13px] font-bold text-[#ba563d]">{error}</div> : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          ["Today reports", kpis.todayReports],
-          ["Total clients", kpis.totalClients],
-          ["Pending unmatched", kpis.pendingUnmatchedReports],
-          ["Published", kpis.publishedReports],
-          ["Abnormal", kpis.abnormalReports],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-[#e2ebe8] bg-white p-4">
-            <p className="text-[12px] font-bold text-[#6f7f7c]">{label}</p>
-            <p className="mt-3 text-[32px] font-black text-[#102323]">{isLoading ? "--" : value}</p>
-          </div>
+        {kpiCards.map((item) => (
+          <Link key={item.label} href={item.href} className="rounded-lg border border-[#e2ebe8] bg-white p-4 transition hover:border-[#9ad8cb] hover:bg-[#fbfdfc]">
+            <p className="text-[12px] font-bold text-[#6f7f7c]">{item.label}</p>
+            <p className="mt-3 text-[32px] font-black text-[#102323]">{isLoading ? "--" : item.value}</p>
+            <p className="mt-2 text-[11px] font-bold text-[#087766]">Open</p>
+          </Link>
         ))}
       </div>
 
@@ -187,8 +193,8 @@ export default function LabDashboardPage() {
           <div className="divide-y divide-[#edf3f1]">
             {[
               { action: "Open", href: `/lab/reports?from=${today}&to=${today}`, label: "Reports today", value: workQueue.todayReports },
-              { action: "Review", href: `/lab/reports?from=${today}&to=${today}`, label: "Abnormal today", value: workQueue.abnormalToday },
-              { action: "Attach", href: "/lab/reports", label: "Needs attachment", value: workQueue.missingAttachment },
+              { action: "Review", href: `/lab/reports?from=${today}&to=${today}&abnormal=1`, label: "Abnormal today", value: workQueue.abnormalToday },
+              { action: "Attach", href: "/lab/reports?attachment=missing", label: "Needs attachment", value: workQueue.missingAttachment },
               { action: "Match", href: "/lab/reports?sync=unclaimed", label: "Waiting phone link", value: workQueue.unmatched },
               { action: "View", href: `/lab/reports?from=${today}&to=${today}&status=published`, label: "Published today", value: workQueue.publishedToday },
             ].map((item) => (
@@ -218,7 +224,7 @@ export default function LabDashboardPage() {
           <div className="divide-y divide-[#edf3f1]">
             {criticalAlerts.length ? (
               criticalAlerts.map((alert) => (
-                <Link key={`${alert.reportId}-${alert.markerName}-${alert.status}`} href="/lab/reports" className="grid gap-3 p-4 hover:bg-[#f7fbfa] md:grid-cols-[1fr_0.75fr_0.65fr] md:items-center">
+                <Link key={`${alert.reportId}-${alert.markerName}-${alert.status}`} href={reportHref(alert.reportId)} className="grid gap-3 p-4 hover:bg-[#f7fbfa] md:grid-cols-[1fr_0.75fr_0.65fr] md:items-center">
                   <div className="min-w-0">
                     <p className="truncate text-[14px] font-black text-[#162523]">{alert.markerName}</p>
                     <p className="mt-1 truncate text-[12px] font-bold text-[#6f7f7c]">{alert.clientName} - {alert.clientPhone}</p>
@@ -257,18 +263,18 @@ export default function LabDashboardPage() {
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-2">
-            <div className="rounded-lg bg-[#f7fbfa] p-3">
+            <Link href="/lab/reports?sync=claimed" className="rounded-lg bg-[#f7fbfa] p-3 hover:bg-[#eef8f4]">
               <p className="text-[11px] font-bold text-[#7b8986]">Visible</p>
               <p className="mt-2 text-[24px] font-black text-[#087766]">{isLoading ? "--" : syncStatus.claimedReports}</p>
-            </div>
-            <div className="rounded-lg bg-[#fff7d8] p-3">
+            </Link>
+            <Link href="/lab/reports?sync=unclaimed" className="rounded-lg bg-[#fff7d8] p-3 hover:bg-[#fff3bd]">
               <p className="text-[11px] font-bold text-[#8a6500]">Waiting</p>
               <p className="mt-2 text-[24px] font-black text-[#8a6500]">{isLoading ? "--" : syncStatus.unclaimedReports}</p>
-            </div>
-            <div className="rounded-lg bg-[#f7fbfa] p-3">
+            </Link>
+            <Link href="/lab/reports?status=published" className="rounded-lg bg-[#f7fbfa] p-3 hover:bg-[#eef8f4]">
               <p className="text-[11px] font-bold text-[#7b8986]">Published</p>
               <p className="mt-2 text-[24px] font-black text-[#102323]">{isLoading ? "--" : syncStatus.publishedTotal}</p>
-            </div>
+            </Link>
           </div>
 
           <Link href="/lab/reports?sync=unclaimed" className="mt-4 flex h-10 items-center justify-center rounded-lg border border-[#dce9e5] text-[12px] font-bold text-[#087766]">
@@ -288,7 +294,7 @@ export default function LabDashboardPage() {
           <div className="divide-y divide-[#edf3f1]">
             {recentReports.length ? (
               recentReports.map((report) => (
-                <Link key={report.id} href="/lab/reports" className="grid gap-3 p-4 hover:bg-[#f7fbfa] md:grid-cols-[1fr_150px_120px_120px] md:items-center">
+                <Link key={report.id} href={reportHref(report.id)} className="grid gap-3 p-4 hover:bg-[#f7fbfa] md:grid-cols-[1fr_150px_120px_120px] md:items-center">
                   <div className="min-w-0">
                     <p className="truncate text-[14px] font-black text-[#162523]">{report.title}</p>
                     <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{report.clientName} - {report.clientPhone}</p>

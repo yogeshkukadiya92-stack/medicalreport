@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
+import { formatDateLabel } from "@/lib/date-client";
 import type { LabReport, ReportMarker } from "@/lib/vault-types";
 
-const emptyFilters = { from: "", q: "", reportType: "", status: "", sync: "", to: "" };
+const emptyFilters = { abnormal: "", attachment: "", from: "", q: "", reportType: "", status: "", sync: "", to: "" };
+type LabReportFilters = typeof emptyFilters;
 
 function markerClass(status: ReportMarker["status"]) {
   if (status === "High" || status === "Low") return "bg-[#fff0ec] text-[#ba563d]";
@@ -18,6 +20,8 @@ function filtersFromUrl() {
   if (typeof window === "undefined") return emptyFilters;
   const params = new URLSearchParams(window.location.search);
   return {
+    abnormal: params.get("abnormal") ?? "",
+    attachment: params.get("attachment") ?? "",
     from: params.get("from") ?? "",
     q: params.get("q") ?? "",
     reportType: params.get("reportType") ?? "",
@@ -25,6 +29,39 @@ function filtersFromUrl() {
     sync: params.get("sync") ?? "",
     to: params.get("to") ?? "",
   };
+}
+
+function reportIdFromUrl() {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("reportId") ?? "";
+}
+
+function buildFilterParams(nextFilters: LabReportFilters) {
+  const params = new URLSearchParams();
+  Object.entries(nextFilters).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  return params;
+}
+
+function updateHistory(nextFilters: LabReportFilters, reportId = "") {
+  if (typeof window === "undefined") return;
+  const params = buildFilterParams(nextFilters);
+  if (reportId) params.set("reportId", reportId);
+  const query = params.toString();
+  window.history.replaceState(null, "", query ? `/lab/reports?${query}` : "/lab/reports");
+}
+
+function filterSummary(filters: LabReportFilters) {
+  return [
+    filters.q ? `Search: ${filters.q}` : "",
+    filters.reportType ? `Type: ${filters.reportType}` : "",
+    filters.status ? `Status: ${filters.status}` : "",
+    filters.sync ? (filters.sync === "claimed" ? "Visible in app" : "Waiting phone link") : "",
+    filters.abnormal ? "Abnormal only" : "",
+    filters.attachment ? (filters.attachment === "missing" ? "Missing attachment" : "Has attachment") : "",
+    filters.from || filters.to ? `Date: ${filters.from || "start"} to ${filters.to || "today"}` : "",
+  ].filter(Boolean);
 }
 
 export default function LabReportsPage() {
@@ -35,7 +72,7 @@ export default function LabReportsPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  async function loadReports() {
+  async function loadReports(nextFilters = filters, nextReportId = reportIdFromUrl()) {
     if (!isConfigured) {
       setIsLoading(false);
       return;
@@ -47,17 +84,21 @@ export default function LabReportsPage() {
     }
     setIsLoading(true);
     setError("");
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.set(key, value);
-    });
+    const params = buildFilterParams(nextFilters);
+    if (nextReportId) params.set("reportId", nextReportId);
     try {
       const response = await fetch(`/api/lab/records?${params.toString()}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const result = await response.json().catch(() => null);
       if (response.ok) {
-        setReports(result?.reports ?? []);
+        const nextReports = result?.reports ?? [];
+        setReports(nextReports);
+        if (nextReportId) {
+          const linkedReport = nextReports.find((report: LabReport) => report.id === nextReportId);
+          setSelectedReport(linkedReport ?? null);
+          if (!linkedReport) setError("The linked report could not be found for this lab.");
+        }
       } else {
         setError(result?.error ?? "Reports could not be loaded.");
       }
@@ -73,6 +114,28 @@ export default function LabReportsPage() {
   }, [isConfigured, session?.access_token, status]);
 
   const reportTypes = useMemo(() => [...new Set(reports.map((report) => report.reportType).filter(Boolean))], [reports]);
+  const activeFilters = useMemo(() => filterSummary(filters), [filters]);
+
+  function applyFilters(nextFilters = filters) {
+    setFilters(nextFilters);
+    setSelectedReport(null);
+    updateHistory(nextFilters);
+    loadReports(nextFilters, "");
+  }
+
+  function clearFilters() {
+    applyFilters(emptyFilters);
+  }
+
+  function openReport(report: LabReport) {
+    setSelectedReport(report);
+    updateHistory(filters, report.id);
+  }
+
+  function closeReport() {
+    setSelectedReport(null);
+    updateHistory(filters);
+  }
 
   async function openStoredFile(report: LabReport) {
     if (!report.fileId || !session?.access_token) return;
@@ -99,7 +162,7 @@ export default function LabReportsPage() {
       </div>
 
       <section className="mt-5 rounded-lg border border-[#e2ebe8] bg-white p-4">
-        <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr_0.75fr_0.75fr_0.7fr_0.7fr_auto]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <input
             value={filters.q}
             onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
@@ -130,9 +193,34 @@ export default function LabReportsPage() {
           </select>
           <input type="date" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} className="h-10 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold" />
           <input type="date" value={filters.to} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))} className="h-10 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold" />
-          <button onClick={loadReports} className="h-10 rounded-lg bg-[#102323] px-4 text-[12px] font-bold text-white">
+          <select value={filters.abnormal} onChange={(event) => setFilters((current) => ({ ...current, abnormal: event.target.value }))} className="h-10 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold">
+            <option value="">Any values</option>
+            <option value="1">Abnormal only</option>
+          </select>
+          <select value={filters.attachment} onChange={(event) => setFilters((current) => ({ ...current, attachment: event.target.value }))} className="h-10 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold">
+            <option value="">Any file</option>
+            <option value="missing">Missing file</option>
+            <option value="attached">Has file</option>
+          </select>
+          <button type="button" onClick={() => applyFilters()} className="h-10 rounded-lg bg-[#102323] px-4 text-[12px] font-bold text-white md:col-span-2 xl:col-span-1">
             Apply
           </button>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {activeFilters.length ? (
+            <>
+              {activeFilters.map((item) => (
+                <span key={item} className="rounded-md bg-[#e8f7f2] px-2.5 py-1 text-[11px] font-bold text-[#087766]">
+                  {item}
+                </span>
+              ))}
+              <button type="button" onClick={clearFilters} className="rounded-md border border-[#dce9e5] px-2.5 py-1 text-[11px] font-bold text-[#52605d]">
+                Clear filters
+              </button>
+            </>
+          ) : (
+            <span className="text-[12px] font-bold text-[#6f7f7c]">Showing latest reports.</span>
+          )}
         </div>
       </section>
 
@@ -149,7 +237,7 @@ export default function LabReportsPage() {
         <div className="divide-y divide-[#edf3f1]">
           {reports.length ? (
             reports.map((report) => (
-              <button key={report.id} onClick={() => setSelectedReport(report)} className="grid w-full gap-3 p-4 text-left hover:bg-[#f7fbfa] md:grid-cols-[1.1fr_1fr_0.8fr_0.7fr_0.7fr] md:items-center">
+              <button key={report.id} onClick={() => openReport(report)} className="grid w-full gap-3 p-4 text-left hover:bg-[#f7fbfa] md:grid-cols-[1.1fr_1fr_0.8fr_0.7fr_0.7fr] md:items-center">
                 <span className="min-w-0">
                   <span className="block truncate text-[14px] font-black text-[#162523]">{report.title}</span>
                   <span className="mt-1 block truncate text-[12px] font-bold text-[#6f7f7c]">{report.labReportId}</span>
@@ -159,7 +247,7 @@ export default function LabReportsPage() {
                   <span className="mt-1 block text-[12px] font-bold text-[#6f7f7c]">{report.clientPhone}</span>
                 </span>
                 <span className="text-[12px] font-bold text-[#52605d]">{report.reportType}</span>
-                <span className="text-[12px] font-bold text-[#52605d]">{report.reportDate}</span>
+                <span className="text-[12px] font-bold text-[#52605d]">{formatDateLabel(report.reportDate)}</span>
                 <span className={`w-fit rounded-md px-2 py-1 text-[11px] font-bold ${report.abnormal ? "bg-[#fff0ec] text-[#ba563d]" : "bg-[#eaf9f2] text-[#087766]"}`}>
                   {report.abnormal ? `${report.abnormal} flagged` : report.status}
                 </span>
@@ -178,9 +266,9 @@ export default function LabReportsPage() {
               <div>
                 <p className="text-[12px] font-bold text-[#087766]">{selectedReport.clientName}</p>
                 <h2 className="mt-1 text-[22px] font-black text-[#162523]">{selectedReport.title}</h2>
-                <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{selectedReport.labReportId} - {selectedReport.reportDate}</p>
+                <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{selectedReport.labReportId} - {formatDateLabel(selectedReport.reportDate)}</p>
               </div>
-              <button onClick={() => setSelectedReport(null)} className="h-9 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
+              <button onClick={closeReport} className="h-9 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
                 Close
               </button>
             </div>

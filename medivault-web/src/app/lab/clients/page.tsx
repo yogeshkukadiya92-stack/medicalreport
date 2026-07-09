@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -155,16 +156,21 @@ export default function LabClientsPage() {
           <div className="divide-y divide-[#edf3f1]">
             {clients.length ? (
               clients.map((client) => (
-                <div key={client.id} className="grid gap-3 p-4 md:grid-cols-[1fr_150px_120px_90px] md:items-center">
+                <div key={client.id} className="grid gap-3 p-4 md:grid-cols-[1fr_150px_120px_170px] md:items-center">
                   <div className="min-w-0">
                     <p className="truncate text-[14px] font-black text-[#162523]">{client.name}</p>
                     <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{client.phone}</p>
                   </div>
                   <span className="text-[12px] font-bold text-[#52605d]">{client.gender || "Gender not set"}</span>
                   <span className="text-[12px] font-bold text-[#52605d]">{client.age ? `${client.age} years` : "Age not set"}</span>
-                  <button onClick={() => editClient(client)} className="h-9 rounded-md bg-[#e8f7f2] text-[12px] font-bold text-[#087766]">
-                    Edit
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link href={`/lab/create?clientId=${encodeURIComponent(client.id)}`} className="flex h-9 items-center justify-center rounded-md bg-[#0a7d6e] text-[12px] font-bold text-white">
+                      Report
+                    </Link>
+                    <button onClick={() => editClient(client)} className="h-9 rounded-md bg-[#e8f7f2] text-[12px] font-bold text-[#087766]">
+                      Edit
+                    </button>
+                  </div>
                 </div>
               ))
             ) : (

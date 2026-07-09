@@ -54,9 +54,14 @@ export default function LabTemplatesPage() {
                 <h2 className="text-[16px] font-black text-[#102323]">{template.name}</h2>
                 <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{template.category}</p>
               </div>
-              <span className="rounded-md bg-[#f1f6f4] px-2.5 py-1 text-[11px] font-bold text-[#52605d]">
-                {template.tests.length} values
-              </span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="rounded-md bg-[#f1f6f4] px-2.5 py-1 text-[11px] font-bold text-[#52605d]">
+                  {template.tests.length} values
+                </span>
+                <Link href={`/lab/create?template=${encodeURIComponent(template.id)}`} className="rounded-md bg-[#0a7d6e] px-3 py-2 text-[12px] font-bold text-white">
+                  Use
+                </Link>
+              </div>
             </div>
             <div className="divide-y divide-[#edf3f1]">
               {template.tests.length ? (

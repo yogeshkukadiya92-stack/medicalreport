@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AppReport, ReportMarker } from "@/components/app-data-provider";
 import { useAppData } from "@/components/app-data-provider";
 import { useAuth } from "@/components/auth-provider";
@@ -80,6 +80,18 @@ export default function Reports() {
   const [manualMarkers, setManualMarkers] = useState<ManualMarkerDraft[]>([emptyMarker()]);
   const hasMember = Boolean(activeMember);
 
+  function updateReportHistory(reportId = "") {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (reportId) {
+      params.set("reportId", reportId);
+    } else {
+      params.delete("reportId");
+    }
+    const queryString = params.toString();
+    window.history.replaceState(null, "", queryString ? `/reports?${queryString}` : "/reports");
+  }
+
   const filteredReports = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return reportsForActiveMember.filter((report) => {
@@ -103,6 +115,24 @@ export default function Reports() {
       summary: report.summary,
     });
   }
+
+  function openReport(report: AppReport) {
+    setSelectedReport(report);
+    updateReportHistory(report.id);
+  }
+
+  function closeReport() {
+    setSelectedReport(null);
+    updateReportHistory();
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reportId = new URLSearchParams(window.location.search).get("reportId");
+    if (!reportId) return;
+    const linkedReport = reportsForActiveMember.find((report) => report.id === reportId);
+    if (linkedReport && selectedReport?.id !== linkedReport.id) setSelectedReport(linkedReport);
+  }, [reportsForActiveMember, selectedReport?.id]);
 
   function saveEdit() {
     if (!editingReport) return;
@@ -289,7 +319,7 @@ export default function Reports() {
                         </div>
                       </div>
                       <div className={`mt-4 grid gap-2 ${report.source === "lab" ? "grid-cols-1" : "grid-cols-3"}`}>
-                        <button onClick={() => setSelectedReport(report)} aria-label={`View ${report.title}`} className="h-9 rounded-md bg-[#e8f7f2] text-[12px] font-bold text-[#087766]">
+                        <button onClick={() => openReport(report)} aria-label={`View ${report.title}`} className="h-9 rounded-md bg-[#e8f7f2] text-[12px] font-bold text-[#087766]">
                           View
                         </button>
                         {report.source !== "lab" ? (
@@ -332,7 +362,7 @@ export default function Reports() {
                   <p className="text-[12px] font-bold text-[#087766]">Report details</p>
                   <h2 className="mt-1 text-[20px] font-black text-[#162523]">{selectedReport.title}</h2>
                 </div>
-                <button onClick={() => setSelectedReport(null)} className="h-9 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
+                <button onClick={closeReport} className="h-9 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
                   Close
                 </button>
               </div>
