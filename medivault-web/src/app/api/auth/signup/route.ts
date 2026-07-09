@@ -7,6 +7,7 @@ type SignupInput = {
   email?: string;
   name?: string;
   password?: string;
+  phone?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -16,6 +17,7 @@ export async function POST(request: NextRequest) {
       email: body?.email ?? "",
       name: body?.name,
       password: body?.password ?? "",
+      phone: body?.phone ?? "",
     });
     const response = NextResponse.json({ user });
     setAuthCookie(response, token);

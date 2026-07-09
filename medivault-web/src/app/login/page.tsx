@@ -26,6 +26,7 @@ export default function LoginPage() {
   });
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
@@ -48,17 +49,22 @@ export default function LoginPage() {
       return;
     }
 
-    if (!email || !password) {
-      setError("Enter email and password.");
+    if (!phone || !password) {
+      setError("Enter mobile number and password.");
+      return;
+    }
+
+    if (mode === "signup" && !email) {
+      setError("Enter email address for signup.");
       return;
     }
 
     setIsSubmitting(true);
     try {
       if (mode === "signin") {
-        await login(email, password);
+        await login(phone, password);
       } else {
-        await signup(email, password);
+        await signup({ email, password, phone });
       }
       router.replace(redirectPath);
     } catch (authError) {
@@ -85,7 +91,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-4 text-[14px] leading-6 text-[#65716f]">
-          Sign in to keep family reports, health trends, and upload history private.
+          Sign in with your mobile number to keep family reports, health trends, and upload history private.
         </p>
 
         <div className="mt-6 grid grid-cols-2 gap-2 rounded-lg border border-[#dce9e5] bg-white p-1">
@@ -116,15 +122,31 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <label className="block">
-            <span className="text-[12px] font-bold text-[#52605d]">Email</span>
+            <span className="text-[12px] font-bold text-[#52605d]">Mobile number</span>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              placeholder="9876543210"
+              inputMode="tel"
+              autoComplete="tel"
+              className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
+            />
+          </label>
+
+          {mode === "signup" ? (
+          <label className="block">
+            <span className="text-[12px] font-bold text-[#52605d]">Email address</span>
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="you@example.com"
+              autoComplete="email"
               className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
             />
           </label>
+          ) : null}
 
           <label className="block">
             <span className="text-[12px] font-bold text-[#52605d]">Password</span>
@@ -134,6 +156,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Minimum 6 characters"
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
                 className="h-12 w-full rounded-lg border border-[#dce9e5] bg-white py-0 pl-4 pr-12 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
               />
               <button
@@ -167,14 +190,14 @@ export default function LoginPage() {
             disabled={isSubmitting || isConfigLoading || !isConfigured}
             className="h-12 w-full rounded-lg bg-[#0a7d6e] text-[14px] font-black text-white shadow-[0_14px_30px_rgba(10,125,110,0.22)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isConfigLoading ? "Checking setup" : isSubmitting ? "Please wait" : mode === "signin" ? "Sign in securely" : "Create account"}
+            {isConfigLoading ? "Checking setup" : isSubmitting ? "Please wait" : mode === "signin" ? "Sign in with mobile" : "Create account"}
           </button>
         </form>
 
         <div className="mt-6 rounded-lg bg-[#f7fbfa] p-4">
           <p className="text-[12px] font-bold text-[#087766]">Protected by MongoDB sessions</p>
           <p className="mt-2 text-[12px] leading-5 text-[#65716f]">
-            Accounts, sessions, reports, files, lab data, and consents are stored in MongoDB.
+            Login uses mobile number and password. Email is collected only while creating an account.
           </p>
         </div>
       </section>

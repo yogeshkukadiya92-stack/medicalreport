@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ReportMarker } from "@/components/app-data-provider";
 import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
@@ -61,6 +61,8 @@ export default function Analytics() {
   const { activeMember, reportsForActiveMember } = useAppData();
   const [range, setRange] = useState("90 days");
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+  const [selectedParameterName, setSelectedParameterName] = useState<string | null>(null);
+  const graphRef = useRef<HTMLElement | null>(null);
   const hasMember = Boolean(activeMember);
   const rangedReports = useMemo(() => filterReportsByRange(reportsForActiveMember, range), [range, reportsForActiveMember]);
   const score = calculateHealthScore(rangedReports);
@@ -141,10 +143,15 @@ export default function Analytics() {
         const bPriority = b.points.length > 1 ? 1 : 0;
         if (aPriority !== bPriority) return bPriority - aPriority;
         return Math.abs(b.delta) - Math.abs(a.delta);
-      })
-      .slice(0, 4);
+      });
   }, [rangedReports]);
+  const selectedTrend = historyTrends.find((trend) => trend.name === selectedParameterName) ?? historyTrends[0] ?? null;
+  const featuredTrends = useMemo(() => historyTrends.slice(0, 4), [historyTrends]);
   const latestSummary = rangedReports.find((report) => report.summary)?.summary;
+  const selectParameter = (name: string) => {
+    setSelectedParameterName(name);
+    window.requestAnimationFrame(() => graphRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
 
   return (
     <MobileShell>
@@ -264,50 +271,84 @@ export default function Analytics() {
           <span className="rounded-md bg-white px-2 py-1 text-[11px] font-bold text-[#65716f]">{range}</span>
         </div>
 
-        {hasMember && historyTrends.length ? (
+        {hasMember && selectedTrend ? (
           <div className="mt-3 space-y-3">
-            {historyTrends.map((trend) => {
+            {(() => {
+              const trend = selectedTrend;
               const isUp = trend.delta > 0;
               const isDown = trend.delta < 0;
               const toneClass = isDown ? "text-[#ba563d] bg-[#fff0ec]" : isUp ? "text-[#087766] bg-[#eaf9f2]" : "text-[#52605d] bg-[#f1f5f4]";
               return (
-                <article key={trend.name} className="rounded-lg border border-[#e2ebe8] bg-white p-4 shadow-[0_10px_28px_rgba(20,67,60,0.05)]">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-[15px] font-black text-[#162523]">{trend.name}</h3>
-                      <p className="mt-1 text-[12px] font-medium text-[#7b8986]">
-                        Latest {trend.latest.value}
-                        {trend.latest.unit ? ` ${trend.latest.unit}` : ""} from {trend.latest.date}
-                      </p>
+                <article ref={graphRef} className="scroll-mt-5 overflow-hidden rounded-lg border border-[#d9e7e3] bg-white shadow-[0_16px_38px_rgba(20,67,60,0.08)]">
+                  <div className="bg-[#102323] px-4 py-4 text-white">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#99f0db]">Selected result graph</p>
+                        <h3 className="mt-1 truncate text-[20px] font-black">{trend.name}</h3>
+                      </div>
+                      <span className={`shrink-0 rounded-md px-2 py-1 text-[12px] font-black ${toneClass}`}>
+                        {isUp ? "+" : isDown ? "-" : ""}
+                        {trend.changeText.replace(/^[-+]/, "")}
+                      </span>
                     </div>
-                    <span className={`shrink-0 rounded-md px-2 py-1 text-[12px] font-black ${toneClass}`}>
-                      {isUp ? "+" : isDown ? "-" : ""}
-                      {trend.changeText.replace(/^[-+]/, "")}
-                    </span>
+                    <p className="mt-2 text-[12px] leading-5 text-[#c5d4d1]">
+                      Tap any result below to switch this graph to that test's past data.
+                    </p>
                   </div>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-bold text-[#7b8986]">Latest reading</p>
+                        <p className="mt-1 text-[12px] font-medium text-[#7b8986]">
+                          {trend.latest.value}
+                          {trend.latest.unit ? ` ${trend.latest.unit}` : ""} from {trend.latest.date}
+                        </p>
+                      </div>
+                      <p className="rounded-md bg-[#f1f5f4] px-2 py-1 text-[11px] font-black text-[#52605d]">{trend.points.length} values</p>
+                    </div>
 
-                  <div className="mt-4 rounded-lg bg-[#f6faf9] p-3">
-                    <svg viewBox="0 0 96 56" className="h-24 w-full" role="img" aria-label={`${trend.name} past value graph`}>
-                      <path d="M8 48H88" stroke="#d8e6e2" strokeWidth="2" strokeLinecap="round" />
-                      <path d="M8 30H88" stroke="#e7efed" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 5" />
-                      <path d="M8 12H88" stroke="#e7efed" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 5" />
-                      <path d={trend.path} fill="none" stroke={isDown ? "#ec795c" : "#0a7d6e"} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-                      {trend.points.map((point, index) => {
-                        const spread = trend.max - trend.min || 1;
-                        const x = trend.points.length === 1 ? 88 : 8 + (index / (trend.points.length - 1)) * 80;
-                        const y = 48 - ((point.value - trend.min) / spread) * 36;
-                        return <circle key={`${point.timestamp}-${index}`} cx={x} cy={y} r="3.2" fill="#ffffff" stroke={isDown ? "#ec795c" : "#0a7d6e"} strokeWidth="2.4" />;
-                      })}
-                    </svg>
-                    <div className="mt-1 flex items-center justify-between text-[11px] font-bold text-[#8a9794]">
-                      <span>{trend.points[0]?.date}</span>
-                      <span>{trend.points.length} values</span>
-                      <span>{trend.latest.date}</span>
+                    <div className="mt-4 rounded-lg bg-[#f6faf9] p-3 ring-1 ring-[#e4efec]">
+                      <svg viewBox="0 0 96 56" className="h-32 w-full" role="img" aria-label={`${trend.name} past value graph`}>
+                        <path d="M8 48H88" stroke="#d8e6e2" strokeWidth="2" strokeLinecap="round" />
+                        <path d="M8 30H88" stroke="#e7efed" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 5" />
+                        <path d="M8 12H88" stroke="#e7efed" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 5" />
+                        <path d={trend.path} fill="none" stroke={isDown ? "#ec795c" : "#0a7d6e"} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                        {trend.points.map((point, index) => {
+                          const spread = trend.max - trend.min || 1;
+                          const x = trend.points.length === 1 ? 88 : 8 + (index / (trend.points.length - 1)) * 80;
+                          const y = 48 - ((point.value - trend.min) / spread) * 36;
+                          return <circle key={`${point.timestamp}-${index}`} cx={x} cy={y} r="3.2" fill="#ffffff" stroke={isDown ? "#ec795c" : "#0a7d6e"} strokeWidth="2.4" />;
+                        })}
+                      </svg>
+                      <div className="mt-1 flex items-center justify-between text-[11px] font-bold text-[#8a9794]">
+                        <span>{trend.points[0]?.date}</span>
+                        <span>{trend.points.length} values</span>
+                        <span>{trend.latest.date}</span>
+                      </div>
                     </div>
                   </div>
                 </article>
               );
-            })}
+            })()}
+            {featuredTrends.length > 1 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {featuredTrends.map((trend) => {
+                  const isSelected = trend.name === selectedTrend.name;
+                  return (
+                    <button
+                      key={trend.name}
+                      onClick={() => selectParameter(trend.name)}
+                      className={`rounded-lg border p-3 text-left transition ${
+                        isSelected ? "border-[#0a7d6e] bg-[#eaf9f2] shadow-[0_10px_24px_rgba(10,125,110,0.12)]" : "border-[#e2ebe8] bg-white"
+                      }`}
+                    >
+                      <p className="truncate text-[12px] font-black text-[#162523]">{trend.name}</p>
+                      <p className="mt-1 text-[11px] font-bold text-[#7b8986]">{trend.points.length} readings</p>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="mt-3 rounded-lg border border-dashed border-[#c5d8d3] bg-white p-5 text-center">
@@ -329,7 +370,13 @@ export default function Analytics() {
         {hasMember && visibleParameters.length ? (
           <div className="mt-3 space-y-3">
             {visibleParameters.map((param) => (
-              <article key={param.name} className="rounded-lg border border-[#e2ebe8] bg-white p-4 shadow-[0_10px_28px_rgba(20,67,60,0.05)]">
+              <button
+                key={`${param.name}-${param.value}`}
+                onClick={() => selectParameter(param.name)}
+                className={`w-full rounded-lg border bg-white p-4 text-left shadow-[0_10px_28px_rgba(20,67,60,0.05)] transition ${
+                  selectedTrend?.name === param.name ? "border-[#0a7d6e] ring-2 ring-[#bfe9df]" : "border-[#e2ebe8]"
+                }`}
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="truncate text-[15px] font-black text-[#162523]">{param.name}</h3>
@@ -347,9 +394,9 @@ export default function Analytics() {
                 </div>
                 <div className="mt-3 flex items-center justify-between text-[11px] font-bold text-[#8a9794]">
                   <span>Trend: {param.trend}</span>
-                  <span>{param.width}</span>
+                  <span>{selectedTrend?.name === param.name ? "Graph selected" : "Tap for graph"}</span>
                 </div>
-              </article>
+              </button>
             ))}
           </div>
         ) : (

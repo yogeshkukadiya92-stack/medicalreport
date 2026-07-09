@@ -8,6 +8,7 @@ export type AuthUser = {
   email: string;
   id: string;
   name?: string;
+  phone?: string;
   updatedAt: string;
 };
 
@@ -40,6 +41,16 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function normalizePhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length > 10 && digits.startsWith("91")) return digits.slice(-10);
+  return digits;
+}
+
+function isValidPhone(phone: string) {
+  return normalizePhone(phone).length >= 10;
+}
+
 function cleanName(email: string, name?: string) {
   const trimmedName = name?.trim();
   if (trimmedName) return trimmedName;
@@ -68,6 +79,7 @@ function publicUser(user: AuthUserDocument): AuthUser {
     email: user.email,
     id: user.id,
     name: user.name,
+    phone: user.phone,
     updatedAt: user.updatedAt,
   };
 }
@@ -75,6 +87,7 @@ function publicUser(user: AuthUserDocument): AuthUser {
 async function ensureAuthIndexes(db: Db) {
   await Promise.all([
     db.collection("authUsers").createIndex({ email: 1 }, { unique: true }),
+    db.collection("authUsers").createIndex({ phone: 1 }, { unique: true, partialFilterExpression: { phone: { $type: "string" } } }),
     db.collection("authUsers").createIndex({ id: 1 }, { unique: true }),
     db.collection("authSessions").createIndex({ tokenHash: 1 }, { unique: true }),
     db.collection("authSessions").createIndex({ userId: 1 }),
@@ -167,14 +180,18 @@ export async function getAuthenticatedUserId(request: NextRequest) {
   return user?.id ?? null;
 }
 
-export async function createAuthUserSession(input: { email: string; name?: string; password: string }) {
+export async function createAuthUserSession(input: { email: string; name?: string; password: string; phone: string }) {
   if (!isMongoConfigured()) {
     throw new Error("MongoDB is not configured.");
   }
 
   const email = normalizeEmail(input.email);
+  const phone = normalizePhone(input.phone);
   if (!isValidEmail(email)) {
     throw new Error("Enter a valid email address.");
+  }
+  if (!isValidPhone(phone)) {
+    throw new Error("Enter a valid mobile number.");
   }
   if (input.password.length < 6) {
     throw new Error("Password must be at least 6 characters.");
@@ -182,9 +199,9 @@ export async function createAuthUserSession(input: { email: string; name?: strin
 
   const db = await getMongoDb();
   await ensureAuthIndexes(db);
-  const existing = await db.collection<AuthUserDocument>("authUsers").findOne({ email });
+  const existing = await db.collection<AuthUserDocument>("authUsers").findOne({ $or: [{ email }, { phone }] });
   if (existing) {
-    throw new Error("An account with this email already exists.");
+    throw new Error(existing.phone === phone ? "An account with this mobile number already exists." : "An account with this email already exists.");
   }
 
   const now = new Date().toISOString();
@@ -197,6 +214,7 @@ export async function createAuthUserSession(input: { email: string; name?: strin
     passwordHash: password.hash,
     passwordIterations: password.iterations,
     passwordSalt: password.salt,
+    phone,
     updatedAt: now,
   };
 
@@ -205,17 +223,21 @@ export async function createAuthUserSession(input: { email: string; name?: strin
   return { token, user: publicUser(user) };
 }
 
-export async function loginAuthUserSession(input: { email: string; password: string }) {
+export async function loginAuthUserSession(input: { password: string; phone: string }) {
   if (!isMongoConfigured()) {
     throw new Error("MongoDB is not configured.");
   }
 
-  const email = normalizeEmail(input.email);
+  const phone = normalizePhone(input.phone);
   const db = await getMongoDb();
   await ensureAuthIndexes(db);
-  const user = await db.collection<AuthUserDocument>("authUsers").findOne({ email }, { projection: { _id: 0 } });
+  const emailFallback = normalizeEmail(input.phone);
+  const user = await db.collection<AuthUserDocument>("authUsers").findOne(
+    isValidEmail(emailFallback) ? { $or: [{ phone }, { email: emailFallback }] } : { phone },
+    { projection: { _id: 0 } },
+  );
   if (!user || !verifyPassword(input.password, user)) {
-    throw new Error("Invalid email or password.");
+    throw new Error("Invalid mobile number or password.");
   }
 
   const token = await createSession(db, user.id);

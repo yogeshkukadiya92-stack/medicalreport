@@ -17,9 +17,9 @@ type AuthContextValue = {
   session: MongoSession | null;
   status: AuthStatus;
   user: AuthUser | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (phone: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  signup: (input: { email: string; password: string; phone: string }) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -78,13 +78,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function submitAuth(endpoint: "/api/auth/login" | "/api/auth/signup", email: string, password: string) {
+  async function submitAuth(endpoint: "/api/auth/login" | "/api/auth/signup", input: { email?: string; password: string; phone?: string }) {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(input),
     });
     const result = await readJsonResponse(response);
     if (!response.ok || !result?.user) {
@@ -109,8 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       status,
       user: session?.user ?? null,
-      login: async (email, password) => submitAuth("/api/auth/login", email, password),
-      signup: async (email, password) => submitAuth("/api/auth/signup", email, password),
+      login: async (phone, password) => submitAuth("/api/auth/login", { password, phone }),
+      signup: async (input) => submitAuth("/api/auth/signup", input),
       signOut: async () => {
         await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
         setSession(null);

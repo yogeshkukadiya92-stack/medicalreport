@@ -6,14 +6,15 @@ export const runtime = "nodejs";
 type LoginInput = {
   email?: string;
   password?: string;
+  phone?: string;
 };
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as LoginInput | null;
   try {
     const { token, user } = await loginAuthUserSession({
-      email: body?.email ?? "",
       password: body?.password ?? "",
+      phone: body?.phone ?? body?.email ?? "",
     });
     const response = NextResponse.json({ user });
     setAuthCookie(response, token);
