@@ -19,7 +19,7 @@ type AuthContextValue = {
   user: AuthUser | null;
   login: (phone: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  signup: (input: { email: string; password: string; phone: string }) => Promise<void>;
+  signup: (input: { email: string; otp: string; password: string; phone: string }) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function submitAuth(endpoint: "/api/auth/login" | "/api/auth/signup", input: { email?: string; password: string; phone?: string }) {
+  async function submitAuth(endpoint: "/api/auth/login" | "/api/auth/signup", input: { email?: string; otp?: string; password: string; phone?: string }) {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {

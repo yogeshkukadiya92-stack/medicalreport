@@ -6,13 +6,20 @@ export const runtime = "nodejs";
 type SignupInput = {
   email?: string;
   name?: string;
+  otp?: string;
   password?: string;
   phone?: string;
 };
 
+const testingSignupOtp = "1111";
+
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as SignupInput | null;
   try {
+    if ((body?.otp ?? "").trim() !== testingSignupOtp) {
+      return NextResponse.json({ error: "Invalid OTP. Use 1111 for testing." }, { status: 400 });
+    }
+
     const { token, user } = await createAuthUserSession({
       email: body?.email ?? "",
       name: body?.name,

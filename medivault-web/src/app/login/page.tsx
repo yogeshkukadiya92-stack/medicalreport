@@ -26,6 +26,8 @@ export default function LoginPage() {
   });
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -54,17 +56,24 @@ export default function LoginPage() {
       return;
     }
 
-    if (mode === "signup" && !email) {
-      setError("Enter email address for signup.");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       if (mode === "signin") {
         await login(phone, password);
       } else {
-        await signup({ email, password, phone });
+        if (!email) {
+          setError("Enter email address for signup.");
+          return;
+        }
+        if (!isOtpSent) {
+          setError("Tap Send OTP first.");
+          return;
+        }
+        if (otp.trim() !== "1111") {
+          setError("Invalid OTP. Use 1111 for testing.");
+          return;
+        }
+        await signup({ email, otp, password, phone });
       }
       router.replace(redirectPath);
     } catch (authError) {
@@ -72,6 +81,35 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleSendOtp() {
+    setError("");
+    setMessage("");
+
+    if (!phone || phone.replace(/\D/g, "").length < 10) {
+      setError("Enter a valid mobile number before sending OTP.");
+      return;
+    }
+    if (!email) {
+      setError("Enter email address before sending OTP.");
+      return;
+    }
+    if (!password || password.length < 6) {
+      setError("Enter a password with at least 6 characters before sending OTP.");
+      return;
+    }
+
+    setIsOtpSent(true);
+    setMessage("Testing OTP sent. Use 1111 to verify this mobile number.");
+  }
+
+  function switchMode(nextMode: Mode) {
+    setMode(nextMode);
+    setError("");
+    setMessage("");
+    setOtp("");
+    setIsOtpSent(false);
   }
 
   return (
@@ -97,14 +135,14 @@ export default function LoginPage() {
         <div className="mt-6 grid grid-cols-2 gap-2 rounded-lg border border-[#dce9e5] bg-white p-1">
           <button
             type="button"
-            onClick={() => setMode("signin")}
+            onClick={() => switchMode("signin")}
             className={`h-10 rounded-md text-[13px] font-bold ${mode === "signin" ? "bg-[#102323] text-white" : "text-[#65716f]"}`}
           >
             Sign in
           </button>
           <button
             type="button"
-            onClick={() => setMode("signup")}
+            onClick={() => switchMode("signup")}
             className={`h-10 rounded-md text-[13px] font-bold ${mode === "signup" ? "bg-[#102323] text-white" : "text-[#65716f]"}`}
           >
             Create account
@@ -135,17 +173,17 @@ export default function LoginPage() {
           </label>
 
           {mode === "signup" ? (
-          <label className="block">
-            <span className="text-[12px] font-bold text-[#52605d]">Email address</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-              className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
-            />
-          </label>
+            <label className="block">
+              <span className="text-[12px] font-bold text-[#52605d]">Email address</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
+              />
+            </label>
           ) : null}
 
           <label className="block">
@@ -182,6 +220,36 @@ export default function LoginPage() {
             </div>
           </label>
 
+          {mode === "signup" ? (
+            <div className="rounded-lg border border-[#dce9e5] bg-[#f7fbfa] p-3">
+              <div className="flex items-end gap-2">
+                <label className="min-w-0 flex-1">
+                  <span className="text-[12px] font-bold text-[#52605d]">Mobile OTP</span>
+                  <input
+                    type="text"
+                    value={otp}
+                    onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="1111"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    disabled={!isOtpSent}
+                    className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[16px] font-black tracking-[0.28em] text-[#162523] outline-none focus:border-[#0a7d6e] disabled:bg-[#edf3f1] disabled:text-[#8a9794]"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  className="h-12 shrink-0 rounded-lg bg-[#102323] px-4 text-[12px] font-black text-white"
+                >
+                  {isOtpSent ? "Resend" : "Send OTP"}
+                </button>
+              </div>
+              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#65716f]">
+                SMS provider is not connected yet. For testing, every mobile number uses OTP 1111.
+              </p>
+            </div>
+          ) : null}
+
           {error ? <p className="rounded-lg bg-[#fff0ec] p-3 text-[13px] font-bold text-[#ba563d]">{error}</p> : null}
           {message ? <p className="rounded-lg bg-[#eaf9f2] p-3 text-[13px] font-bold text-[#087766]">{message}</p> : null}
 
@@ -190,14 +258,14 @@ export default function LoginPage() {
             disabled={isSubmitting || isConfigLoading || !isConfigured}
             className="h-12 w-full rounded-lg bg-[#0a7d6e] text-[14px] font-black text-white shadow-[0_14px_30px_rgba(10,125,110,0.22)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isConfigLoading ? "Checking setup" : isSubmitting ? "Please wait" : mode === "signin" ? "Sign in with mobile" : "Create account"}
+            {isConfigLoading ? "Checking setup" : isSubmitting ? "Please wait" : mode === "signin" ? "Sign in with mobile" : "Verify OTP & create account"}
           </button>
         </form>
 
         <div className="mt-6 rounded-lg bg-[#f7fbfa] p-4">
           <p className="text-[12px] font-bold text-[#087766]">Protected by MongoDB sessions</p>
           <p className="mt-2 text-[12px] leading-5 text-[#65716f]">
-            Login uses mobile number and password. Email is collected only while creating an account.
+            Signup verifies mobile with test OTP 1111. Login uses mobile number and password.
           </p>
         </div>
       </section>
