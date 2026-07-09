@@ -151,5 +151,7 @@ export async function PUT(request: NextRequest) {
     { upsert: true },
   );
 
-  return NextResponse.json({ isConfigured: true, saved: true, vault: snapshot || emptyVault });
+  const mergedSnapshot = await mergePublishedLabReports(userId, snapshot || emptyVault);
+
+  return NextResponse.json({ isConfigured: true, saved: true, vault: mergedSnapshot });
 }
