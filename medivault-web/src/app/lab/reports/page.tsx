@@ -70,6 +70,8 @@ export default function LabReportsPage() {
   const [reports, setReports] = useState<LabReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<LabReport | null>(null);
   const [error, setError] = useState("");
+  const [fileError, setFileError] = useState("");
+  const [isOpeningFileId, setIsOpeningFileId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   async function loadReports(nextFilters = filters, nextReportId = reportIdFromUrl()) {
@@ -129,24 +131,44 @@ export default function LabReportsPage() {
 
   function openReport(report: LabReport) {
     setSelectedReport(report);
+    setFileError("");
     updateHistory(filters, report.id);
   }
 
   function closeReport() {
     setSelectedReport(null);
+    setFileError("");
     updateHistory(filters);
   }
 
   async function openStoredFile(report: LabReport) {
-    if (!report.fileId || !session?.access_token) return;
-    const response = await fetch(`/api/files/${report.fileId}`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-    if (!response.ok) return;
-    const blob = await response.blob();
-    const fileUrl = URL.createObjectURL(blob);
-    window.open(fileUrl, "_blank", "noopener,noreferrer");
-    window.setTimeout(() => URL.revokeObjectURL(fileUrl), 60_000);
+    setFileError("");
+    if (!report.fileId) {
+      setFileError("Original file is not attached to this report.");
+      return;
+    }
+    if (!session?.access_token) {
+      setFileError("Sign in again to open the original file.");
+      return;
+    }
+    setIsOpeningFileId(report.id);
+    try {
+      const response = await fetch(`/api/files/${report.fileId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.error ?? "Original file could not be opened.");
+      }
+      const blob = await response.blob();
+      const fileUrl = URL.createObjectURL(blob);
+      window.open(fileUrl, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(fileUrl), 60_000);
+    } catch (openError) {
+      setFileError(openError instanceof Error ? openError.message : "Original file could not be opened.");
+    } finally {
+      setIsOpeningFileId("");
+    }
   }
 
   return (
@@ -286,11 +308,16 @@ export default function LabReportsPage() {
             </div>
             {selectedReport.fileId ? (
               <div className="px-5">
-                <button onClick={() => openStoredFile(selectedReport)} className="h-11 w-full rounded-lg bg-[#0a7d6e] text-[13px] font-bold text-white">
-                  Open original file
+                <button
+                  onClick={() => openStoredFile(selectedReport)}
+                  disabled={isOpeningFileId === selectedReport.id}
+                  className="h-11 w-full rounded-lg bg-[#0a7d6e] text-[13px] font-bold text-white disabled:opacity-60"
+                >
+                  {isOpeningFileId === selectedReport.id ? "Opening..." : "Open original file"}
                 </button>
               </div>
             ) : null}
+            {fileError ? <p className="mx-5 mt-3 rounded-lg bg-[#fff0ec] p-3 text-[12px] font-bold text-[#ba563d]">{fileError}</p> : null}
             <div className="space-y-2 p-5">
               {selectedReport.values.map((value) => (
                 <div key={value.id} className="grid gap-3 rounded-lg border border-[#e2ebe8] p-3 md:grid-cols-[1.2fr_0.8fr_1fr_120px] md:items-center">

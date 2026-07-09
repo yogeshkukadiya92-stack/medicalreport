@@ -2,6 +2,7 @@
 
 import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { clearAccessToken, setAccessToken } from "@/lib/api-client";
 import { createSupabaseBrowserClient, loadPublicConfig } from "@/lib/supabase";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsConfigLoading(false);
 
       if (!client) {
+        clearAccessToken();
         setSession(null);
         setStatus("unauthenticated");
         return;
@@ -58,12 +60,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data } = await getSessionWithTimeout(client);
       if (!mounted) return;
       setSession(data.session);
+      if (data.session?.access_token) {
+        setAccessToken(data.session.access_token);
+      } else {
+        clearAccessToken();
+      }
       setStatus(data.session ? "authenticated" : "unauthenticated");
 
       const {
         data: { subscription },
       } = client.auth.onAuthStateChange((_event, nextSession) => {
         setSession(nextSession);
+        if (nextSession?.access_token) {
+          setAccessToken(nextSession.access_token);
+        } else {
+          clearAccessToken();
+        }
         setStatus(nextSession ? "authenticated" : "unauthenticated");
       });
 
@@ -90,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (supabase) {
           await supabase.auth.signOut();
         }
+        clearAccessToken();
       },
     }),
     [isConfigLoading, isConfigured, session, status, supabase],

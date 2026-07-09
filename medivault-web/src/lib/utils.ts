@@ -99,23 +99,6 @@ export function validateOTP(otp: string): boolean {
   return /^\d{6}$/.test(otp);
 }
 
-// Generate fake report data for chart
-export function generateTrendData(baseValue: number, points: number = 6) {
-  const data = [];
-  for (let i = points - 1; i >= 0; i--) {
-    const variance = Math.random() * 4 - 2; // ±2
-    const value = Math.round((baseValue + variance) * 10) / 10;
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    data.push({
-      date: formatDate(date),
-      value: value.toString(),
-      status: value > 5.7 ? 'high' : 'normal',
-    });
-  }
-  return data;
-}
-
 // Debounce helper
 export function debounce<T extends (...args: any[]) => any>(
   func: T,

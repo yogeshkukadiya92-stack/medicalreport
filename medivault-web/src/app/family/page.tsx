@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
+import { calculateHealthScore } from "@/lib/health-score";
 
 const emptyForm = { name: "", relation: "", age: "", bloodGroup: "", phone: "" };
 
@@ -98,6 +99,7 @@ export default function FamilyPage() {
           <div className="mt-5 space-y-3">
             {familyMembers.map((member) => {
               const memberReports = reports.filter((report) => report.memberId === member.id);
+              const memberScore = calculateHealthScore(memberReports);
               const isActive = activeMemberId === member.id;
               return (
                 <div
@@ -117,7 +119,7 @@ export default function FamilyPage() {
                       </p>
                     </button>
                     <div className="text-right">
-                      <p className="text-[22px] font-black">{member.score}</p>
+                      <p className="text-[22px] font-black">{memberReports.length ? memberScore : "--"}</p>
                       <p className={`text-[11px] font-bold ${isActive ? "text-[#aee7d9]" : "text-[#7b8986]"}`}>
                         {memberReports.length} reports
                       </p>

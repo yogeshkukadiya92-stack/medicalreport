@@ -1,53 +1,31 @@
-// Consents API Service
-// MVP: Returns dummy data. Replace with real API calls when backend is ready.
+import apiClient from "@/lib/api-client";
+
+export type ConsentRecord = {
+  consent_type: string;
+  consent_version: string;
+  granted_at?: string | null;
+  is_granted: boolean;
+  updated_at?: string;
+};
 
 export const consentsAPI = {
-  // Grant consent
   async grant(consentType: string, version: string): Promise<void> {
-    // TODO: Replace with real API call
-    // await apiClient.post('/consents', {
-    //   consent_type: consentType,
-    //   consent_version: version,
-    //   is_granted: true,
-    // });
-
-    return Promise.resolve();
+    await apiClient.post("/consents", {
+      consent_type: consentType,
+      consent_version: version,
+      is_granted: true,
+    });
   },
 
-  // Get current consents
-  async getConsents(): Promise<any[]> {
-    // TODO: Replace with real API call
-    // return apiClient.get('/consents');
-
-    return [
-      {
-        consent_type: 'ai_processing',
-        consent_version: '1.0',
-        is_granted: true,
-        granted_at: new Date().toISOString(),
-      },
-      {
-        consent_type: 'terms_of_service',
-        consent_version: '1.0',
-        is_granted: true,
-        granted_at: new Date().toISOString(),
-      },
-      {
-        consent_type: 'privacy_policy',
-        consent_version: '1.0',
-        is_granted: true,
-        granted_at: new Date().toISOString(),
-      },
-    ];
+  async getConsents(): Promise<ConsentRecord[]> {
+    const response = await apiClient.get<{ consents: ConsentRecord[] }>("/consents");
+    return response.data.consents;
   },
 
-  // Revoke consent
   async revoke(consentType: string): Promise<void> {
-    // TODO: Replace with real API call
-    // await apiClient.post('/consents/revoke', {
-    //   consent_type: consentType,
-    // });
-
-    return Promise.resolve();
+    await apiClient.post("/consents", {
+      consent_type: consentType,
+      is_granted: false,
+    });
   },
 };

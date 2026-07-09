@@ -1,42 +1,31 @@
-// Files API Service
-// MVP: Returns dummy data. Replace with real API calls when backend is ready.
+import apiClient from "@/lib/api-client";
 
 export const filesAPI = {
-  // Get presigned upload URL from backend
+  async uploadFile(file: File): Promise<{ fileId: string; fileMimeType: string; fileName: string; fileSizeBytes: number }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await apiClient.post("/files", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  },
+
   async getUploadURL(
-    filename: string,
-    mimeType: string,
-    fileSize: number
+    _filename: string,
+    _mimeType: string,
+    _fileSize: number,
   ): Promise<{ file_id: string; upload_url: string; expires_in_seconds: number }> {
-    // TODO: Replace with real API call to get presigned S3 URL
-    // const response = await apiClient.post('/files/upload-url', {
-    //   filename,
-    //   mime_type: mimeType,
-    //   file_size_bytes: fileSize,
-    // });
-
-    return {
-      file_id: `file_${Date.now()}`,
-      upload_url: `https://s3-presigned-url-${Date.now()}`,
-      expires_in_seconds: 600,
-    };
+    throw new Error("Presigned upload URLs are not configured. Use filesAPI.uploadFile(file) to store reports in MongoDB GridFS.");
   },
 
-  // Confirm file upload to backend
-  async confirmUpload(fileId: string, checksum: string): Promise<void> {
-    // TODO: Replace with real API call
-    // await apiClient.post(`/files/${fileId}/confirm`, {
-    //   checksum_sha256: checksum,
-    // });
-
-    return Promise.resolve();
+  async confirmUpload(_fileId: string, _checksum: string): Promise<void> {
+    throw new Error("Upload confirmation is not required for direct MongoDB GridFS uploads.");
   },
 
-  // Get signed download URL
   async getFileURL(fileId: string): Promise<string> {
-    // TODO: Replace with real API call to get signed download URL
-    // const response = await apiClient.get(`/files/${fileId}/url`);
-
-    return `https://signed-download-url-${fileId}`;
+    if (!fileId) throw new Error("File id is required.");
+    return `/api/files/${encodeURIComponent(fileId)}`;
   },
 };

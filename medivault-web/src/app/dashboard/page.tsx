@@ -1,18 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 import { SignOutButton } from "@/components/sign-out-button";
+import { calculateHealthScore, healthScoreLabel } from "@/lib/health-score";
 
 export default function Dashboard() {
-  const { activeMember, familyMembers, reportsForActiveMember, setActiveMemberId } = useAppData();
-  const [notice, setNotice] = useState("");
+  const router = useRouter();
+  const { activeMember, familyMembers, reports, reportsForActiveMember, setActiveMemberId } = useAppData();
   const attentionCount = reportsForActiveMember.filter((report) => report.abnormal > 0 || report.status === "Needs review").length;
   const recentReports = reportsForActiveMember.slice(0, 3);
   const hasMembers = familyMembers.length > 0;
+  const hasReports = reportsForActiveMember.length > 0;
   const activeMemberId = activeMember?.id ?? null;
+  const healthScore = calculateHealthScore(reportsForActiveMember);
 
   const attentionItems = useMemo(() => {
     if (!attentionCount) return [];
@@ -41,7 +45,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <button
               aria-label="Notifications"
-              onClick={() => setNotice(attentionCount ? `${attentionCount} report needs review.` : "All reports are up to date.")}
+              onClick={() => router.push(attentionCount ? "/reports?filter=Needs%20review" : "/reports")}
               className="grid h-11 w-11 place-items-center rounded-lg border border-[#dce9e5] bg-white text-[#223230] shadow-[0_8px_24px_rgba(20,67,60,0.08)]"
             >
               <Icon name="bell" className="h-5 w-5" />
@@ -50,30 +54,28 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {notice ? (
-          <div className="mt-4 rounded-lg border border-[#dce9e5] bg-white p-3 text-[13px] font-bold text-[#087766]">
-            {notice}
-          </div>
-        ) : null}
-
         {hasMembers ? (
           <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
-            {familyMembers.map((member) => (
-              <button
-                key={member.id}
-                onClick={() => setActiveMemberId(member.id)}
-                className={`min-w-[104px] rounded-lg border px-3 py-3 text-left ${
-                  member.id === activeMemberId
-                    ? "border-[#0a7d6e] bg-[#0b2b2b] text-white shadow-[0_16px_32px_rgba(11,43,43,0.18)]"
-                    : "border-[#dce9e5] bg-white text-[#44524f]"
-                }`}
-              >
-                <span className="block text-[13px] font-bold">{member.name}</span>
-                <span className={`mt-1 block text-[11px] ${member.id === activeMemberId ? "text-[#aee7d9]" : "text-[#81908d]"}`}>
-                  {member.relation} - {member.score}
-                </span>
-              </button>
-            ))}
+            {familyMembers.map((member) => {
+              const memberReports = reports.filter((report) => report.memberId === member.id);
+              const memberScore = calculateHealthScore(memberReports);
+              return (
+                <button
+                  key={member.id}
+                  onClick={() => setActiveMemberId(member.id)}
+                  className={`min-w-[104px] rounded-lg border px-3 py-3 text-left ${
+                    member.id === activeMemberId
+                      ? "border-[#0a7d6e] bg-[#0b2b2b] text-white shadow-[0_16px_32px_rgba(11,43,43,0.18)]"
+                      : "border-[#dce9e5] bg-white text-[#44524f]"
+                  }`}
+                >
+                  <span className="block text-[13px] font-bold">{member.name}</span>
+                  <span className={`mt-1 block text-[11px] ${member.id === activeMemberId ? "text-[#aee7d9]" : "text-[#81908d]"}`}>
+                    {member.relation} - {memberReports.length ? memberScore : "No reports"}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         ) : (
           <div className="mt-5 rounded-lg border border-dashed border-[#c5d8d3] bg-white p-5">
@@ -90,9 +92,9 @@ export default function Dashboard() {
             <div>
               <p className="text-[13px] font-medium text-[#a9bfba]">Health score</p>
               <div className="mt-2 flex items-end gap-2">
-                <span className="text-[56px] font-black leading-none tracking-normal">{hasMembers ? activeMember?.score : "--"}</span>
+                <span className="text-[56px] font-black leading-none tracking-normal">{hasReports ? healthScore : "--"}</span>
                 <span className="mb-2 text-[13px] font-semibold text-[#99f0db]">
-                  {hasMembers ? (activeMember && activeMember.score >= 90 ? "Great" : activeMember && activeMember.score >= 80 ? "Good" : "Watch") : "Waiting"}
+                  {healthScoreLabel(healthScore, hasReports)}
                 </span>
               </div>
               <p className="mt-3 max-w-[180px] text-[13px] leading-5 text-[#c5d4d1]">
@@ -104,12 +106,12 @@ export default function Dashboard() {
               className="relative grid h-[116px] w-[116px] shrink-0 place-items-center rounded-full"
               style={{
                 background: hasMembers
-                  ? `conic-gradient(#38d7b1 0 ${activeMember?.score ?? 0}%, rgba(255,255,255,0.12) ${activeMember?.score ?? 0}% 100%)`
+                  ? `conic-gradient(#38d7b1 0 ${healthScore}%, rgba(255,255,255,0.12) ${healthScore}% 100%)`
                   : "conic-gradient(#2b3a3a 0 100%, rgba(255,255,255,0.12) 100% 100%)",
               }}
             >
               <div className="grid h-[86px] w-[86px] place-items-center rounded-full bg-[#102323] text-center">
-                <span className="text-[12px] font-semibold text-[#99f0db]">{hasMembers ? `${activeMember?.score}%` : "0%"}</span>
+                <span className="text-[12px] font-semibold text-[#99f0db]">{hasReports ? `${healthScore}%` : "0%"}</span>
                 <span className="-mt-2 text-[10px] text-[#a9bfba]">live</span>
               </div>
             </div>
@@ -133,7 +135,7 @@ export default function Dashboard() {
 
         <div className="mt-6 flex items-center justify-between">
           <h2 className="text-[18px] font-bold text-[#101c1c]">Needs attention</h2>
-          <Link href="/analytics" className="text-[13px] font-bold text-[#087766]">
+          <Link href="/reports?filter=Needs%20review" className="text-[13px] font-bold text-[#087766]">
             View all
           </Link>
         </div>

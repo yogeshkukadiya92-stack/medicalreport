@@ -5,8 +5,7 @@ import { useMemo, useState } from "react";
 import type { ReportMarker } from "@/components/app-data-provider";
 import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
-
-const scoreBars = [44, 58, 52, 66, 61, 74, 70, 85];
+import { buildScoreTrend, calculateHealthScore, filterReportsByRange } from "@/lib/health-score";
 
 function statusStyles(tone: string) {
   if (tone === "coral") return "bg-[#fff0ec] text-[#ba563d]";
@@ -38,13 +37,15 @@ export default function Analytics() {
   const [range, setRange] = useState("90 days");
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
   const hasMember = Boolean(activeMember);
-  const score = activeMember?.score ?? 0;
-  const flaggedCount = reportsForActiveMember.filter((report) => report.abnormal > 0 || report.status === "Needs review").length;
-  const verifiedPercent = reportsForActiveMember.length
-    ? Math.round((reportsForActiveMember.filter((report) => report.status === "Reviewed" || report.status === "Normal").length / reportsForActiveMember.length) * 100)
+  const rangedReports = useMemo(() => filterReportsByRange(reportsForActiveMember, range), [range, reportsForActiveMember]);
+  const score = calculateHealthScore(rangedReports);
+  const scoreBars = useMemo(() => buildScoreTrend(reportsForActiveMember, range), [range, reportsForActiveMember]);
+  const flaggedCount = rangedReports.filter((report) => report.abnormal > 0 || report.status === "Needs review").length;
+  const verifiedPercent = rangedReports.length
+    ? Math.round((rangedReports.filter((report) => report.status === "Reviewed" || report.status === "Normal").length / rangedReports.length) * 100)
     : 0;
   const parameters = useMemo(() => {
-    return reportsForActiveMember.flatMap((report) =>
+    return rangedReports.flatMap((report) =>
       report.markers.map((marker, index) => ({
         name: marker.name,
         value: marker.value,
@@ -55,12 +56,12 @@ export default function Analytics() {
         tone: markerTone(marker),
       })),
     );
-  }, [reportsForActiveMember]);
+  }, [rangedReports]);
   const visibleParameters = useMemo(() => {
     const list = showFlaggedOnly ? parameters.filter((param) => param.status === "High" || param.status === "Low" || param.status === "Watch") : parameters;
     return list.slice(0, 8);
   }, [parameters, showFlaggedOnly]);
-  const latestSummary = reportsForActiveMember.find((report) => report.summary)?.summary;
+  const latestSummary = rangedReports.find((report) => report.summary)?.summary;
 
   return (
     <MobileShell>
@@ -98,8 +99,8 @@ export default function Analytics() {
             <div>
               <p className="text-[13px] font-semibold text-[#a9bfba]">Overall score</p>
               <div className="mt-2 flex items-end gap-2">
-                <span className="text-[56px] font-black leading-none">{hasMember ? score : "--"}</span>
-                <span className="mb-2 rounded-md bg-[#173938] px-2 py-1 text-[11px] font-bold text-[#99f0db]">{hasMember ? "+4" : "--"}</span>
+                <span className="text-[56px] font-black leading-none">{hasMember && rangedReports.length ? score : "--"}</span>
+                <span className="mb-2 rounded-md bg-[#173938] px-2 py-1 text-[11px] font-bold text-[#99f0db]">{hasMember && rangedReports.length ? "live" : "--"}</span>
               </div>
               <p className="mt-3 text-[13px] leading-5 text-[#c5d4d1]">
                 {hasMember ? `${range} view, with ${flaggedCount} report${flaggedCount === 1 ? "" : "s"} needing attention.` : "Add a member and upload reports to unlock analytics."}
@@ -109,7 +110,7 @@ export default function Analytics() {
           <div
             className="grid h-[104px] w-[104px] place-items-center rounded-full"
             style={{
-              background: hasMember
+              background: hasMember && rangedReports.length
                 ? `conic-gradient(#39deb8 0 ${score}%, rgba(255,255,255,0.13) ${score}% 100%)`
                 : "conic-gradient(#2b3a3a 0 100%, rgba(255,255,255,0.13) 100% 100%)",
             }}
@@ -134,15 +135,15 @@ export default function Analytics() {
             ))}
           </div>
           <div className="mt-3 flex items-center justify-between text-[11px] font-semibold text-[#a9bfba]">
-            <span>Mar</span>
-            <span>Jun</span>
+            <span>{range} ago</span>
+            <span>Today</span>
           </div>
         </div>
 
         <div className="mt-5 grid grid-cols-3 gap-2">
           <div className="rounded-lg border border-[#e2ebe8] bg-white p-3">
             <p className="text-[11px] font-bold text-[#7b8986]">Scanned</p>
-            <p className="mt-2 text-[24px] font-black text-[#162523]">{reportsForActiveMember.length}</p>
+            <p className="mt-2 text-[24px] font-black text-[#162523]">{rangedReports.length}</p>
           </div>
           <div className="rounded-lg border border-[#e2ebe8] bg-white p-3">
             <p className="text-[11px] font-bold text-[#7b8986]">Flagged</p>
@@ -163,12 +164,12 @@ export default function Analytics() {
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-[14px] font-black text-[#162523]">Doctor visit ready</h2>
                 <span className="rounded-md bg-white px-2 py-1 text-[11px] font-bold text-[#52605d]">
-                  {reportsForActiveMember.length} reports
+                  {rangedReports.length} reports
                 </span>
               </div>
               <p className="mt-1 text-[13px] leading-5 text-[#65716f]">
-                {hasMember && reportsForActiveMember.length
-                  ? `${reportsForActiveMember.length} report${reportsForActiveMember.length === 1 ? "" : "s"} grouped for quick review.`
+                {hasMember && rangedReports.length
+                  ? `${rangedReports.length} report${rangedReports.length === 1 ? "" : "s"} grouped for quick review.`
                   : "Upload reports to create this summary."}
               </p>
             </div>

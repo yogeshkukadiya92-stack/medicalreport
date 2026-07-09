@@ -8,8 +8,10 @@ import { useAuth } from "@/components/auth-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 
 type Filter = "All" | "Starred" | "Needs review" | "Processing" | "Reviewed";
+type SourceFilter = "All sources" | "Lab reports" | "Uploaded by you";
 
 const filters: Filter[] = ["All", "Starred", "Needs review", "Processing", "Reviewed"];
+const sourceFilters: SourceFilter[] = ["All sources", "Lab reports", "Uploaded by you"];
 const biomarkerSuggestions = [
   "Vitamin D",
   "Vitamin B12",
@@ -63,15 +65,38 @@ function markerClass(status: string) {
   return "bg-[#eaf9f2] text-[#087766]";
 }
 
+function filterFromUrl(): Filter {
+  if (typeof window === "undefined") return "All";
+  const value = new URLSearchParams(window.location.search).get("filter");
+  return filters.includes(value as Filter) ? (value as Filter) : "All";
+}
+
+function sourceFromUrl(): SourceFilter {
+  if (typeof window === "undefined") return "All sources";
+  const value = new URLSearchParams(window.location.search).get("source");
+  if (value === "lab") return "Lab reports";
+  if (value === "self_upload") return "Uploaded by you";
+  return "All sources";
+}
+
+function queryFromUrl() {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("q") ?? "";
+}
+
 export default function Reports() {
   const { session } = useAuth();
   const { activeMember, addManualReport, deleteReport, markReviewed, reportsForActiveMember, toggleStar, updateReport } = useAppData();
-  const [filter, setFilter] = useState<Filter>("All");
-  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>(filterFromUrl);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(sourceFromUrl);
+  const [query, setQuery] = useState(queryFromUrl);
   const [selectedReport, setSelectedReport] = useState<AppReport | null>(null);
   const [editingReport, setEditingReport] = useState<AppReport | null>(null);
   const [editForm, setEditForm] = useState({ title: "", lab: "", category: "", summary: "" });
+  const [fileError, setFileError] = useState("");
+  const [isOpeningFileId, setIsOpeningFileId] = useState("");
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const [manualError, setManualError] = useState("");
   const [manualForm, setManualForm] = useState({
     category: "Manual",
     lab: "Manual entry",
@@ -80,14 +105,18 @@ export default function Reports() {
   const [manualMarkers, setManualMarkers] = useState<ManualMarkerDraft[]>([emptyMarker()]);
   const hasMember = Boolean(activeMember);
 
-  function updateReportHistory(reportId = "") {
+  function updateReportHistory(options: { nextFilter?: Filter; nextQuery?: string; nextSource?: SourceFilter; reportId?: string } = {}) {
     if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (reportId) {
-      params.set("reportId", reportId);
-    } else {
-      params.delete("reportId");
-    }
+    const nextFilter = options.nextFilter ?? filter;
+    const nextQuery = options.nextQuery ?? query;
+    const nextSource = options.nextSource ?? sourceFilter;
+    const reportId = options.reportId ?? selectedReport?.id ?? "";
+    const params = new URLSearchParams();
+    if (nextFilter !== "All") params.set("filter", nextFilter);
+    if (nextQuery.trim()) params.set("q", nextQuery.trim());
+    if (nextSource === "Lab reports") params.set("source", "lab");
+    if (nextSource === "Uploaded by you") params.set("source", "self_upload");
+    if (reportId) params.set("reportId", reportId);
     const queryString = params.toString();
     window.history.replaceState(null, "", queryString ? `/reports?${queryString}` : "/reports");
   }
@@ -100,10 +129,14 @@ export default function Reports() {
         (filter === "Starred" && report.starred) ||
         (filter === "Needs review" && (report.abnormal > 0 || report.status === "Needs review")) ||
         report.status === filter;
-      const searchable = `${report.title} ${report.lab} ${report.fileName} ${report.category} ${report.summary}`.toLowerCase();
-      return matchesFilter && (!needle || searchable.includes(needle));
+      const matchesSource =
+        sourceFilter === "All sources" ||
+        (sourceFilter === "Lab reports" && report.source === "lab") ||
+        (sourceFilter === "Uploaded by you" && report.source !== "lab");
+      const searchable = `${report.title} ${report.lab} ${report.fileName} ${report.category} ${report.summary} ${report.labReportId ?? ""}`.toLowerCase();
+      return matchesFilter && matchesSource && (!needle || searchable.includes(needle));
     });
-  }, [filter, query, reportsForActiveMember]);
+  }, [filter, query, reportsForActiveMember, sourceFilter]);
 
   function beginEdit(report: AppReport) {
     if (report.source === "lab") return;
@@ -118,12 +151,32 @@ export default function Reports() {
 
   function openReport(report: AppReport) {
     setSelectedReport(report);
-    updateReportHistory(report.id);
+    setFileError("");
+    updateReportHistory({ reportId: report.id });
   }
 
   function closeReport() {
     setSelectedReport(null);
-    updateReportHistory();
+    setFileError("");
+    updateReportHistory({ reportId: "" });
+  }
+
+  function applyFilter(nextFilter: Filter) {
+    setFilter(nextFilter);
+    setSelectedReport(null);
+    updateReportHistory({ nextFilter, reportId: "" });
+  }
+
+  function applySourceFilter(nextSource: SourceFilter) {
+    setSourceFilter(nextSource);
+    setSelectedReport(null);
+    updateReportHistory({ nextSource, reportId: "" });
+  }
+
+  function updateSearch(nextQuery: string) {
+    setQuery(nextQuery);
+    setSelectedReport(null);
+    updateReportHistory({ nextQuery, reportId: "" });
   }
 
   useEffect(() => {
@@ -150,7 +203,11 @@ export default function Reports() {
   }
 
   function saveManualReport() {
-    if (!activeMember) return;
+    setManualError("");
+    if (!activeMember) {
+      setManualError("Add or select a family member first.");
+      return;
+    }
     const markers = manualMarkers
       .filter((marker) => marker.name.trim() && marker.value.trim())
       .map(({ id: _id, ...marker }) => ({
@@ -159,7 +216,10 @@ export default function Reports() {
         range: marker.range.trim() || "Reference range not added",
         value: marker.value.trim(),
       }));
-    if (!markers.length) return;
+    if (!markers.length) {
+      setManualError("Add at least one test name and value.");
+      return;
+    }
     addManualReport({
       category: manualForm.category,
       lab: manualForm.lab,
@@ -173,24 +233,44 @@ export default function Reports() {
   }
 
   async function openStoredFile(report: AppReport) {
-    if (!report.fileId || !session?.access_token) return;
+    setFileError("");
+    if (!report.fileId) {
+      setFileError("Original file is not available for this report.");
+      return;
+    }
+    if (!session?.access_token) {
+      setFileError("Sign in again to view the original file.");
+      return;
+    }
 
-    const response = await fetch(`/api/files/${report.fileId}`, {
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
+    setIsOpeningFileId(report.id);
+    try {
+      const response = await fetch(`/api/files/${report.fileId}`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
-    if (!response.ok) return;
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.error ?? "Original file could not be opened.");
+      }
 
-    const blob = await response.blob();
-    const fileUrl = URL.createObjectURL(blob);
-    window.open(fileUrl, "_blank", "noopener,noreferrer");
-    window.setTimeout(() => URL.revokeObjectURL(fileUrl), 60_000);
+      const blob = await response.blob();
+      const fileUrl = URL.createObjectURL(blob);
+      window.open(fileUrl, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(fileUrl), 60_000);
+    } catch (openError) {
+      setFileError(openError instanceof Error ? openError.message : "Original file could not be opened.");
+    } finally {
+      setIsOpeningFileId("");
+    }
   }
 
   async function removeReport(report: AppReport) {
     if (report.source === "lab") return;
+    const ok = window.confirm(`Delete ${report.title}? This removes it from your vault.`);
+    if (!ok) return;
     if (report.fileId && session?.access_token) {
       fetch(`/api/files/${report.fileId}`, {
         method: "DELETE",
@@ -219,7 +299,10 @@ export default function Reports() {
 
         {hasMember ? (
           <button
-            onClick={() => setIsManualOpen(true)}
+            onClick={() => {
+              setManualError("");
+              setIsManualOpen(true);
+            }}
             className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0a7d6e] text-[14px] font-bold text-white shadow-[0_12px_30px_rgba(10,125,110,0.18)]"
           >
             <span className="text-[18px] leading-none">+</span>
@@ -246,7 +329,7 @@ export default function Reports() {
           <span className="text-[12px] font-bold text-[#52605d]">Search reports</span>
           <input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => updateSearch(event.target.value)}
             placeholder="Search title, lab, file, category"
             className="mt-2 h-11 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[13px] font-bold text-[#162523]"
           />
@@ -256,8 +339,20 @@ export default function Reports() {
           {filters.map((item) => (
             <button
               key={item}
-              onClick={() => setFilter(item)}
+              onClick={() => applyFilter(item)}
               className={`h-10 min-w-[96px] rounded-lg px-3 text-[12px] font-bold ${filter === item ? "bg-[#0a7d6e] text-white" : "border border-[#dce9e5] bg-white text-[#52605d]"}`}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {sourceFilters.map((item) => (
+            <button
+              key={item}
+              onClick={() => applySourceFilter(item)}
+              className={`h-9 min-w-[112px] rounded-lg px-3 text-[12px] font-bold ${sourceFilter === item ? "bg-[#102323] text-white" : "border border-[#dce9e5] bg-white text-[#52605d]"}`}
             >
               {item}
             </button>
@@ -385,11 +480,13 @@ export default function Reports() {
               {selectedReport.fileId ? (
                 <button
                   onClick={() => openStoredFile(selectedReport)}
+                  disabled={isOpeningFileId === selectedReport.id}
                   className="mt-4 h-11 w-full rounded-lg bg-[#0a7d6e] text-[13px] font-bold text-white"
                 >
-                  View original file
+                  {isOpeningFileId === selectedReport.id ? "Opening..." : "View original file"}
                 </button>
               ) : null}
+              {fileError ? <p className="mt-3 rounded-lg bg-[#fff0ec] p-3 text-[12px] font-bold text-[#ba563d]">{fileError}</p> : null}
               <div className="mt-4 rounded-lg bg-[#f7fbfa] p-4">
                 <p className="text-[12px] font-bold text-[#087766]">{selectedReport.source === "lab" ? "Rule summary" : "AI summary"}</p>
                 <p className="mt-2 text-[13px] leading-5 text-[#52605d]">{selectedReport.summary}</p>
@@ -447,7 +544,13 @@ export default function Reports() {
                   <p className="text-[12px] font-bold text-[#087766]">Manual entry</p>
                   <h2 className="mt-1 text-[20px] font-black text-[#162523]">Add health values</h2>
                 </div>
-                <button onClick={() => setIsManualOpen(false)} className="h-9 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
+                <button
+                  onClick={() => {
+                    setManualError("");
+                    setIsManualOpen(false);
+                  }}
+                  className="h-9 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold"
+                >
                   Close
                 </button>
               </div>
@@ -555,6 +658,7 @@ export default function Reports() {
               >
                 Add another value
               </button>
+              {manualError ? <p className="mt-3 rounded-lg bg-[#fff0ec] p-3 text-[12px] font-bold text-[#ba563d]">{manualError}</p> : null}
               <button onClick={saveManualReport} className="mt-3 h-11 w-full rounded-lg bg-[#0a7d6e] text-[13px] font-bold text-white">
                 Save manual report
               </button>
