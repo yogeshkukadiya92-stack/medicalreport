@@ -192,7 +192,26 @@ export type LabBooking = {
   collectionType: "lab_visit" | "home_collection";
   address?: string;
   notes?: string;
+  paymentAmount?: number;
+  paymentCurrency?: string;
+  paymentMethod: "pay_at_lab" | "razorpay";
+  paymentOrderId?: string;
+  paymentPaymentId?: string;
+  paymentStatus: "not_required" | "pending" | "paid";
   status: LabBookingStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LabPaymentOrder = {
+  id: string;
+  labId: string;
+  amount: number;
+  currency: string;
+  receipt: string;
+  serviceId?: string;
+  serviceName: string;
+  status: "created" | "paid" | "expired";
   createdAt: string;
   updatedAt: string;
 };

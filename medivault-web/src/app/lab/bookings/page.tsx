@@ -85,7 +85,7 @@ export default function LabBookingsPage() {
         <div className="grid gap-3 border-b border-[#edf3f1] p-4 md:grid-cols-[1fr_170px_150px_260px]">
           <p className="text-[12px] font-black uppercase text-[#7b8986]">Client</p>
           <p className="text-[12px] font-black uppercase text-[#7b8986]">Schedule</p>
-          <p className="text-[12px] font-black uppercase text-[#7b8986]">Status</p>
+          <p className="text-[12px] font-black uppercase text-[#7b8986]">Status / pay</p>
           <p className="text-[12px] font-black uppercase text-[#7b8986]">Actions</p>
         </div>
         <div className="divide-y divide-[#edf3f1]">
@@ -102,7 +102,12 @@ export default function LabBookingsPage() {
                   <p className="text-[13px] font-black text-[#102323]">{booking.preferredDate}</p>
                   <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{booking.preferredTime}</p>
                 </div>
-                <span className={`w-fit rounded-md px-2 py-1 text-[11px] font-bold capitalize ${statusClass(booking.status)}`}>{booking.status.replace(/_/g, " ")}</span>
+                <div>
+                  <span className={`w-fit rounded-md px-2 py-1 text-[11px] font-bold capitalize ${statusClass(booking.status)}`}>{booking.status.replace(/_/g, " ")}</span>
+                  <p className="mt-2 text-[11px] font-bold text-[#65716f]">
+                    {booking.paymentStatus === "paid" ? `Paid ${booking.paymentCurrency || ""} ${booking.paymentAmount ? booking.paymentAmount / 100 : ""}` : "Pay at lab"}
+                  </p>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {statuses.map((item) => (
                     <button key={item.value} onClick={() => updateStatus(booking, item.value)} disabled={booking.status === item.value} className="h-9 rounded-md border border-[#dce9e5] px-3 text-[11px] font-bold text-[#087766] disabled:opacity-45">

@@ -45,6 +45,8 @@ async function ensureLabIndexes(db: Db) {
     db.collection("labServices").createIndex({ labId: 1, active: 1 }),
     db.collection("labBookings").createIndex({ labId: 1, preferredDate: 1, status: 1 }),
     db.collection("labBookings").createIndex({ labId: 1, normalizedPhone: 1 }),
+    db.collection("labPaymentOrders").createIndex({ id: 1 }, { unique: true }),
+    db.collection("labPaymentOrders").createIndex({ labId: 1, status: 1 }),
   ]);
 }
 

@@ -6,11 +6,13 @@ import { useAuth } from "@/components/auth-provider";
 import type { LabProfile, LabRole } from "@/lib/vault-types";
 
 const emptyForm = { address: "", name: "", phone: "" };
+type RazorpayStatus = { currency: string; enabled: boolean; keyId: string };
 
 export default function LabSettingsPage() {
   const { isConfigured, session, status } = useAuth();
   const [form, setForm] = useState(emptyForm);
   const [lab, setLab] = useState<LabProfile | null>(null);
+  const [razorpay, setRazorpay] = useState<RazorpayStatus>({ currency: "INR", enabled: false, keyId: "" });
   const [role, setRole] = useState<LabRole>("lab_staff");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -30,6 +32,7 @@ export default function LabSettingsPage() {
         return;
       }
       setLab(result?.lab ?? null);
+      setRazorpay(result?.razorpay ?? { currency: "INR", enabled: false, keyId: "" });
       setRole(result?.role ?? "lab_staff");
       setForm({
         address: result?.lab?.address ?? "",
@@ -145,6 +148,13 @@ export default function LabSettingsPage() {
                   Open booking page
                 </a>
               ) : null}
+            </div>
+            <div className="rounded-lg bg-[#f7fbfa] p-4 sm:col-span-2">
+              <p className="text-[12px] font-bold text-[#6f7f7c]">Razorpay</p>
+              <p className="mt-2 text-[13px] font-black text-[#102323]">{razorpay.enabled ? `Enabled (${razorpay.currency})` : "Not configured"}</p>
+              <p className="mt-2 text-[12px] leading-5 text-[#65716f]">
+                Add `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and optional `RAZORPAY_CURRENCY` in Railway variables to enable online booking payments.
+              </p>
             </div>
           </div>
         </section>

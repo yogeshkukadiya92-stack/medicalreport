@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
 import { normalizePhone } from "@/lib/lab-utils";
-import type { LabBooking, LabProfile, LabService } from "@/lib/vault-types";
+import { getRazorpayPublicConfig, verifyRazorpaySignature } from "@/lib/razorpay";
+import type { LabBooking, LabPaymentOrder, LabProfile, LabService } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,11 @@ type BookingInput = {
   notes?: string;
   preferredDate?: string;
   preferredTime?: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
   serviceId?: string;
+  paymentMethod?: "pay_at_lab" | "razorpay";
 };
 
 type RouteParams = {
@@ -56,6 +61,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       name: lab.name,
       phone: lab.phone,
     },
+    payment: getRazorpayPublicConfig(),
     services,
   });
 }
@@ -91,6 +97,39 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Address is required for home collection." }, { status: 400 });
   }
 
+  const paymentMethod = body?.paymentMethod === "razorpay" ? "razorpay" : "pay_at_lab";
+  let paymentAmount: number | undefined;
+  let paymentCurrency: string | undefined;
+  let paymentOrderId: string | undefined;
+  let paymentPaymentId: string | undefined;
+  let paymentStatus: LabBooking["paymentStatus"] = "not_required";
+
+  if (paymentMethod === "razorpay") {
+    const razorpayOrderId = cleanText(body?.razorpayOrderId);
+    const razorpayPaymentId = cleanText(body?.razorpayPaymentId);
+    const razorpaySignature = cleanText(body?.razorpaySignature);
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+      return NextResponse.json({ error: "Online payment confirmation is required." }, { status: 400 });
+    }
+    if (!verifyRazorpaySignature({ orderId: razorpayOrderId, paymentId: razorpayPaymentId, signature: razorpaySignature })) {
+      return NextResponse.json({ error: "Payment verification failed." }, { status: 400 });
+    }
+
+    const order = await db.collection<LabPaymentOrder>("labPaymentOrders").findOne({ id: razorpayOrderId, labId: lab.id }, { projection: { _id: 0 } });
+    if (!order || order.status !== "created") {
+      return NextResponse.json({ error: "Payment order is invalid or already used." }, { status: 400 });
+    }
+    if (service?.id && order.serviceId !== service.id) {
+      return NextResponse.json({ error: "Payment order does not match selected service." }, { status: 400 });
+    }
+
+    paymentAmount = order.amount;
+    paymentCurrency = order.currency;
+    paymentOrderId = razorpayOrderId;
+    paymentPaymentId = razorpayPaymentId;
+    paymentStatus = "paid";
+  }
+
   const now = new Date().toISOString();
   const booking: LabBooking = {
     id: `book-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -103,6 +142,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     labName: lab.name,
     normalizedPhone,
     notes: cleanText(body?.notes) || undefined,
+    paymentAmount,
+    paymentCurrency,
+    paymentMethod,
+    paymentOrderId,
+    paymentPaymentId,
+    paymentStatus,
     preferredDate,
     preferredTime,
     serviceId: service?.id,
@@ -112,5 +157,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   };
 
   await db.collection<LabBooking>("labBookings").insertOne(booking);
+  if (paymentOrderId) {
+    await db.collection<LabPaymentOrder>("labPaymentOrders").updateOne({ id: paymentOrderId, labId: lab.id }, { $set: { status: "paid", updatedAt: now } });
+  }
   return NextResponse.json({ booking }, { status: 201 });
 }
