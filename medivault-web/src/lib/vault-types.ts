@@ -62,6 +62,7 @@ export type LabRole = "lab_admin" | "lab_staff";
 export type LabProfile = {
   id: string;
   name: string;
+  bookingSlug?: string;
   phone?: string;
   address?: string;
   ownerUserId: string;
@@ -159,4 +160,39 @@ export type LabTemplate = {
   name: string;
   category: string;
   tests: LabTemplateTest[];
+};
+
+export type LabService = {
+  id: string;
+  labId: string;
+  name: string;
+  description?: string;
+  price?: number;
+  durationMinutes?: number;
+  sampleType?: string;
+  homeCollection: boolean;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LabBookingStatus = "requested" | "confirmed" | "sample_collected" | "report_ready" | "cancelled";
+
+export type LabBooking = {
+  id: string;
+  labId: string;
+  labName: string;
+  clientName: string;
+  clientPhone: string;
+  normalizedPhone: string;
+  serviceId?: string;
+  serviceName: string;
+  preferredDate: string;
+  preferredTime: string;
+  collectionType: "lab_visit" | "home_collection";
+  address?: string;
+  notes?: string;
+  status: LabBookingStatus;
+  createdAt: string;
+  updatedAt: string;
 };

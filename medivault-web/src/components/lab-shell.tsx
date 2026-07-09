@@ -12,6 +12,8 @@ import { SignOutButton } from "@/components/sign-out-button";
 const labNav = [
   { href: "/lab", icon: "analytics", label: "Dashboard" },
   { href: "/lab/clients", icon: "family", label: "Clients" },
+  { href: "/lab/bookings", icon: "calendar", label: "Bookings" },
+  { href: "/lab/services", icon: "trend", label: "Services" },
   { href: "/lab/create", icon: "upload", label: "Create report" },
   { href: "/lab/reports", icon: "reports", label: "History" },
   { href: "/lab/templates", icon: "shield", label: "Templates" },

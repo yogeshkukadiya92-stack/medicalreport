@@ -45,6 +45,16 @@ type SyncStatus = {
   unclaimedReports: number;
 };
 
+type BookingOps = {
+  activeServices: number;
+  bookingLink: string;
+  completedToday: number;
+  homeCollections: number;
+  pendingBookings: number;
+  samplesToCollect: number;
+  todayBookings: number;
+};
+
 type Activity = {
   action: string;
   createdAt: string;
@@ -71,6 +81,15 @@ const emptySyncStatus: SyncStatus = {
   publishedTotal: 0,
   unclaimedReports: 0,
 };
+const emptyBookingOps: BookingOps = {
+  activeServices: 0,
+  bookingLink: "",
+  completedToday: 0,
+  homeCollections: 0,
+  pendingBookings: 0,
+  samplesToCollect: 0,
+  todayBookings: 0,
+};
 
 function alertClass(status: string) {
   return status === "High" ? "bg-[#fff0ec] text-[#ba563d]" : "bg-[#eef5ff] text-[#4167a8]";
@@ -90,6 +109,7 @@ export default function LabDashboardPage() {
   const [lab, setLab] = useState<LabProfile | null>(null);
   const [reports, setReports] = useState<LabReport[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
+  const [bookingOps, setBookingOps] = useState<BookingOps>(emptyBookingOps);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -125,6 +145,7 @@ export default function LabDashboardPage() {
           setLab(result?.lab ?? null);
           setReports(result?.reports ?? []);
           setActivity(result?.recentActivity ?? []);
+          setBookingOps(result?.bookingOps ?? emptyBookingOps);
           setSyncStatus(result?.syncStatus ?? emptySyncStatus);
           setWorkQueue(result?.workQueue ?? emptyWorkQueue);
         }
@@ -280,6 +301,63 @@ export default function LabDashboardPage() {
           <Link href="/lab/reports?sync=unclaimed" className="mt-4 flex h-10 items-center justify-center rounded-lg border border-[#dce9e5] text-[12px] font-bold text-[#087766]">
             View waiting reports
           </Link>
+        </section>
+      </div>
+
+      <div className="mt-6 grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+        <section className="rounded-lg border border-[#e2ebe8] bg-white p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-[16px] font-black text-[#102323]">Online booking link</h2>
+              <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">Share this with clients for lab visit or home collection requests</p>
+            </div>
+            <Icon name="calendar" className="h-5 w-5 text-[#0a7d6e]" />
+          </div>
+          <div className="mt-4 rounded-lg border border-[#dce9e5] bg-[#f7fbfa] p-3">
+            <p className="break-all text-[13px] font-black text-[#102323]">{bookingOps.bookingLink || "Sign in to generate booking link"}</p>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <Link href="/lab/services" className="flex h-10 items-center justify-center rounded-lg border border-[#dce9e5] text-[12px] font-bold text-[#087766]">
+              Manage services
+            </Link>
+            <a
+              href={bookingOps.bookingLink || "#"}
+              target="_blank"
+              rel="noreferrer"
+              className={`flex h-10 items-center justify-center rounded-lg text-[12px] font-bold ${
+                bookingOps.bookingLink ? "bg-[#0a7d6e] text-white" : "pointer-events-none bg-[#dce9e5] text-[#7b8986]"
+              }`}
+            >
+              Open booking page
+            </a>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-[#e2ebe8] bg-white p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-[16px] font-black text-[#102323]">Collection operations</h2>
+              <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">Bookings, home collections, and sample handoff</p>
+            </div>
+            <Link href="/lab/bookings" className="text-[12px] font-bold text-[#087766]">
+              View queue
+            </Link>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {[
+              { href: "/lab/bookings?status=requested", label: "Pending", value: bookingOps.pendingBookings },
+              { href: `/lab/bookings?date=${today}`, label: "Today", value: bookingOps.todayBookings },
+              { href: "/lab/bookings?collection=home", label: "Home collection", value: bookingOps.homeCollections },
+              { href: `/lab/bookings?status=confirmed&date=${today}`, label: "Collect samples", value: bookingOps.samplesToCollect },
+              { href: `/lab/bookings?done=today`, label: "Completed today", value: bookingOps.completedToday },
+              { href: "/lab/services", label: "Active services", value: bookingOps.activeServices },
+            ].map((item) => (
+              <Link key={item.label} href={item.href} className="rounded-lg bg-[#f7fbfa] p-3 hover:bg-[#eef8f4]">
+                <p className="text-[11px] font-bold text-[#6f7f7c]">{item.label}</p>
+                <p className="mt-2 text-[24px] font-black text-[#102323]">{isLoading ? "--" : item.value}</p>
+              </Link>
+            ))}
+          </div>
         </section>
       </div>
 

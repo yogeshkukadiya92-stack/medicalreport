@@ -15,6 +15,7 @@ export default function LabSettingsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const bookingPath = lab?.bookingSlug ? `/book/${lab.bookingSlug}` : "";
 
   async function loadSettings() {
     if (!isConfigured || status === "loading") return;
@@ -135,6 +136,15 @@ export default function LabSettingsPage() {
             <div className="rounded-lg bg-[#f7fbfa] p-4">
               <p className="text-[12px] font-bold text-[#6f7f7c]">Owner</p>
               <p className="mt-2 break-all text-[13px] font-black text-[#102323]">{lab?.ownerUserId ?? "--"}</p>
+            </div>
+            <div className="rounded-lg bg-[#f7fbfa] p-4 sm:col-span-2">
+              <p className="text-[12px] font-bold text-[#6f7f7c]">Booking link</p>
+              <p className="mt-2 break-all text-[13px] font-black text-[#102323]">{bookingPath || "--"}</p>
+              {bookingPath ? (
+                <a href={bookingPath} target="_blank" rel="noreferrer" className="mt-3 inline-flex h-10 items-center justify-center rounded-lg bg-[#0a7d6e] px-4 text-[12px] font-bold text-white">
+                  Open booking page
+                </a>
+              ) : null}
             </div>
           </div>
         </section>
