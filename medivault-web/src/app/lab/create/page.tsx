@@ -306,8 +306,8 @@ export default function LabCreateReportPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-4 grid gap-4 xl:grid-cols-[320px_1fr] 2xl:grid-cols-[340px_1fr]">
-        <aside className="space-y-3">
+      <form onSubmit={handleSubmit} className="mt-3">
+        <aside className="grid gap-3 xl:grid-cols-[0.8fr_1.1fr_0.7fr]">
           <section className="rounded-lg border border-[#e2ebe8] bg-white p-3">
             <h2 className="text-[15px] font-black text-[#102323]">Client</h2>
             <label className="mt-3 block">
@@ -325,7 +325,7 @@ export default function LabCreateReportPage() {
                 ))}
               </select>
             </label>
-            <div className="mt-2 grid gap-2">
+            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_0.9fr] xl:grid-cols-1">
               <input
                 value={clientForm.name}
                 onChange={(event) => setClientForm((current) => ({ ...current, name: event.target.value }))}
@@ -375,7 +375,7 @@ export default function LabCreateReportPage() {
                 </select>
               </label>
             ) : null}
-            <div className="mt-2 grid gap-2">
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
               <input
                 value={reportForm.title}
                 onChange={(event) => setReportForm((current) => ({ ...current, title: event.target.value }))}
@@ -419,10 +419,15 @@ export default function LabCreateReportPage() {
             <h2 className="text-[15px] font-black text-[#102323]">Attachment</h2>
             <input ref={inputRef} type="file" accept="application/pdf,image/*" className="mt-2 w-full rounded-lg border border-[#dce9e5] bg-white p-2 text-[12px] font-bold" />
             {storedFile ? <p className="mt-2 rounded-lg bg-[#eaf9f2] p-2 text-[12px] font-bold text-[#087766]">{storedFile.fileName} stored.</p> : null}
+            <div className="mt-3 rounded-lg bg-[#f7fbfa] p-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.1em] text-[#087766]">Progress</p>
+              <p className="mt-1 text-[13px] font-black text-[#102323]">{summary.complete}/{values.length} values entered</p>
+              <p className="mt-1 text-[12px] font-bold text-[#7b8986]">{summary.flagged} flagged for review</p>
+            </div>
           </section>
         </aside>
 
-        <section className="min-w-0 rounded-lg border border-[#e2ebe8] bg-white">
+        <section className="mt-3 min-w-0 rounded-lg border border-[#e2ebe8] bg-white">
           <div className="sticky top-0 z-10 flex flex-col gap-3 border-b border-[#edf3f1] bg-white/95 p-3 backdrop-blur md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-[15px] font-black text-[#102323]">Values</h2>
@@ -444,10 +449,10 @@ export default function LabCreateReportPage() {
             <span></span>
           </div>
 
-          <div className="space-y-2 p-3">
+          <div className="space-y-1.5 p-3">
             {values.map((item, index) => (
-              <div key={item.id} className="rounded-lg border border-[#e2ebe8] bg-[#fbfdfc] p-2">
-                <div className="grid min-w-0 gap-2 lg:grid-cols-2 2xl:grid-cols-[44px_1.35fr_0.7fr_0.7fr_0.95fr_116px_1fr_64px] 2xl:items-center">
+              <div key={item.id} className="rounded-lg border border-[#e2ebe8] bg-[#fbfdfc] p-1.5">
+                <div className="grid min-w-0 gap-1.5 lg:grid-cols-2 2xl:grid-cols-[42px_1.35fr_0.7fr_0.7fr_0.95fr_112px_1fr_62px] 2xl:items-center">
                   <p className="hidden text-[12px] font-black text-[#102323] 2xl:block">#{index + 1}</p>
                   <div className="flex items-center justify-between gap-2 2xl:hidden">
                     <p className="text-[12px] font-black text-[#102323]">Value {index + 1}</p>
