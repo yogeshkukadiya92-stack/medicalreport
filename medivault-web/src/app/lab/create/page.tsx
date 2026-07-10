@@ -280,12 +280,19 @@ export default function LabCreateReportPage() {
 
   return (
     <LabShell>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[12px] font-black uppercase tracking-[0.12em] text-[#087766]">Report builder</p>
-          <h1 className="mt-1 text-[24px] font-black text-[#101c1c]">Create lab report</h1>
-        </div>
-        <div className="grid grid-cols-3 rounded-lg border border-[#dce9e5] bg-white p-1">
+      <form onSubmit={handleSubmit}>
+        <header className="flex flex-col gap-3 border-b border-[#dbe6e3] pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-[22px] font-black text-[#17222b]">Create lab report</h1>
+                <span className="rounded border border-[#cfe0dc] bg-white px-2 py-1 text-[10px] font-black text-[#64748b]">DRAFT</span>
+              </div>
+              <p className="mt-0.5 text-[11px] font-semibold text-[#7b8b88]">Clinical entry workspace · changes are kept while this page stays open</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="hidden grid-cols-3 rounded-md border border-[#d7e4e0] bg-white p-0.5 md:grid">
           {[
             ["template", "Template"],
             ["custom", "Custom"],
@@ -298,24 +305,31 @@ export default function LabCreateReportPage() {
                 setMode(value as BuilderMode);
                 if (value === "custom" && !values.length) setValues([emptyValue()]);
               }}
-              className={`h-9 rounded-md px-3 text-[12px] font-bold ${mode === value ? "bg-[#102323] text-white" : "text-[#65716f]"}`}
+                  className={`h-8 rounded px-3 text-[11px] font-bold ${mode === value ? "bg-[#e0f5ef] text-[#0d5c46]" : "text-[#65716f]"}`}
             >
               {label}
             </button>
           ))}
-        </div>
-      </div>
+            </div>
+            <button disabled={isSaving} className="h-9 rounded-md bg-[#0d5c46] px-4 text-[12px] font-black text-white shadow-[0_4px_12px_rgba(13,92,70,0.16)] hover:bg-[#0a4938] disabled:opacity-60">
+              {isSaving ? "Publishing..." : "Verify & publish"}
+            </button>
+          </div>
+        </header>
 
-      <form onSubmit={handleSubmit} className="mt-3">
-        <aside className="grid gap-3 xl:grid-cols-[0.8fr_1.1fr_0.7fr]">
-          <section className="rounded-lg border border-[#e2ebe8] bg-white p-3">
-            <h2 className="text-[15px] font-black text-[#102323]">Client</h2>
-            <label className="mt-3 block">
-              <span className="text-[12px] font-bold text-[#52605d]">Select existing</span>
+        <div className="mt-4 grid min-w-0 gap-3 min-[1050px]:grid-cols-[250px_minmax(0,1fr)]">
+          <aside className="space-y-3">
+            <section className="overflow-hidden rounded-md border border-[#dbe6e3] bg-white">
+              <div className="border-b border-[#e7efed] bg-[#f8fbfa] px-3 py-2.5">
+                <h2 className="text-[12px] font-black text-[#17222b]">Patient & order</h2>
+              </div>
+              <div className="space-y-2 p-3">
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-black uppercase text-[#74837f]">Find client</span>
               <select
                 value={selectedClientId}
                 onChange={(event) => selectClient(event.target.value)}
-                className="mt-1.5 h-9 w-full rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold"
+                    className="clinical-field"
               >
                 <option value="">New client</option>
                 {clients.map((client) => (
@@ -325,17 +339,16 @@ export default function LabCreateReportPage() {
                 ))}
               </select>
             </label>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_0.9fr] xl:grid-cols-1">
               <input
                 value={clientForm.name}
                 onChange={(event) => setClientForm((current) => ({ ...current, name: event.target.value }))}
-                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                  className="clinical-field"
                 placeholder="Client name"
               />
               <input
                 value={clientForm.phone}
                 onChange={(event) => setClientForm((current) => ({ ...current, phone: event.target.value }))}
-                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                  className="clinical-field"
                 placeholder="Phone"
               />
               <div className="grid grid-cols-2 gap-2">
@@ -344,28 +357,54 @@ export default function LabCreateReportPage() {
                   min="0"
                   value={clientForm.age}
                   onChange={(event) => setClientForm((current) => ({ ...current, age: event.target.value }))}
-                  className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                    className="clinical-field"
                   placeholder="Age"
                 />
                 <input
                   value={clientForm.gender}
                   onChange={(event) => setClientForm((current) => ({ ...current, gender: event.target.value }))}
-                  className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                    className="clinical-field"
                   placeholder="Gender"
                 />
               </div>
-            </div>
-          </section>
+                <div className="my-3 h-px bg-[#e7efed]" />
+                <p className="text-[10px] font-black uppercase text-[#74837f]">Order details</p>
+                <input value={reportForm.accessionNumber} onChange={(event) => setReportForm((current) => ({ ...current, accessionNumber: event.target.value }))} className="clinical-field" placeholder="Accession number" />
+                <input value={reportForm.doctorName} onChange={(event) => setReportForm((current) => ({ ...current, doctorName: event.target.value }))} className="clinical-field" placeholder="Ordering doctor" />
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-bold text-[#74837f]">Sample collected</span>
+                  <input type="datetime-local" value={reportForm.sampleCollectedAt} onChange={(event) => setReportForm((current) => ({ ...current, sampleCollectedAt: event.target.value }))} className="clinical-field" />
+                </label>
+              </div>
+            </section>
 
-          <section className="rounded-lg border border-[#e2ebe8] bg-white p-3">
-            <h2 className="text-[15px] font-black text-[#102323]">Report</h2>
+            <section className="rounded-md border border-[#dbe6e3] bg-white p-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-[12px] font-black text-[#17222b]">Attachment</h2>
+                <span className="text-[10px] font-bold text-[#879590]">PDF / image</span>
+              </div>
+              <input ref={inputRef} type="file" accept="application/pdf,image/*" className="mt-2 w-full rounded-md border border-dashed border-[#bfcfcb] bg-[#f8fbfa] p-2 text-[10px] font-bold text-[#52605d]" />
+              {storedFile ? <p className="mt-2 rounded bg-[#eaf9f2] p-2 text-[10px] font-bold text-[#087766]">{storedFile.fileName} stored.</p> : null}
+            </section>
+
+            <section className="rounded-md bg-[#0d5c46] p-3 text-white">
+              <div className="flex items-end justify-between">
+                <div><p className="text-[9px] font-black uppercase text-[#99f6e4]">Completion</p><p className="mt-1 text-[20px] font-black">{summary.complete}/{values.length}</p></div>
+                <p className="text-[11px] font-bold text-white/70">{summary.flagged} flagged</p>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/15"><div className="h-full bg-[#2dd4bf]" style={{ width: `${values.length ? (summary.complete / values.length) * 100 : 0}%` }} /></div>
+            </section>
+          </aside>
+
+          <section className="min-w-0 space-y-3">
+            <section className="rounded-md border border-[#dbe6e3] bg-white p-3">
+              <div className="grid gap-2 md:grid-cols-2 min-[1050px]:grid-cols-[1fr_1.25fr_0.8fr_0.85fr]">
             {mode === "template" ? (
-              <label className="mt-3 block">
-                <span className="text-[12px] font-bold text-[#52605d]">Template</span>
+                  <label className="block"><span className="mb-1 block text-[10px] font-black uppercase text-[#74837f]">Template</span>
                 <select
                   value={selectedTemplateId}
                   onChange={(event) => selectTemplate(event.target.value)}
-                  className="mt-1.5 h-9 w-full rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold"
+                      className="clinical-field"
                 >
                   {(templates.length ? templates : [getLabTemplate("cbc")]).map((template) => (
                     <option key={template.id} value={template.id}>
@@ -374,130 +413,92 @@ export default function LabCreateReportPage() {
                   ))}
                 </select>
               </label>
-            ) : null}
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                ) : <input value={reportForm.reportType} onChange={(event) => setReportForm((current) => ({ ...current, reportType: event.target.value }))} className="clinical-field self-end" placeholder="Report type" />}
+                <label><span className="mb-1 block text-[10px] font-black uppercase text-[#74837f]">Report title</span>
               <input
                 value={reportForm.title}
                 onChange={(event) => setReportForm((current) => ({ ...current, title: event.target.value }))}
-                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                    className="clinical-field"
                 placeholder="Report title"
               />
-              <input
-                value={reportForm.reportType}
-                onChange={(event) => setReportForm((current) => ({ ...current, reportType: event.target.value }))}
-                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
-                placeholder="Report type"
-              />
+                </label>
+                <label><span className="mb-1 block text-[10px] font-black uppercase text-[#74837f]">Report date</span>
               <input
                 type="date"
                 value={reportForm.reportDate}
                 onChange={(event) => setReportForm((current) => ({ ...current, reportDate: event.target.value }))}
-                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                    className="clinical-field"
               />
-              <input
-                value={reportForm.accessionNumber}
-                onChange={(event) => setReportForm((current) => ({ ...current, accessionNumber: event.target.value }))}
-                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
-                placeholder="Accession number"
-              />
-              <input
-                value={reportForm.doctorName}
-                onChange={(event) => setReportForm((current) => ({ ...current, doctorName: event.target.value }))}
-                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
-                placeholder="Doctor name"
-              />
-              <input
-                type="datetime-local"
-                value={reportForm.sampleCollectedAt}
-                onChange={(event) => setReportForm((current) => ({ ...current, sampleCollectedAt: event.target.value }))}
-                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
-              />
+                </label>
+                <label><span className="mb-1 block text-[10px] font-black uppercase text-[#74837f]">Report type</span><input value={reportForm.reportType} onChange={(event) => setReportForm((current) => ({ ...current, reportType: event.target.value }))} className="clinical-field" placeholder="Report type" /></label>
             </div>
           </section>
 
-          <section className="rounded-lg border border-[#e2ebe8] bg-white p-3">
-            <h2 className="text-[15px] font-black text-[#102323]">Attachment</h2>
-            <input ref={inputRef} type="file" accept="application/pdf,image/*" className="mt-2 w-full rounded-lg border border-[#dce9e5] bg-white p-2 text-[12px] font-bold" />
-            {storedFile ? <p className="mt-2 rounded-lg bg-[#eaf9f2] p-2 text-[12px] font-bold text-[#087766]">{storedFile.fileName} stored.</p> : null}
-            <div className="mt-3 rounded-lg bg-[#f7fbfa] p-3">
-              <p className="text-[11px] font-black uppercase tracking-[0.1em] text-[#087766]">Progress</p>
-              <p className="mt-1 text-[13px] font-black text-[#102323]">{summary.complete}/{values.length} values entered</p>
-              <p className="mt-1 text-[12px] font-bold text-[#7b8986]">{summary.flagged} flagged for review</p>
-            </div>
-          </section>
-        </aside>
-
-        <section className="mt-3 min-w-0 rounded-lg border border-[#e2ebe8] bg-white">
-          <div className="sticky top-0 z-10 flex flex-col gap-3 border-b border-[#edf3f1] bg-white/95 p-3 backdrop-blur md:flex-row md:items-center md:justify-between">
+            <section className="min-w-0 overflow-hidden rounded-md border border-[#dbe6e3] bg-white">
+              <div className="flex items-center justify-between border-b border-[#e7efed] px-3 py-2.5">
             <div>
-              <h2 className="text-[15px] font-black text-[#102323]">Values</h2>
-              <p className="mt-0.5 text-[12px] font-bold text-[#6f7f7c]">{summary.complete} entered - {summary.flagged} flagged</p>
+                  <h2 className="text-[13px] font-black text-[#17222b]">{reportForm.reportType || "Report values"}</h2>
+                  <p className="mt-0.5 text-[10px] font-bold text-[#7b8986]">{summary.complete} entered · {summary.flagged} require review</p>
             </div>
-            <button type="button" onClick={() => setValues((current) => [...current, emptyValue()])} className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[12px] font-bold text-[#087766]">
-              Add value
+                <button type="button" onClick={() => setValues((current) => [...current, emptyValue()])} className="h-8 rounded-md border border-[#b8d4cc] px-3 text-[11px] font-black text-[#0d5c46] hover:bg-[#eff8f5]">
+                  + Add parameter
             </button>
           </div>
 
-          <div className="hidden border-b border-[#edf3f1] bg-[#f7fbfa] px-3 py-2 text-[11px] font-black uppercase tracking-[0.08em] text-[#7b8986] 2xl:grid 2xl:grid-cols-[44px_1.35fr_0.7fr_0.7fr_0.95fr_116px_1fr_64px] 2xl:gap-2">
-            <span>No</span>
-            <span>Test</span>
+              <div className="hidden border-b border-[#dfe9e6] bg-[#f7faf9] px-2 py-2 text-[9px] font-black uppercase text-[#74837f] min-[1050px]:grid min-[1050px]:grid-cols-[22px_2fr_56px_62px_82px_76px_52px_22px] min-[1050px]:gap-1.5">
+                <span>#</span><span>Parameter</span>
             <span>Value</span>
-            <span>Unit</span>
-            <span>Range</span>
-            <span>Status</span>
-            <span>Notes</span>
-            <span></span>
+                <span>Unit</span><span>Reference</span><span>Status</span><span>Notes</span><span />
           </div>
 
-          <div className="space-y-1.5 p-3">
+              <div className="divide-y divide-[#e7efed]">
             {values.map((item, index) => (
-              <div key={item.id} className="rounded-lg border border-[#e2ebe8] bg-[#fbfdfc] p-1.5">
-                <div className="grid min-w-0 gap-1.5 lg:grid-cols-2 2xl:grid-cols-[42px_1.35fr_0.7fr_0.7fr_0.95fr_112px_1fr_62px] 2xl:items-center">
-                  <p className="hidden text-[12px] font-black text-[#102323] 2xl:block">#{index + 1}</p>
-                  <div className="flex items-center justify-between gap-2 2xl:hidden">
-                    <p className="text-[12px] font-black text-[#102323]">Value {index + 1}</p>
+                  <div key={item.id} className={`relative p-2 ${item.status === "Normal" ? "border-l-2 border-l-[#22a06b]" : item.status === "Watch" ? "border-l-2 border-l-[#eab308]" : "border-l-2 border-l-[#ef654f]"}`}>
+                    <div className="grid min-w-0 gap-2 sm:grid-cols-2 min-[1050px]:grid-cols-[20px_2fr_56px_62px_82px_76px_52px_20px] min-[1050px]:items-center min-[1050px]:gap-1.5">
+                      <p className="hidden text-[10px] font-black text-[#8a9894] min-[1050px]:block">{index + 1}</p>
+                      <div className="col-span-2 flex items-center justify-between min-[1050px]:hidden"><p className="text-[11px] font-black text-[#17222b]">Parameter {index + 1}</p>
                     {values.length > 1 ? (
-                      <button type="button" onClick={() => setValues((current) => current.filter((value) => value.id !== item.id))} className="text-[12px] font-bold text-[#ba563d]">
+                          <button type="button" onClick={() => setValues((current) => current.filter((value) => value.id !== item.id))} className="text-[10px] font-bold text-[#ba563d]">
                         Remove
                       </button>
                     ) : null}
                   </div>
-                  <input value={item.name} onChange={(event) => updateValue(item.id, { name: event.target.value })} className="h-9 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Test name" />
-                  <input value={item.value} onChange={(event) => updateValue(item.id, { value: event.target.value })} className="h-9 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Value" />
-                  <input value={item.unit} onChange={(event) => updateValue(item.id, { unit: event.target.value })} className="h-9 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Unit" />
-                  <input value={item.referenceRange} onChange={(event) => updateValue(item.id, { referenceRange: event.target.value })} className="h-9 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Reference range" />
-                  <select value={item.status} onChange={(event) => updateValue(item.id, { status: event.target.value as ReportMarker["status"] })} className={`h-9 min-w-0 rounded-lg border border-[#dce9e5] px-3 text-[12px] font-bold ${statusStyles(item.status)}`}>
+                      <input value={item.name} onChange={(event) => updateValue(item.id, { name: event.target.value })} className="clinical-field clinical-cell" placeholder="Test name" />
+                      <input value={item.value} onChange={(event) => updateValue(item.id, { value: event.target.value })} className="clinical-field clinical-cell" placeholder="Value" />
+                      <input value={item.unit} onChange={(event) => updateValue(item.id, { unit: event.target.value })} className="clinical-field clinical-cell" placeholder="Unit" />
+                      <input value={item.referenceRange} onChange={(event) => updateValue(item.id, { referenceRange: event.target.value })} className="clinical-field clinical-cell" placeholder="Reference range" />
+                      <select value={item.status} onChange={(event) => updateValue(item.id, { status: event.target.value as ReportMarker["status"] })} className={`clinical-field clinical-cell ${statusStyles(item.status)}`}>
                     <option>Normal</option>
                     <option>High</option>
                     <option>Low</option>
                     <option>Watch</option>
                   </select>
-                  <input value={item.notes} onChange={(event) => updateValue(item.id, { notes: event.target.value })} className="h-9 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Notes" />
+                      <input value={item.notes} onChange={(event) => updateValue(item.id, { notes: event.target.value })} className="clinical-field clinical-cell" placeholder="Notes" />
                   {values.length > 1 ? (
-                    <button type="button" onClick={() => setValues((current) => current.filter((value) => value.id !== item.id))} className="hidden h-9 rounded-lg border border-[#f2c6bb] bg-white text-[11px] font-bold text-[#ba563d] 2xl:block">
-                      Remove
+                        <button type="button" title="Remove parameter" onClick={() => setValues((current) => current.filter((value) => value.id !== item.id))} className="hidden h-8 text-[18px] font-bold text-[#ba563d] min-[1050px]:block">
+                          ×
                     </button>
                   ) : (
-                    <span className="hidden 2xl:block" />
+                        <span className="hidden min-[1050px]:block" />
                   )}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="sticky bottom-0 border-t border-[#edf3f1] bg-white/95 p-3 backdrop-blur">
+              <div className="border-t border-[#dfe9e6] bg-[#f8fbfa] p-3">
             {duplicateReport ? (
-              <p className="mb-3 rounded-lg bg-[#fff7d8] p-3 text-[12px] font-bold text-[#8a6500]">
+                  <p className="mb-2 rounded bg-[#fff7d8] p-2 text-[11px] font-bold text-[#8a6500]">
                 Duplicate warning: {duplicateReport.reportType} already exists for this phone on {duplicateReport.reportDate}.
               </p>
             ) : null}
-            {message ? <p className="mb-3 rounded-lg bg-[#eaf9f2] p-3 text-[12px] font-bold text-[#087766]">{message}</p> : null}
-            {error ? <p className="mb-3 rounded-lg bg-[#fff0ec] p-3 text-[12px] font-bold text-[#ba563d]">{error}</p> : null}
-            <button disabled={isSaving} className="h-10 w-full rounded-lg bg-[#0a7d6e] text-[14px] font-bold text-white disabled:opacity-60">
-              {isSaving ? "Publishing..." : "Save and publish"}
-            </button>
+                {message ? <p className="mb-2 rounded bg-[#eaf9f2] p-2 text-[11px] font-bold text-[#087766]">{message}</p> : null}
+                {error ? <p className="mb-2 rounded bg-[#fff0ec] p-2 text-[11px] font-bold text-[#ba563d]">{error}</p> : null}
+                <div className="flex items-center justify-between gap-3"><p className="text-[10px] font-semibold text-[#74837f]">Status colors update automatically from reference ranges.</p><button disabled={isSaving} className="h-9 shrink-0 rounded-md bg-[#0d5c46] px-4 text-[11px] font-black text-white disabled:opacity-60">{isSaving ? "Publishing..." : "Verify & publish"}</button></div>
           </div>
         </section>
+          </section>
+        </div>
       </form>
     </LabShell>
   );

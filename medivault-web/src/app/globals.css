@@ -16,7 +16,7 @@ html {
 
 body {
   min-height: 100dvh;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   background: #eef3f1;
@@ -26,6 +26,30 @@ body {
   text-rendering: geometricPrecision;
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+.clinical-field {
+  height: 36px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d9e4e1;
+  border-radius: 6px;
+  background: #fff;
+  padding: 0 10px;
+  color: #17222b;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.clinical-field:hover { border-color: #afc9c2; }
+.clinical-field:focus { border-color: #14b8a6; box-shadow: 0 0 0 3px rgba(20, 184, 166, .12); outline: none; }
+
+.clinical-cell {
+  height: 34px;
+  padding-right: 7px;
+  padding-left: 7px;
+  font-size: 10px;
 }
 
 input,
@@ -71,7 +95,24 @@ a:active {
 
 /* Focus states for accessibility */
 button:focus-visible,
-a:focus-visible {
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
   outline: 2px solid #0d9488;
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

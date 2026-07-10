@@ -46,17 +46,17 @@ export function LabShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <main className="min-h-screen bg-[#e8efed] text-[#101c1c]">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col lg:flex-row">
-        <aside className="border-b border-[#dce9e5] bg-white px-4 py-4 lg:sticky lg:top-0 lg:min-h-screen lg:w-[220px] lg:border-b-0 lg:border-r lg:px-4">
+    <main className="min-h-screen bg-[#f2f6f5] text-[#17222b]">
+      <div className="flex min-h-screen w-full flex-col lg:flex-row">
+        <aside className="border-b border-[#dce9e5] bg-[#064e3b] px-4 py-3 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[216px] lg:flex-col lg:border-b-0 lg:border-r-0 lg:px-3 lg:py-4">
           <div className="flex items-center justify-between gap-3 lg:block">
             <Link href="/lab" className="flex items-center gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-lg bg-[#102323] text-[#99f0db] shadow-[0_14px_30px_rgba(16,35,35,0.16)]">
+              <span className="grid h-9 w-9 place-items-center rounded-md border border-white/15 bg-white/10 text-[#7ce7d2]">
                 <Icon name="shield" className="h-5 w-5" />
               </span>
               <span>
-            <span className="block text-[14px] font-black text-[#102323]">MediVault Lab</span>
-                <span className="block text-[12px] font-bold text-[#6f7f7c]">Operations workspace</span>
+                <span className="block text-[14px] font-black text-white">MediVault <span className="text-[#5eead4]">Lab</span></span>
+                <span className="block text-[10px] font-bold text-white/55">Clinical operations</span>
               </span>
             </Link>
             <div className="lg:hidden">
@@ -64,15 +64,15 @@ export function LabShell({ children }: { children: ReactNode }) {
             </div>
           </div>
 
-          <nav className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:mt-7 lg:block lg:space-y-1.5 lg:overflow-visible lg:pb-0">
+          <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:mt-6 lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">
             {labNav.map((item) => {
               const isActive = pathname === item.href || (item.href !== "/lab" && pathname.startsWith(item.href));
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex h-10 min-w-max items-center gap-3 rounded-lg px-3 text-[12px] font-bold ${
-                    isActive ? "bg-[#0a7d6e] text-white shadow-[0_10px_24px_rgba(10,125,110,0.18)]" : "text-[#52605d] hover:bg-[#f1f6f4] hover:text-[#102323]"
+                  className={`flex h-9 min-w-max items-center gap-3 rounded-md px-3 text-[12px] font-bold ${
+                    isActive ? "bg-[#14b8a6] text-[#052e2b] shadow-[inset_3px_0_0_#99f6e4]" : "text-white/72 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   <Icon name={item.icon} className="h-4 w-4" />
@@ -82,21 +82,21 @@ export function LabShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <div className="mt-6 hidden rounded-lg border border-[#dce9e5] bg-[#f7fbfa] p-3 lg:block">
-            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[#087766]">Current role</p>
-            <p className="mt-2 text-[14px] font-black text-[#102323]">Pathologist admin</p>
-            <p className="mt-1 text-[12px] font-semibold text-[#6f7f7c]">Branch: Main lab</p>
+          <div className="mt-auto hidden border-t border-white/12 pt-4 lg:block">
+            <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#5eead4]">Current workspace</p>
+            <p className="mt-1.5 text-[12px] font-black text-white">Pathologist admin</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-white/55">Main lab · Ahmedabad</p>
           </div>
 
-          <div className="mt-4 hidden lg:block">
+          <div className="mt-3 hidden lg:block">
             <SignOutButton />
-            <Link href="/dashboard" className="mt-3 flex h-10 items-center justify-center rounded-lg border border-[#dce9e5] text-[12px] font-bold text-[#52605d]">
+            <Link href="/dashboard" className="mt-2 flex h-9 items-center justify-center rounded-md border border-white/15 text-[11px] font-bold text-white/70 hover:bg-white/10 hover:text-white">
               Client app
             </Link>
           </div>
         </aside>
 
-        <section className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">{children}</section>
+        <section className="min-w-0 flex-1 px-3 py-4 sm:px-5 lg:px-6 lg:py-5">{children}</section>
       </div>
     </main>
   );
