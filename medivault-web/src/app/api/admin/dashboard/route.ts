@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { todayDate } from "@/lib/lab-dashboard";
-import { getLabContext, requireLabPermission } from "@/lib/lab-server";
-import type { LabReport, LabRole } from "@/lib/vault-types";
+import { getLabContext } from "@/lib/lab-server";
+import type { LabReport } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
 
 type TimedReport = Pick<LabReport, "publishedAt" | "sampleCollectedAt">;
+type AdminRole = "lab_admin" | "lab_staff" | "pathologist" | "technician" | "collector" | "cashier";
 
 function averageMinutes(reports: TimedReport[]) {
   const durations = reports.flatMap((report) => {
@@ -25,14 +26,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: context.error }, { status: context.status });
   }
 
-  const permissionError = requireLabPermission(context.labUser, "analytics:view");
-  if (permissionError) {
-    return NextResponse.json({ error: permissionError.error }, { status: permissionError.status });
-  }
-
   const labId = context.lab.id;
   const today = todayDate();
-  const roleValues: LabRole[] = ["lab_admin", "lab_staff", "pathologist", "technician", "collector", "cashier"];
+  const roleValues: AdminRole[] = ["lab_admin", "lab_staff", "pathologist", "technician", "collector", "cashier"];
 
   const [
     reportsToday,
@@ -60,7 +56,7 @@ export async function GET(request: NextRequest) {
     context.db.collection<LabReport>("labReports").countDocuments({ labId, reportDate: today, abnormal: { $gt: 0 } }),
     context.db.collection<LabReport>("labReports").countDocuments({ labId, status: "published" }),
     context.db.collection("labClients").countDocuments({ labId }),
-    context.db.collection("labUsers").aggregate<{ _id: LabRole; count: number }>([
+    context.db.collection("labUsers").aggregate<{ _id: AdminRole; count: number }>([
       { $match: { labId } },
       { $group: { _id: "$role", count: { $sum: 1 } } },
     ]).toArray(),
@@ -82,7 +78,7 @@ export async function GET(request: NextRequest) {
     context.db.collection("criticalValueAcknowledgements").countDocuments({ labId }),
   ]);
 
-  const roleCounts = Object.fromEntries(roleValues.map((role) => [role, 0])) as Record<LabRole, number>;
+  const roleCounts = Object.fromEntries(roleValues.map((role) => [role, 0])) as Record<AdminRole, number>;
   for (const row of staffRows) {
     if (row._id in roleCounts) roleCounts[row._id] = row.count;
   }

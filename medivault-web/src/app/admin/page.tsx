@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/mobile-shell";
-import type { LabProfile, LabRole } from "@/lib/vault-types";
+import type { LabProfile } from "@/lib/vault-types";
+
+type AdminRole = "lab_admin" | "lab_staff" | "pathologist" | "technician" | "collector" | "cashier";
 
 type AdminPayload = {
   generatedAt: string;
@@ -31,11 +33,11 @@ type AdminPayload = {
     runningJobs: number;
     specimens: number;
   };
-  roleCounts: Record<LabRole, number>;
+  roleCounts: Record<AdminRole, number>;
   workspace: { lastActivityAt: string | null; status: "active" };
 };
 
-const roleRows: Array<{ role: LabRole; label: string; scope: string }> = [
+const roleRows: Array<{ role: AdminRole; label: string; scope: string }> = [
   { role: "lab_admin", label: "Admin", scope: "Settings, billing, users and audit" },
   { role: "pathologist", label: "Pathologist", scope: "Verify, publish and correct reports" },
   { role: "technician", label: "Technician", scope: "Result entry, analyzer review and QC" },
