@@ -27,7 +27,7 @@ type StoredFile = {
   fileSizeBytes: number;
 };
 
-const emptyClient = { age: "", countryCode: "+91", gender: "", name: "", phone: "" };
+const emptyClient = { age: "", gender: "", name: "", phone: "" };
 const createEmptyReport = () => ({
   accessionNumber: "",
   doctorName: "",
@@ -131,7 +131,7 @@ export default function LabCreateReportPage() {
   }, [isConfigured, session?.access_token, status]);
 
   const duplicateReport = useMemo(() => {
-    const normalizedPhone = normalizePhone(clientForm.phone, clientForm.countryCode);
+    const normalizedPhone = normalizePhone(clientForm.phone);
     if (!normalizedPhone || !reportForm.reportType || !reportForm.reportDate) return null;
     return reports.find(
       (report) =>
@@ -139,7 +139,7 @@ export default function LabCreateReportPage() {
         report.reportType === reportForm.reportType &&
         report.reportDate === reportForm.reportDate,
     );
-  }, [clientForm.countryCode, clientForm.phone, reportForm.reportDate, reportForm.reportType, reports]);
+  }, [clientForm.phone, reportForm.reportDate, reportForm.reportType, reports]);
 
   const summary = useMemo(() => {
     const completeValues = values.filter((value) => value.name.trim() && value.value.trim());
@@ -169,7 +169,6 @@ export default function LabCreateReportPage() {
         setSelectedClientId(linkedClient.id);
         setClientForm({
           age: linkedClient.age ? String(linkedClient.age) : "",
-          countryCode: linkedClient.countryCode ?? "+91",
           gender: linkedClient.gender ?? "",
           name: linkedClient.name,
           phone: linkedClient.phone,
@@ -188,7 +187,6 @@ export default function LabCreateReportPage() {
     if (!client) return;
     setClientForm({
       age: client.age ? String(client.age) : "",
-      countryCode: client.countryCode ?? "+91",
       gender: client.gender ?? "",
       name: client.name,
       phone: client.phone,
@@ -284,8 +282,8 @@ export default function LabCreateReportPage() {
     <LabShell>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[13px] font-bold text-[#087766]">Report builder</p>
-          <h1 className="mt-1 text-[28px] font-black text-[#101c1c]">Create lab report</h1>
+          <p className="text-[12px] font-black uppercase tracking-[0.12em] text-[#087766]">Report builder</p>
+          <h1 className="mt-1 text-[24px] font-black text-[#101c1c]">Create lab report</h1>
         </div>
         <div className="grid grid-cols-3 rounded-lg border border-[#dce9e5] bg-white p-1">
           {[
@@ -308,74 +306,66 @@ export default function LabCreateReportPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-5 grid gap-5 xl:grid-cols-[380px_1fr]">
-        <aside className="space-y-4">
-          <section className="rounded-lg border border-[#e2ebe8] bg-white p-4">
-            <h2 className="text-[16px] font-black text-[#102323]">Client</h2>
-            <label className="mt-4 block">
+      <form onSubmit={handleSubmit} className="mt-4 grid gap-4 xl:grid-cols-[320px_1fr] 2xl:grid-cols-[340px_1fr]">
+        <aside className="space-y-3">
+          <section className="rounded-lg border border-[#e2ebe8] bg-white p-3">
+            <h2 className="text-[15px] font-black text-[#102323]">Client</h2>
+            <label className="mt-3 block">
               <span className="text-[12px] font-bold text-[#52605d]">Select existing</span>
               <select
                 value={selectedClientId}
                 onChange={(event) => selectClient(event.target.value)}
-                className="mt-2 h-11 w-full rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold"
+                className="mt-1.5 h-9 w-full rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold"
               >
                 <option value="">New client</option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
-                    {client.name} - {client.countryCode ?? "+91"} {client.phone}
+                    {client.name} - {client.phone}
                   </option>
                 ))}
               </select>
             </label>
-            <div className="mt-3 grid gap-3">
+            <div className="mt-2 grid gap-2">
               <input
                 value={clientForm.name}
                 onChange={(event) => setClientForm((current) => ({ ...current, name: event.target.value }))}
-                className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
                 placeholder="Client name"
               />
-              <div className="grid grid-cols-[90px_1fr] gap-2">
-                <input
-                  value={clientForm.countryCode}
-                  onChange={(event) => setClientForm((current) => ({ ...current, countryCode: event.target.value }))}
-                  className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
-                  placeholder="+91"
-                />
-                <input
-                  value={clientForm.phone}
-                  onChange={(event) => setClientForm((current) => ({ ...current, phone: event.target.value }))}
-                  className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
-                  placeholder="Mobile number"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+              <input
+                value={clientForm.phone}
+                onChange={(event) => setClientForm((current) => ({ ...current, phone: event.target.value }))}
+                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                placeholder="Phone"
+              />
+              <div className="grid grid-cols-2 gap-2">
                 <input
                   type="number"
                   min="0"
                   value={clientForm.age}
                   onChange={(event) => setClientForm((current) => ({ ...current, age: event.target.value }))}
-                  className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                  className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
                   placeholder="Age"
                 />
                 <input
                   value={clientForm.gender}
                   onChange={(event) => setClientForm((current) => ({ ...current, gender: event.target.value }))}
-                  className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                  className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
                   placeholder="Gender"
                 />
               </div>
             </div>
           </section>
 
-          <section className="rounded-lg border border-[#e2ebe8] bg-white p-4">
-            <h2 className="text-[16px] font-black text-[#102323]">Report</h2>
+          <section className="rounded-lg border border-[#e2ebe8] bg-white p-3">
+            <h2 className="text-[15px] font-black text-[#102323]">Report</h2>
             {mode === "template" ? (
-              <label className="mt-4 block">
+              <label className="mt-3 block">
                 <span className="text-[12px] font-bold text-[#52605d]">Template</span>
                 <select
                   value={selectedTemplateId}
                   onChange={(event) => selectTemplate(event.target.value)}
-                  className="mt-2 h-11 w-full rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold"
+                  className="mt-1.5 h-9 w-full rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold"
                 >
                   {(templates.length ? templates : [getLabTemplate("cbc")]).map((template) => (
                     <option key={template.id} value={template.id}>
@@ -385,93 +375,112 @@ export default function LabCreateReportPage() {
                 </select>
               </label>
             ) : null}
-            <div className="mt-3 grid gap-3">
+            <div className="mt-2 grid gap-2">
               <input
                 value={reportForm.title}
                 onChange={(event) => setReportForm((current) => ({ ...current, title: event.target.value }))}
-                className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
                 placeholder="Report title"
               />
               <input
                 value={reportForm.reportType}
                 onChange={(event) => setReportForm((current) => ({ ...current, reportType: event.target.value }))}
-                className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
                 placeholder="Report type"
               />
               <input
                 type="date"
                 value={reportForm.reportDate}
                 onChange={(event) => setReportForm((current) => ({ ...current, reportDate: event.target.value }))}
-                className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
               />
               <input
                 value={reportForm.accessionNumber}
                 onChange={(event) => setReportForm((current) => ({ ...current, accessionNumber: event.target.value }))}
-                className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
                 placeholder="Accession number"
               />
               <input
                 value={reportForm.doctorName}
                 onChange={(event) => setReportForm((current) => ({ ...current, doctorName: event.target.value }))}
-                className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
                 placeholder="Doctor name"
               />
               <input
                 type="datetime-local"
                 value={reportForm.sampleCollectedAt}
                 onChange={(event) => setReportForm((current) => ({ ...current, sampleCollectedAt: event.target.value }))}
-                className="h-11 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
+                className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
               />
             </div>
           </section>
 
-          <section className="rounded-lg border border-[#e2ebe8] bg-white p-4">
-            <h2 className="text-[16px] font-black text-[#102323]">Attachment</h2>
-            <input ref={inputRef} type="file" accept="application/pdf,image/*" className="mt-4 w-full rounded-lg border border-[#dce9e5] bg-white p-3 text-[13px] font-bold" />
-            {storedFile ? <p className="mt-3 rounded-lg bg-[#eaf9f2] p-3 text-[12px] font-bold text-[#087766]">{storedFile.fileName} stored.</p> : null}
+          <section className="rounded-lg border border-[#e2ebe8] bg-white p-3">
+            <h2 className="text-[15px] font-black text-[#102323]">Attachment</h2>
+            <input ref={inputRef} type="file" accept="application/pdf,image/*" className="mt-2 w-full rounded-lg border border-[#dce9e5] bg-white p-2 text-[12px] font-bold" />
+            {storedFile ? <p className="mt-2 rounded-lg bg-[#eaf9f2] p-2 text-[12px] font-bold text-[#087766]">{storedFile.fileName} stored.</p> : null}
           </section>
         </aside>
 
         <section className="min-w-0 rounded-lg border border-[#e2ebe8] bg-white">
-          <div className="flex flex-col gap-3 border-b border-[#edf3f1] p-4 md:flex-row md:items-center md:justify-between">
+          <div className="sticky top-0 z-10 flex flex-col gap-3 border-b border-[#edf3f1] bg-white/95 p-3 backdrop-blur md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-[16px] font-black text-[#102323]">Values</h2>
-              <p className="mt-1 text-[12px] font-bold text-[#6f7f7c]">{summary.complete} entered - {summary.flagged} flagged</p>
+              <h2 className="text-[15px] font-black text-[#102323]">Values</h2>
+              <p className="mt-0.5 text-[12px] font-bold text-[#6f7f7c]">{summary.complete} entered - {summary.flagged} flagged</p>
             </div>
-            <button type="button" onClick={() => setValues((current) => [...current, emptyValue()])} className="h-10 rounded-lg border border-[#dce9e5] px-4 text-[12px] font-bold text-[#087766]">
+            <button type="button" onClick={() => setValues((current) => [...current, emptyValue()])} className="h-9 rounded-lg border border-[#dce9e5] px-3 text-[12px] font-bold text-[#087766]">
               Add value
             </button>
           </div>
 
-          <div className="space-y-3 p-4">
+          <div className="hidden border-b border-[#edf3f1] bg-[#f7fbfa] px-3 py-2 text-[11px] font-black uppercase tracking-[0.08em] text-[#7b8986] 2xl:grid 2xl:grid-cols-[44px_1.35fr_0.7fr_0.7fr_0.95fr_116px_1fr_64px] 2xl:gap-2">
+            <span>No</span>
+            <span>Test</span>
+            <span>Value</span>
+            <span>Unit</span>
+            <span>Range</span>
+            <span>Status</span>
+            <span>Notes</span>
+            <span></span>
+          </div>
+
+          <div className="space-y-2 p-3">
             {values.map((item, index) => (
-              <div key={item.id} className="rounded-lg border border-[#e2ebe8] bg-[#fbfdfc] p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-[12px] font-black text-[#102323]">Value {index + 1}</p>
-                  {values.length > 1 ? (
-                    <button type="button" onClick={() => setValues((current) => current.filter((value) => value.id !== item.id))} className="text-[12px] font-bold text-[#ba563d]">
-                      Remove
-                    </button>
-                  ) : null}
-                </div>
-                <div className="mt-3 grid min-w-0 gap-2 lg:grid-cols-2 2xl:grid-cols-[1.3fr_0.8fr_0.7fr_1fr_130px]">
-                  <input value={item.name} onChange={(event) => updateValue(item.id, { name: event.target.value })} className="h-10 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Test name" />
-                  <input value={item.value} onChange={(event) => updateValue(item.id, { value: event.target.value })} className="h-10 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Value" />
-                  <input value={item.unit} onChange={(event) => updateValue(item.id, { unit: event.target.value })} className="h-10 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Unit" />
-                  <input value={item.referenceRange} onChange={(event) => updateValue(item.id, { referenceRange: event.target.value })} className="h-10 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Reference range" />
-                  <select value={item.status} onChange={(event) => updateValue(item.id, { status: event.target.value as ReportMarker["status"] })} className={`h-10 min-w-0 rounded-lg border border-[#dce9e5] px-3 text-[12px] font-bold ${statusStyles(item.status)}`}>
+              <div key={item.id} className="rounded-lg border border-[#e2ebe8] bg-[#fbfdfc] p-2">
+                <div className="grid min-w-0 gap-2 lg:grid-cols-2 2xl:grid-cols-[44px_1.35fr_0.7fr_0.7fr_0.95fr_116px_1fr_64px] 2xl:items-center">
+                  <p className="hidden text-[12px] font-black text-[#102323] 2xl:block">#{index + 1}</p>
+                  <div className="flex items-center justify-between gap-2 2xl:hidden">
+                    <p className="text-[12px] font-black text-[#102323]">Value {index + 1}</p>
+                    {values.length > 1 ? (
+                      <button type="button" onClick={() => setValues((current) => current.filter((value) => value.id !== item.id))} className="text-[12px] font-bold text-[#ba563d]">
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                  <input value={item.name} onChange={(event) => updateValue(item.id, { name: event.target.value })} className="h-9 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Test name" />
+                  <input value={item.value} onChange={(event) => updateValue(item.id, { value: event.target.value })} className="h-9 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Value" />
+                  <input value={item.unit} onChange={(event) => updateValue(item.id, { unit: event.target.value })} className="h-9 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Unit" />
+                  <input value={item.referenceRange} onChange={(event) => updateValue(item.id, { referenceRange: event.target.value })} className="h-9 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Reference range" />
+                  <select value={item.status} onChange={(event) => updateValue(item.id, { status: event.target.value as ReportMarker["status"] })} className={`h-9 min-w-0 rounded-lg border border-[#dce9e5] px-3 text-[12px] font-bold ${statusStyles(item.status)}`}>
                     <option>Normal</option>
                     <option>High</option>
                     <option>Low</option>
                     <option>Watch</option>
                   </select>
+                  <input value={item.notes} onChange={(event) => updateValue(item.id, { notes: event.target.value })} className="h-9 min-w-0 rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Notes" />
+                  {values.length > 1 ? (
+                    <button type="button" onClick={() => setValues((current) => current.filter((value) => value.id !== item.id))} className="hidden h-9 rounded-lg border border-[#f2c6bb] bg-white text-[11px] font-bold text-[#ba563d] 2xl:block">
+                      Remove
+                    </button>
+                  ) : (
+                    <span className="hidden 2xl:block" />
+                  )}
                 </div>
-                <input value={item.notes} onChange={(event) => updateValue(item.id, { notes: event.target.value })} className="mt-2 h-10 w-full rounded-lg border border-[#dce9e5] bg-white px-3 text-[13px] font-bold" placeholder="Notes" />
               </div>
             ))}
           </div>
 
-          <div className="border-t border-[#edf3f1] p-4">
+          <div className="sticky bottom-0 border-t border-[#edf3f1] bg-white/95 p-3 backdrop-blur">
             {duplicateReport ? (
               <p className="mb-3 rounded-lg bg-[#fff7d8] p-3 text-[12px] font-bold text-[#8a6500]">
                 Duplicate warning: {duplicateReport.reportType} already exists for this phone on {duplicateReport.reportDate}.
@@ -479,7 +488,7 @@ export default function LabCreateReportPage() {
             ) : null}
             {message ? <p className="mb-3 rounded-lg bg-[#eaf9f2] p-3 text-[12px] font-bold text-[#087766]">{message}</p> : null}
             {error ? <p className="mb-3 rounded-lg bg-[#fff0ec] p-3 text-[12px] font-bold text-[#ba563d]">{error}</p> : null}
-            <button disabled={isSaving} className="h-12 w-full rounded-lg bg-[#0a7d6e] text-[14px] font-bold text-white disabled:opacity-60">
+            <button disabled={isSaving} className="h-10 w-full rounded-lg bg-[#0a7d6e] text-[14px] font-bold text-white disabled:opacity-60">
               {isSaving ? "Publishing..." : "Save and publish"}
             </button>
           </div>
