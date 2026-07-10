@@ -11,9 +11,9 @@ type IconName = "home" | "reports" | "analytics" | "family" | "upload" | "bell" 
 
 const navItems: Array<{ href: string; label: string; icon: IconName }> = [
   { href: "/dashboard", label: "Home", icon: "home" },
-  { href: "/reports", label: "Reports", icon: "reports" },
-  { href: "/upload", label: "Upload", icon: "upload" },
-  { href: "/analytics", label: "Analytics", icon: "analytics" },
+  { href: "/reports", label: "Timeline", icon: "reports" },
+  { href: "/upload", label: "Book", icon: "upload" },
+  { href: "/analytics", label: "Trends", icon: "analytics" },
   { href: "/family", label: "Family", icon: "family" },
 ];
 
