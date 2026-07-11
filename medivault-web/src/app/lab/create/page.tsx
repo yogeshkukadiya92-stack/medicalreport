@@ -153,6 +153,11 @@ export default function LabCreateReportPage() {
     const templateId = params.get("template") ?? "";
     const clientId = params.get("clientId") ?? "";
     const phone = params.get("phone") ?? "";
+    const accessionNumber = params.get("accession") ?? "";
+
+    if (accessionNumber) {
+      setReportForm((current) => ({ ...current, accessionNumber }));
+    }
 
     if (templateId) {
       const template = templates.find((item) => item.id === templateId) ?? getLabTemplate(templateId);
