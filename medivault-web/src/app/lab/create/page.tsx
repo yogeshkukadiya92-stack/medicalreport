@@ -71,6 +71,15 @@ function statusStyles(status: ReportMarker["status"]) {
   return "bg-[#eaf9f2] text-[#087766]";
 }
 
+function numericText(value: string) {
+  const match = value.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+function normalizeMetricName(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
 export default function LabCreateReportPage() {
   const { isConfigured, session, status } = useAuth();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -147,6 +156,8 @@ export default function LabCreateReportPage() {
     return { complete: completeValues.length, flagged };
   }, [values]);
 
+  const isBodyCompositionReport = selectedTemplateId === "body-composition" || reportForm.reportType.toLowerCase().includes("body composition") || reportForm.reportType.toLowerCase().includes("bmi");
+
   useEffect(() => {
     if (!isInitialDataLoaded || hasAppliedUrlPrefill || typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -216,6 +227,28 @@ export default function LabCreateReportPage() {
         return next;
       }),
     );
+  }
+
+  function applyBmiEstimate() {
+    setValues((current) => {
+      const height = current.find((item) => normalizeMetricName(item.name) === "height");
+      const weight = current.find((item) => normalizeMetricName(item.name) === "weight");
+      const bmiMetric = current.find((item) => normalizeMetricName(item.name) === "bmi");
+      const heightCm = numericText(height?.value ?? "");
+      const weightKg = numericText(weight?.value ?? "");
+      if (!heightCm || !weightKg || heightCm <= 0 || weightKg <= 0 || !bmiMetric) return current;
+      const bmi = weightKg / ((heightCm / 100) ** 2);
+      const bmiValue = bmi.toFixed(1);
+      return current.map((item) => {
+        if (item.id !== bmiMetric.id) return item;
+        return {
+          ...item,
+          notes: item.notes || "Auto-calculated from height and weight.",
+          status: statusFromValue(bmiValue, item.referenceRange),
+          value: bmiValue,
+        };
+      });
+    });
   }
 
   async function uploadAttachment() {
@@ -449,6 +482,14 @@ export default function LabCreateReportPage() {
                   + Add parameter
             </button>
           </div>
+              {isBodyCompositionReport ? (
+                <div className="flex flex-col gap-2 border-b border-[#e7efed] bg-[#f8fbfa] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[10px] font-bold text-[#60716d]">BMI, fat, muscle, water, visceral fat, BMR and body score stay saved as normal report parameters.</p>
+                  <button type="button" onClick={applyBmiEstimate} className="h-8 shrink-0 rounded-md bg-[#e0f5ef] px-3 text-[10px] font-black text-[#0d5c46] hover:bg-[#c9eee4]">
+                    Calculate BMI
+                  </button>
+                </div>
+              ) : null}
 
               <div className="hidden border-b border-[#dfe9e6] bg-[#f7faf9] px-2 py-2 text-[9px] font-black uppercase text-[#74837f] min-[1050px]:grid min-[1050px]:grid-cols-[22px_2fr_56px_62px_82px_76px_52px_22px] min-[1050px]:gap-1.5">
                 <span>#</span><span>Parameter</span>
