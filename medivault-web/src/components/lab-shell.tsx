@@ -14,6 +14,7 @@ const labNav = [
   { href: "/lab/clients", icon: "family", label: "Clients" },
   { href: "/lab/create", icon: "upload", label: "Create report" },
   { href: "/lab/reports", icon: "reports", label: "History" },
+  { href: "/lab/pdf", icon: "reports", label: "PDF Studio" },
   { href: "/lab/templates", icon: "shield", label: "Templates" },
   { href: "/lab/settings", icon: "home", label: "Settings" },
   { href: "/admin", icon: "trend", label: "Admin" },
