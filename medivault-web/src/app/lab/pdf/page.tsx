@@ -109,7 +109,7 @@ export default function LabPdfStudioPage() {
       setIsLoading(true);
       setError("");
       try {
-        const response = await fetch("/api/lab/records", { headers: { Authorization: `Bearer ${session?.access_token}` } });
+        const response = await fetch("/api/lab/reports", { headers: { Authorization: `Bearer ${session?.access_token}` } });
         const result = await response.json().catch(() => null);
         if (!response.ok) throw new Error(result?.error ?? "Reports could not be loaded.");
         if (!active) return;
