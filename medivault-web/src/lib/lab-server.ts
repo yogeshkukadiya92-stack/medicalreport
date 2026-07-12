@@ -69,7 +69,7 @@ export async function getLabContext(request: NextRequest): Promise<LabContext> {
     const lab = await db.collection<LabProfile>("labs").findOne({ id: existingLabUser.labId }, { projection: { _id: 0 } });
     if (lab) {
       if (!lab.bookingSlug) {
-        const bookingSlug = `${slugFromText(lab.name)}-${lab.id.replace(/^lab-/, "").slice(0, 8)}`;
+        const bookingSlug = `${slugFromText(lab.name)}-${lab.id.replace(/^lab-/, "").slice(-20)}`;
         await db.collection<LabProfile>("labs").updateOne({ id: lab.id }, { $set: { bookingSlug, updatedAt: isoNow() } });
         lab.bookingSlug = bookingSlug;
       }
@@ -82,7 +82,7 @@ export async function getLabContext(request: NextRequest): Promise<LabContext> {
   const lab: LabProfile = {
     id: labId,
     name: "MediVault Lab",
-    bookingSlug: `medivault-lab-${userId.slice(0, 8)}`,
+    bookingSlug: `medivault-lab-${userId.slice(-20)}`,
     ownerUserId: userId,
     createdAt: now,
     updatedAt: now,
