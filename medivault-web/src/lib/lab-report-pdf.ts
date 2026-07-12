@@ -1,9 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type RGB } from "pdf-lib";
-import { addLabAuditLog, getLabContext } from "@/lib/lab-server";
-import type { LabReport, LabReportValue } from "@/lib/vault-types";
-
-export const runtime = "nodejs";
+import type { LabProfile, LabReport, LabReportValue } from "@/lib/vault-types";
 
 type PdfAccent = "blue" | "burgundy" | "charcoal" | "teal";
 type PdfSections = {
@@ -17,7 +13,7 @@ type PdfSections = {
   statuses?: boolean;
   summary?: boolean;
 };
-type PdfInput = {
+export type LabReportPdfInput = {
   accent?: PdfAccent;
   clinicalNotes?: string;
   customFields?: Array<{ label?: string; value?: string }>;
@@ -104,34 +100,7 @@ function safeFileName(report: LabReport) {
   return `${base || "lab-report"}.pdf`;
 }
 
-export async function GET(request: NextRequest) {
-  const context = await getLabContext(request);
-  if ("error" in context) return NextResponse.json({ error: context.error }, { status: context.status });
-
-  const reports = await context.db
-    .collection<LabReport>("labReports")
-    .find({ labId: context.lab.id }, { projection: { _id: 0 } })
-    .sort({ createdAt: -1 })
-    .limit(250)
-    .toArray();
-
-  return NextResponse.json({ lab: context.lab, reports });
-}
-
-export async function POST(request: NextRequest) {
-  const context = await getLabContext(request);
-  if ("error" in context) return NextResponse.json({ error: context.error }, { status: context.status });
-
-  const body = (await request.json().catch(() => ({}))) as PdfInput;
-  const reportId = cleanText(body.reportId, 160);
-  if (!reportId) return NextResponse.json({ error: "Report ID is required." }, { status: 400 });
-
-  const report = await context.db.collection<LabReport>("labReports").findOne(
-    { id: reportId, labId: context.lab.id },
-    { projection: { _id: 0 } },
-  );
-  if (!report) return NextResponse.json({ error: "Report not found." }, { status: 404 });
-
+export async function createLabReportPdf(lab: LabProfile, report: LabReport, body: LabReportPdfInput) {
   const accent = accents[body.accent && body.accent in accents ? body.accent : "teal"];
   const sections: Required<PdfSections> = {
     accession: body.sections?.accession !== false,
@@ -151,7 +120,7 @@ export async function POST(request: NextRequest) {
 
   const pdf = await PDFDocument.create();
   pdf.setTitle(cleanText(body.customTitle, 140) || report.title);
-  pdf.setAuthor(context.lab.name);
+  pdf.setAuthor(lab.name);
   pdf.setSubject(`${report.reportType} report for ${report.clientName}`);
   pdf.setCreator("MediVault Lab PDF Studio");
   pdf.setCreationDate(new Date());
@@ -171,7 +140,7 @@ export async function POST(request: NextRequest) {
     pages.push(page);
     y = PAGE_HEIGHT - MARGIN;
     if (continued) {
-      page.drawText(pdfText(context.lab.name), { x: MARGIN, y, size: 11, font: bold, color: accent });
+      page.drawText(pdfText(lab.name), { x: MARGIN, y, size: 11, font: bold, color: accent });
       page.drawText("Lab report - continued", { x: PAGE_WIDTH - MARGIN - 112, y, size: 8, font: regular, color: muted });
       y -= 24;
       page.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_WIDTH - MARGIN, y }, thickness: 1, color: border });
@@ -202,10 +171,10 @@ export async function POST(request: NextRequest) {
   };
 
   page.drawRectangle({ x: 0, y: PAGE_HEIGHT - 8, width: PAGE_WIDTH, height: 8, color: accent });
-  page.drawText(pdfText(context.lab.name), { x: MARGIN, y, size: 18, font: bold, color: accent });
+  page.drawText(pdfText(lab.name), { x: MARGIN, y, size: 18, font: bold, color: accent });
   y -= 15;
-  if (sections.labAddress && context.lab.address) drawWrapped(context.lab.address, { size: 7.8, color: muted, maxWidth: 320 });
-  const labContact = [context.lab.phone, report.labReportId].filter(Boolean).join("  |  ");
+  if (sections.labAddress && lab.address) drawWrapped(lab.address, { size: 7.8, color: muted, maxWidth: 320 });
+  const labContact = [lab.phone, report.labReportId].filter(Boolean).join("  |  ");
   if (labContact) drawWrapped(labContact, { size: 7.8, color: muted, maxWidth: 360 });
   y -= 8;
   page.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_WIDTH - MARGIN, y }, thickness: 1.5, color: accent });
@@ -333,19 +302,5 @@ export async function POST(request: NextRequest) {
   });
 
   const bytes = await pdf.save();
-  await addLabAuditLog(context.db, {
-    action: "update",
-    actorUserId: context.userId,
-    labId: context.lab.id,
-    labReportId: report.id,
-    note: "Customized PDF generated from report history.",
-  });
-
-  return new NextResponse(Buffer.from(bytes), {
-    headers: {
-      "Cache-Control": "private, no-store",
-      "Content-Disposition": `attachment; filename="${safeFileName(report)}"`,
-      "Content-Type": "application/pdf",
-    },
-  });
+  return { bytes: Buffer.from(bytes), fileName: safeFileName(report) };
 }

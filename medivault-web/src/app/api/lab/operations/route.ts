@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GET as getDocumentCenter, POST as generateDocument } from "@/app/api/lab/document-center/route";
-import { getLabContext } from "@/lib/lab-server";
+import { createLabReportPdf, type LabReportPdfInput } from "@/lib/lab-report-pdf";
+import { addLabAuditLog, getLabContext } from "@/lib/lab-server";
+import type { LabReport } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
 
@@ -142,10 +143,18 @@ async function readOperations(context: Exclude<Awaited<ReturnType<typeof getLabC
 }
 
 export async function GET(request: NextRequest) {
-  if (request.nextUrl.searchParams.get("view") === "document-center") return getDocumentCenter(request);
-
   const context = await getLabContext(request);
   if ("error" in context) return NextResponse.json({ error: context.error }, { status: context.status });
+
+  if (request.nextUrl.searchParams.get("view") === "document-center") {
+    const reports = await context.db
+      .collection<LabReport>("labReports")
+      .find({ labId: context.lab.id }, { projection: { _id: 0 } })
+      .sort({ createdAt: -1 })
+      .limit(250)
+      .toArray();
+    return NextResponse.json({ lab: context.lab, reports });
+  }
 
   await Promise.all([
     context.db.collection("labOrders").createIndex({ labId: 1, accessionNumber: 1 }, { unique: true }),
@@ -158,15 +167,37 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const requestBody = (await request.clone().json().catch(() => null)) as Record<string, unknown> | null;
-  if (cleanText(requestBody?.action) === "generate_document") return generateDocument(request);
-
   const context = await getLabContext(request);
   if ("error" in context) return NextResponse.json({ error: context.error }, { status: context.status });
 
-  const body = requestBody;
+  const body = (await request.json().catch(() => null)) as (Record<string, unknown> & LabReportPdfInput) | null;
   const action = cleanText(body?.action);
   const now = new Date().toISOString();
+
+  if (action === "generate_document") {
+    const reportId = cleanText(body?.reportId);
+    if (!reportId) return NextResponse.json({ error: "Report ID is required." }, { status: 400 });
+    const report = await context.db.collection<LabReport>("labReports").findOne(
+      { id: reportId, labId: context.lab.id },
+      { projection: { _id: 0 } },
+    );
+    if (!report) return NextResponse.json({ error: "Report not found." }, { status: 404 });
+    const generated = await createLabReportPdf(context.lab, report, body ?? {});
+    await addLabAuditLog(context.db, {
+      action: "update",
+      actorUserId: context.userId,
+      labId: context.lab.id,
+      labReportId: report.id,
+      note: "Customized PDF generated from PDF Studio.",
+    });
+    return new NextResponse(generated.bytes, {
+      headers: {
+        "Cache-Control": "private, no-store",
+        "Content-Disposition": `attachment; filename="${generated.fileName}"`,
+        "Content-Type": "application/pdf",
+      },
+    });
+  }
 
   if (action === "create_order") {
     const patientName = cleanText(body?.patientName);
