@@ -19,6 +19,7 @@ export default function Upload() {
   const { activeMember, addReport, familyMembers, updateReport } = useAppData();
   const [fileName, setFileName] = useState("");
   const [memberId, setMemberId] = useState("");
+  const [reportKind, setReportKind] = useState<"medical" | "body_composition">("medical");
   const [title, setTitle] = useState("");
   const [lab, setLab] = useState("");
   const [message, setMessage] = useState("");
@@ -196,6 +197,7 @@ export default function Upload() {
           memberName: report.memberName,
           mimeType: preparedFile.mimeType,
           originalMimeType: file.type,
+          reportKind,
           title: report.title,
         }),
       });
@@ -270,7 +272,9 @@ export default function Upload() {
             </div>
             <h2 className="mt-5 text-[18px] font-bold text-[#162523]">{fileName || "Select a report file"}</h2>
             <p className="mx-auto mt-2 max-w-[280px] text-[13px] leading-5 text-[#65716f]">
-              PDF, JPG, or PNG. The app will save it, extract key markers, and prepare a doctor-ready summary.
+              {reportKind === "body_composition"
+                ? "Upload a body-composition machine photo or screenshot. BMI, fat, muscle and other metrics will be saved for graphs."
+                : "PDF, JPG, or PNG. The app will save it, extract key markers, and prepare a doctor-ready summary."}
             </p>
           </button>
           <input
@@ -280,6 +284,29 @@ export default function Upload() {
             className="hidden"
             onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")}
           />
+
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-[#dce9e5] bg-white p-1">
+            {[
+              ["medical", "Medical report"],
+              ["body_composition", "Body composition"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  const nextKind = value as "medical" | "body_composition";
+                  setReportKind(nextKind);
+                  if (nextKind === "body_composition") {
+                    setTitle((current) => current || "BMI & Body Composition");
+                    setLab((current) => current || "Body composition scan");
+                  }
+                }}
+                className={`h-10 rounded-md text-[12px] font-bold ${reportKind === value ? "bg-[#102323] text-white" : "text-[#65716f]"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
           <label className="block">
             <span className="text-[12px] font-bold text-[#52605d]">Family member</span>
@@ -294,13 +321,22 @@ export default function Upload() {
 
           <label className="block">
             <span className="text-[12px] font-bold text-[#52605d]">Report title</span>
-            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Complete Blood Count" className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-bold text-[#162523]" />
+            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={reportKind === "body_composition" ? "BMI & Body Composition" : "Complete Blood Count"} className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-bold text-[#162523]" />
           </label>
 
           <label className="block">
-            <span className="text-[12px] font-bold text-[#52605d]">Lab or doctor</span>
-            <input value={lab} onChange={(event) => setLab(event.target.value)} placeholder="Apollo Diagnostics" className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-bold text-[#162523]" />
+            <span className="text-[12px] font-bold text-[#52605d]">{reportKind === "body_composition" ? "Device, gym, clinic or source" : "Lab or doctor"}</span>
+            <input value={lab} onChange={(event) => setLab(event.target.value)} placeholder={reportKind === "body_composition" ? "InBody / Smart scale / Gym scan" : "Apollo Diagnostics"} className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-bold text-[#162523]" />
           </label>
+
+          {reportKind === "body_composition" ? (
+            <div className="rounded-lg border border-[#dce9e5] bg-white p-4">
+              <p className="text-[13px] font-black text-[#162523]">Tracked metrics</p>
+              <p className="mt-1 text-[12px] leading-5 text-[#65716f]">
+                Weight, BMI, body fat, muscle, water, visceral fat, BMR and body score will appear in Analytics with past-history graphs when you upload repeat scans.
+              </p>
+            </div>
+          ) : null}
 
           {error ? <p className="rounded-lg bg-[#fff0ec] p-3 text-[13px] font-bold text-[#ba563d]">{error}</p> : null}
           {message ? <p className="rounded-lg bg-[#eaf9f2] p-3 text-[13px] font-bold text-[#087766]">{message}</p> : null}

@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
     memberName?: string;
     mimeType?: string;
     originalMimeType?: string;
+    reportKind?: string;
     title?: string;
   } | null;
 
@@ -121,12 +122,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const isBodyComposition = body.reportKind === "body_composition" || /body composition|bmi|body scan|inbody|smart scale/i.test(`${title} ${body.lab || ""}`);
   const prompt = [
     imageUrls.length > 1
       ? "Analyze these medical report page images for a personal health vault."
       : "Analyze this medical report page image for a personal health vault.",
+    isBodyComposition
+      ? "This is a BMI/body composition report or machine/photo reading. Prioritize body metrics such as Height, Weight, BMI, Body Fat, Skeletal Muscle, Muscle Mass, Visceral Fat, Subcutaneous Fat, Body Water, Bone Mass, Basal Metabolic Rate, Metabolic Age, Protein, Body Score, WHR, and obesity/fitness score if visible."
+      : "Prioritize clinical lab values and biomarkers visible in the report.",
     "Return only JSON with: title, category, summary, markers.",
     "markers must be an array of {name,value,range,status}; status must be Normal, High, Low, or Watch.",
+    "For body composition values, keep consistent marker names so history graphs work across uploads. Put units in value when visible, for example \"72.4 kg\", \"24.8 %\", or \"1420 kcal\".",
     "Keep summary short, doctor-ready, and avoid diagnosis. Mention that a doctor should review abnormal results.",
     `Patient/member: ${body.memberName || "Family member"}`,
     `Uploaded title: ${title}`,
@@ -187,13 +193,13 @@ export async function POST(request: NextRequest) {
   const completion = await openAiResponse.json();
   const content = completion?.choices?.[0]?.message?.content;
   const parsed = extractJsonObject(content || "{}") as Partial<AnalysisResponse>;
-  const markers = Array.isArray(parsed.markers) ? parsed.markers.slice(0, 8).map(cleanMarker) : fallbackMarkers;
+  const markers = Array.isArray(parsed.markers) ? parsed.markers.slice(0, isBodyComposition ? 16 : 8).map(cleanMarker) : fallbackMarkers;
   const abnormal = markers.filter((marker) => marker.status !== "Normal").length;
 
   return NextResponse.json({
     abnormal,
     aiConfidence: markers.length ? 88 : 60,
-    category: String(parsed.category || "General").slice(0, 40),
+    category: String(parsed.category || (isBodyComposition ? "Body Composition" : "General")).slice(0, 40),
     markers,
     parameters: Math.max(markers.length, 1),
     status: abnormal ? "Needs review" : "Reviewed",

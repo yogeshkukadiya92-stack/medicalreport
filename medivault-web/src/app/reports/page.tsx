@@ -13,6 +13,20 @@ type SourceFilter = "All sources" | "Lab reports" | "Uploaded by you";
 const filters: Filter[] = ["All", "Starred", "Needs review", "Processing", "Reviewed"];
 const sourceFilters: SourceFilter[] = ["All sources", "Lab reports", "Uploaded by you"];
 const biomarkerSuggestions = [
+  "Height",
+  "Weight",
+  "BMI",
+  "Body Fat",
+  "Skeletal Muscle",
+  "Muscle Mass",
+  "Visceral Fat",
+  "Subcutaneous Fat",
+  "Body Water",
+  "Bone Mass",
+  "Basal Metabolic Rate",
+  "Metabolic Age",
+  "Protein",
+  "Body Score",
   "Vitamin D",
   "Vitamin B12",
   "HbA1c",
@@ -40,6 +54,23 @@ const biomarkerSuggestions = [
 ];
 
 type ManualMarkerDraft = ReportMarker & { id: string };
+
+const bodyCompositionPreset: ReportMarker[] = [
+  { name: "Height", value: "", range: "> 0 cm", status: "Watch" },
+  { name: "Weight", value: "", range: "> 0 kg", status: "Watch" },
+  { name: "BMI", value: "", range: "18.5-24.9 kg/m2", status: "Watch" },
+  { name: "Body Fat", value: "", range: "10-25 %", status: "Watch" },
+  { name: "Skeletal Muscle", value: "", range: "30-45 %", status: "Watch" },
+  { name: "Muscle Mass", value: "", range: "> 0 kg", status: "Watch" },
+  { name: "Visceral Fat", value: "", range: "< 10 level", status: "Watch" },
+  { name: "Subcutaneous Fat", value: "", range: "8-20 %", status: "Watch" },
+  { name: "Body Water", value: "", range: "45-65 %", status: "Watch" },
+  { name: "Bone Mass", value: "", range: "> 0 kg", status: "Watch" },
+  { name: "Basal Metabolic Rate", value: "", range: "> 0 kcal", status: "Watch" },
+  { name: "Metabolic Age", value: "", range: "> 0 years", status: "Watch" },
+  { name: "Protein", value: "", range: "16-20 %", status: "Watch" },
+  { name: "Body Score", value: "", range: "70-100 score", status: "Watch" },
+];
 
 const emptyMarker = (): ManualMarkerDraft => ({
   id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -202,6 +233,17 @@ export default function Reports() {
     setManualMarkers((current) => current.map((marker) => (marker.id === id ? { ...marker, ...patch } : marker)));
   }
 
+  function startBodyCompositionEntry() {
+    setManualError("");
+    setManualForm({
+      category: "Body Composition",
+      lab: "Body composition scan",
+      title: "BMI & Body Composition",
+    });
+    setManualMarkers(bodyCompositionPreset.map((marker) => ({ ...marker, id: emptyMarker().id })));
+    setIsManualOpen(true);
+  }
+
   function saveManualReport() {
     setManualError("");
     if (!activeMember) {
@@ -298,16 +340,25 @@ export default function Reports() {
         </div>
 
         {hasMember ? (
-          <button
-            onClick={() => {
-              setManualError("");
-              setIsManualOpen(true);
-            }}
-            className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0a7d6e] text-[14px] font-bold text-white shadow-[0_12px_30px_rgba(10,125,110,0.18)]"
-          >
-            <span className="text-[18px] leading-none">+</span>
-            Add values manually
-          </button>
+          <>
+            <button
+              onClick={() => {
+                setManualError("");
+                setIsManualOpen(true);
+              }}
+              className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0a7d6e] text-[14px] font-bold text-white shadow-[0_12px_30px_rgba(10,125,110,0.18)]"
+            >
+              <span className="text-[18px] leading-none">+</span>
+              Add values manually
+            </button>
+            <button
+              onClick={startBodyCompositionEntry}
+              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-[#b8d4cc] bg-white text-[14px] font-bold text-[#0a7d6e]"
+            >
+              <Icon name="trend" className="h-4 w-4" />
+              Add body composition
+            </button>
+          </>
         ) : null}
 
         <div className="mt-5 rounded-lg bg-[#102323] p-5 text-white shadow-[0_18px_44px_rgba(16,35,35,0.22)]">
@@ -576,6 +627,13 @@ export default function Reports() {
               </div>
 
               <div className="mt-4 grid gap-3">
+                <button
+                  type="button"
+                  onClick={startBodyCompositionEntry}
+                  className="h-10 rounded-lg bg-[#e8f7f2] text-[12px] font-black text-[#087766]"
+                >
+                  Use BMI & body composition preset
+                </button>
                 <input
                   value={manualForm.title}
                   onChange={(event) => setManualForm((current) => ({ ...current, title: event.target.value }))}
