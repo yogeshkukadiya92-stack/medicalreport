@@ -109,7 +109,7 @@ export default function LabPdfStudioPage() {
       setIsLoading(true);
       setError("");
       try {
-        const response = await fetch("/api/lab/document-center", { headers: { Authorization: `Bearer ${session?.access_token}` } });
+        const response = await fetch("/api/lab/operations?view=document-center", { headers: { Authorization: `Bearer ${session?.access_token}` } });
         const result = await response.json().catch(() => null);
         if (!response.ok) throw new Error(result?.error ?? "Reports could not be loaded.");
         if (!active) return;
@@ -163,13 +163,14 @@ export default function LabPdfStudioPage() {
     setError("");
     setMessage("");
     try {
-      const response = await fetch("/api/lab/document-center", {
+      const response = await fetch("/api/lab/operations", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${session.access_token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          action: "generate_document",
           accent,
           clinicalNotes,
           customFields: customFields.map(({ label, value }) => ({ label, value })),

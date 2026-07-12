@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { GET as getDocumentCenter, POST as generateDocument } from "@/app/api/lab/document-center/route";
 import { getLabContext } from "@/lib/lab-server";
 
 export const runtime = "nodejs";
@@ -141,6 +142,8 @@ async function readOperations(context: Exclude<Awaited<ReturnType<typeof getLabC
 }
 
 export async function GET(request: NextRequest) {
+  if (request.nextUrl.searchParams.get("view") === "document-center") return getDocumentCenter(request);
+
   const context = await getLabContext(request);
   if ("error" in context) return NextResponse.json({ error: context.error }, { status: context.status });
 
@@ -155,10 +158,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const requestBody = (await request.clone().json().catch(() => null)) as Record<string, unknown> | null;
+  if (cleanText(requestBody?.action) === "generate_document") return generateDocument(request);
+
   const context = await getLabContext(request);
   if ("error" in context) return NextResponse.json({ error: context.error }, { status: context.status });
 
-  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const body = requestBody;
   const action = cleanText(body?.action);
   const now = new Date().toISOString();
 
