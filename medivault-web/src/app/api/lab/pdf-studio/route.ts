@@ -5,7 +5,6 @@ import type { LabReport, LabReportValue } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
 
-type RouteParams = { params: Promise<{ reportId: string }> };
 type PdfAccent = "blue" | "burgundy" | "charcoal" | "teal";
 type PdfSections = {
   accession?: boolean;
@@ -24,6 +23,7 @@ type PdfInput = {
   customFields?: Array<{ label?: string; value?: string }>;
   customTitle?: string;
   footerText?: string;
+  reportId?: string;
   sections?: PdfSections;
   signatoryName?: string;
   signatoryRole?: string;
@@ -104,10 +104,27 @@ function safeFileName(report: LabReport) {
   return `${base || "lab-report"}.pdf`;
 }
 
-export async function POST(request: NextRequest, { params }: RouteParams) {
-  const { reportId } = await params;
+export async function GET(request: NextRequest) {
   const context = await getLabContext(request);
   if ("error" in context) return NextResponse.json({ error: context.error }, { status: context.status });
+
+  const reports = await context.db
+    .collection<LabReport>("labReports")
+    .find({ labId: context.lab.id }, { projection: { _id: 0 } })
+    .sort({ createdAt: -1 })
+    .limit(250)
+    .toArray();
+
+  return NextResponse.json({ lab: context.lab, reports });
+}
+
+export async function POST(request: NextRequest) {
+  const context = await getLabContext(request);
+  if ("error" in context) return NextResponse.json({ error: context.error }, { status: context.status });
+
+  const body = (await request.json().catch(() => ({}))) as PdfInput;
+  const reportId = cleanText(body.reportId, 160);
+  if (!reportId) return NextResponse.json({ error: "Report ID is required." }, { status: 400 });
 
   const report = await context.db.collection<LabReport>("labReports").findOne(
     { id: reportId, labId: context.lab.id },
@@ -115,7 +132,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   );
   if (!report) return NextResponse.json({ error: "Report not found." }, { status: 404 });
 
-  const body = (await request.json().catch(() => ({}))) as PdfInput;
   const accent = accents[body.accent && body.accent in accents ? body.accent : "teal"];
   const sections: Required<PdfSections> = {
     accession: body.sections?.accession !== false,
