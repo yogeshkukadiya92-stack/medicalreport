@@ -109,7 +109,7 @@ export default function LabPdfStudioPage() {
       setIsLoading(true);
       setError("");
       try {
-        const response = await fetch("/api/lab/pdf-studio", { headers: { Authorization: `Bearer ${session?.access_token}` } });
+        const response = await fetch("/api/lab/document-center", { headers: { Authorization: `Bearer ${session?.access_token}` } });
         const result = await response.json().catch(() => null);
         if (!response.ok) throw new Error(result?.error ?? "Reports could not be loaded.");
         if (!active) return;
@@ -163,7 +163,7 @@ export default function LabPdfStudioPage() {
     setError("");
     setMessage("");
     try {
-      const response = await fetch("/api/lab/pdf-studio", {
+      const response = await fetch("/api/lab/document-center", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${session.access_token}`,
