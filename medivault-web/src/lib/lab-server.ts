@@ -2,7 +2,7 @@ import type { Db } from "mongodb";
 import { NextRequest } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
-import type { LabProfile, LabReportAuditLog, LabUser } from "@/lib/vault-types";
+import type { LabProfile, LabReport, LabReportAuditLog, LabUser } from "@/lib/vault-types";
 
 export type LabContext =
   | {
@@ -50,6 +50,62 @@ async function ensureLabIndexes(db: Db) {
   ]);
 }
 
+type LabCandidate = {
+  lab: LabProfile;
+  labUser?: LabUser;
+  activityCount: number;
+  reportCount: number;
+};
+
+async function findBestLabForUser(db: Db, userId: string): Promise<LabCandidate | null> {
+  const [memberships, ownedLabs, reportLabIds] = await Promise.all([
+    db.collection<LabUser>("labUsers").find({ userId }, { projection: { _id: 0 } }).toArray(),
+    db.collection<LabProfile>("labs").find({ ownerUserId: userId }, { projection: { _id: 0 } }).toArray(),
+    db.collection<LabReport>("labReports").distinct("labId", { createdByLabUserId: userId }),
+  ]);
+  const membershipByLabId = new Map(memberships.map((membership) => [membership.labId, membership]));
+  const labIds = Array.from(new Set([
+    ...memberships.map((membership) => membership.labId),
+    ...ownedLabs.map((lab) => lab.id),
+    ...reportLabIds.filter((labId): labId is string => typeof labId === "string" && Boolean(labId)),
+  ]));
+
+  if (!labIds.length) return null;
+
+  const labs = await db
+    .collection<LabProfile>("labs")
+    .find({ id: { $in: labIds } }, { projection: { _id: 0 } })
+    .toArray();
+  const candidates = await Promise.all(labs.map(async (lab): Promise<LabCandidate> => {
+    const [reportCount, clientCount, orderCount] = await Promise.all([
+      db.collection("labReports").countDocuments({ labId: lab.id }),
+      db.collection("labClients").countDocuments({ labId: lab.id }),
+      db.collection("labOrders").countDocuments({ labId: lab.id }),
+    ]);
+    return {
+      activityCount: reportCount + clientCount + orderCount,
+      lab,
+      labUser: membershipByLabId.get(lab.id),
+      reportCount,
+    };
+  }));
+
+  return candidates.sort((left, right) => {
+    if (right.reportCount !== left.reportCount) return right.reportCount - left.reportCount;
+    if (right.activityCount !== left.activityCount) return right.activityCount - left.activityCount;
+    const rightUpdatedAt = Date.parse(right.labUser?.updatedAt || right.lab.updatedAt || right.lab.createdAt);
+    const leftUpdatedAt = Date.parse(left.labUser?.updatedAt || left.lab.updatedAt || left.lab.createdAt);
+    return (Number.isFinite(rightUpdatedAt) ? rightUpdatedAt : 0) - (Number.isFinite(leftUpdatedAt) ? leftUpdatedAt : 0);
+  })[0] ?? null;
+}
+
+async function ensureBookingSlug(db: Db, lab: LabProfile) {
+  if (lab.bookingSlug) return lab;
+  const bookingSlug = `${slugFromText(lab.name)}-${lab.id.replace(/^lab-/, "").slice(-20)}`;
+  await db.collection<LabProfile>("labs").updateOne({ id: lab.id }, { $set: { bookingSlug, updatedAt: isoNow() } });
+  return { ...lab, bookingSlug };
+}
+
 export async function getLabContext(request: NextRequest): Promise<LabContext> {
   const userId = await getAuthenticatedUserId(request);
 
@@ -64,17 +120,26 @@ export async function getLabContext(request: NextRequest): Promise<LabContext> {
   const db = await getMongoDb();
   await ensureLabIndexes(db);
 
-  const existingLabUser = await db.collection<LabUser>("labUsers").findOne({ userId }, { projection: { _id: 0 } });
-  if (existingLabUser) {
-    const lab = await db.collection<LabProfile>("labs").findOne({ id: existingLabUser.labId }, { projection: { _id: 0 } });
-    if (lab) {
-      if (!lab.bookingSlug) {
-        const bookingSlug = `${slugFromText(lab.name)}-${lab.id.replace(/^lab-/, "").slice(-20)}`;
-        await db.collection<LabProfile>("labs").updateOne({ id: lab.id }, { $set: { bookingSlug, updatedAt: isoNow() } });
-        lab.bookingSlug = bookingSlug;
-      }
-      return { db, lab, labUser: existingLabUser, userId };
+  const candidate = await findBestLabForUser(db, userId);
+  if (candidate) {
+    const now = isoNow();
+    const labUser = candidate.labUser ?? {
+      createdAt: now,
+      id: `${candidate.lab.id}:${userId}`,
+      labId: candidate.lab.id,
+      role: candidate.lab.ownerUserId === userId ? "lab_admin" as const : "lab_staff" as const,
+      updatedAt: now,
+      userId,
+    };
+    if (!candidate.labUser) {
+      await db.collection<LabUser>("labUsers").updateOne(
+        { labId: candidate.lab.id, userId },
+        { $setOnInsert: labUser },
+        { upsert: true },
+      );
     }
+    const lab = await ensureBookingSlug(db, candidate.lab);
+    return { db, lab, labUser, userId };
   }
 
   const now = isoNow();
