@@ -37,6 +37,15 @@ type DietPlan = {
   summary: string;
 };
 
+type CustomTemplate = {
+  id: string;
+  createdAt: string;
+  meals: MealSlot[];
+  note: string;
+  title: string;
+  updatedAt: string;
+};
+
 type ShareLog = {
   id: string;
   channel: "WhatsApp";
@@ -71,7 +80,16 @@ type NutritionClient = {
 
 type NutritionStore = {
   clients: NutritionClient[];
+  customTemplates: CustomTemplate[];
   selectedClientId: string;
+};
+
+type PdfSettings = {
+  clinicName: string;
+  footerNote: string;
+  includeBodyMetrics: boolean;
+  nutritionistName: string;
+  title: string;
 };
 
 const storageKey = "medivault-nutrition-dashboard-v1";
@@ -202,6 +220,8 @@ const starterClients: NutritionClient[] = [
   },
 ];
 
+const emptyCustomTemplates: CustomTemplate[] = [];
+
 const emptyEntry = (): BodyEntry => ({
   id: `body-${Date.now()}`,
   date: new Date().toISOString().slice(0, 10),
@@ -269,6 +289,32 @@ function metricLabel(key: string) {
   return labels[key] ?? key;
 }
 
+function fileSafeName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64) || "diet-plan";
+}
+
+function wrapText(text: string, maxChars: number) {
+  const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+  words.forEach((word) => {
+    const nextLine = line ? `${line} ${word}` : word;
+    if (nextLine.length > maxChars && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = nextLine;
+    }
+  });
+  if (line) lines.push(line);
+  return lines.length ? lines : [""];
+}
+
 function normalizeClient(client: Partial<NutritionClient>): NutritionClient {
   return {
     id: client.id || nextId("nutrition-client"),
@@ -295,11 +341,23 @@ function normalizeClient(client: Partial<NutritionClient>): NutritionClient {
   };
 }
 
+function normalizeTemplate(template: Partial<CustomTemplate>): CustomTemplate {
+  const now = new Date().toISOString();
+  return {
+    id: template.id || nextId("template"),
+    createdAt: template.createdAt || now,
+    meals: Array.isArray(template.meals) ? template.meals : [],
+    note: template.note || "",
+    title: template.title || "Custom template",
+    updatedAt: template.updatedAt || now,
+  };
+}
+
 export function NutritionWorkspace({ section = "dashboard" }: { section?: NutritionSection }) {
   const router = useRouter();
   const { familyMembers, reports } = useAppData();
   const { isConfigLoading, isConfigured, status } = useAuth();
-  const [store, setStore] = useState<NutritionStore>({ clients: starterClients, selectedClientId: starterClients[0]?.id ?? "" });
+  const [store, setStore] = useState<NutritionStore>({ clients: starterClients, customTemplates: emptyCustomTemplates, selectedClientId: starterClients[0]?.id ?? "" });
   const [isLoaded, setIsLoaded] = useState(false);
   const [query, setQuery] = useState("");
   const [clientForm, setClientForm] = useState({ goal: "", name: "", phone: "" });
@@ -307,6 +365,14 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
   const [planSummary, setPlanSummary] = useState("High protein, controlled carbs, daily walk, and weekly body composition review.");
   const [planLanguage, setPlanLanguage] = useState<DietPlan["language"]>("English");
   const [mealRows, setMealRows] = useState<MealSlot[]>(mealTemplate);
+  const [pdfMessage, setPdfMessage] = useState("");
+  const [pdfSettings, setPdfSettings] = useState<PdfSettings>({
+    clinicName: "MediVault Nutrition",
+    footerNote: "This plan is prepared for nutrition coaching and should be adjusted if medical symptoms, allergies, pregnancy, or doctor restrictions apply.",
+    includeBodyMetrics: true,
+    nutritionistName: "",
+    title: "Personalized Diet Plan",
+  });
 
   useEffect(() => {
     if (isConfigured && status === "unauthenticated") {
@@ -322,7 +388,8 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
         const parsed = JSON.parse(stored) as NutritionStore;
         if (Array.isArray(parsed.clients)) {
           const clients = parsed.clients.map(normalizeClient);
-          setStore({ clients, selectedClientId: parsed.selectedClientId || clients[0]?.id || "" });
+          const customTemplates = Array.isArray(parsed.customTemplates) ? parsed.customTemplates.map(normalizeTemplate) : [];
+          setStore({ clients, customTemplates, selectedClientId: parsed.selectedClientId || clients[0]?.id || "" });
         }
       } catch {
         window.localStorage.removeItem(storageKey);
@@ -410,7 +477,7 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
       dietPlans: [],
       shareLogs: [],
     };
-    setStore((current) => ({ clients: [nextClient, ...current.clients], selectedClientId: nextClient.id }));
+    setStore((current) => ({ ...current, clients: [nextClient, ...current.clients], selectedClientId: nextClient.id }));
     setClientForm({ goal: "", name: "", phone: "" });
   }
 
@@ -475,6 +542,163 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
     setMealRows(template.meals.map((meal) => ({ ...meal, id: nextId("meal") })));
     setPlanSummary(template.note);
     router.push("/nutrition/diet-builder");
+  }
+
+  function applyCustomTemplate(template: CustomTemplate) {
+    setMealRows(template.meals.map((meal) => ({ ...meal, id: nextId("meal") })));
+    setPlanSummary(template.note);
+    router.push("/nutrition/diet-builder");
+  }
+
+  function saveCurrentAsTemplate() {
+    const title = window.prompt("Template name", selectedClient ? `${selectedClient.goal} template` : "Custom diet template");
+    if (!title?.trim()) return;
+    const now = new Date().toISOString();
+    const nextTemplate: CustomTemplate = {
+      id: nextId("template"),
+      createdAt: now,
+      meals: mealRows.map((meal) => ({ ...meal, id: nextId("meal") })),
+      note: planSummary,
+      title: title.trim(),
+      updatedAt: now,
+    };
+    setStore((current) => ({ ...current, customTemplates: [nextTemplate, ...current.customTemplates] }));
+  }
+
+  function updateCustomTemplate(templateId: string, patch: Partial<Pick<CustomTemplate, "meals" | "note" | "title">>) {
+    setStore((current) => ({
+      ...current,
+      customTemplates: current.customTemplates.map((template) =>
+        template.id === templateId ? { ...template, ...patch, updatedAt: new Date().toISOString() } : template,
+      ),
+    }));
+  }
+
+  function saveBuilderIntoTemplate(templateId: string) {
+    updateCustomTemplate(templateId, {
+      meals: mealRows.map((meal) => ({ ...meal, id: nextId("meal") })),
+      note: planSummary,
+    });
+  }
+
+  function deleteCustomTemplate(templateId: string) {
+    setStore((current) => ({ ...current, customTemplates: current.customTemplates.filter((template) => template.id !== templateId) }));
+  }
+
+  async function downloadDietPdf() {
+    if (!selectedClient) return;
+    setPdfMessage("Creating PDF...");
+    const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+    const pdf = await PDFDocument.create();
+    const regular = await pdf.embedFont(StandardFonts.Helvetica);
+    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+    const accent = rgb(0.04, 0.49, 0.43);
+    const dark = rgb(0.06, 0.14, 0.14);
+    const muted = rgb(0.38, 0.45, 0.43);
+    const light = rgb(0.93, 0.97, 0.95);
+    const border = rgb(0.82, 0.9, 0.87);
+    const draftPlan: DietPlan = selectedPlan ?? {
+      id: "draft",
+      createdAt: new Date().toISOString(),
+      goal: selectedClient.goal,
+      language: planLanguage,
+      meals: mealRows,
+      summary: planSummary,
+    };
+
+    let page = pdf.addPage([595, 842]);
+    let y = 790;
+    const margin = 42;
+    const pageWidth = page.getWidth();
+
+    function addPageIfNeeded(nextHeight = 52) {
+      if (y - nextHeight > 48) return;
+      page = pdf.addPage([595, 842]);
+      y = 790;
+    }
+
+    function text(value: string, x: number, size = 10, font = regular, color = dark) {
+      page.drawText(value, { x, y, size, font, color });
+    }
+
+    function labelValue(label: string, value: string, x: number, width: number) {
+      page.drawRectangle({ x, y: y - 34, width, height: 44, color: light, borderColor: border, borderWidth: 0.8 });
+      page.drawText(label.toUpperCase(), { x: x + 10, y: y - 4, size: 7, font: bold, color: muted });
+      page.drawText(value || "--", { x: x + 10, y: y - 22, size: 11, font: bold, color: dark });
+    }
+
+    page.drawRectangle({ x: 0, y: 770, width: pageWidth, height: 72, color: rgb(0.03, 0.25, 0.21) });
+    page.drawText(pdfSettings.clinicName || "MediVault Nutrition", { x: margin, y: 812, size: 12, font: bold, color: rgb(0.55, 0.96, 0.87) });
+    page.drawText(pdfSettings.title || "Personalized Diet Plan", { x: margin, y: 786, size: 24, font: bold, color: rgb(1, 1, 1) });
+    page.drawText(`Prepared for ${selectedClient.name}`, { x: margin, y: 764, size: 11, font: regular, color: rgb(0.82, 0.92, 0.89) });
+    y = 728;
+
+    labelValue("Client", selectedClient.name, margin, 150);
+    labelValue("Mobile", selectedClient.phone, margin + 162, 128);
+    labelValue("Goal", selectedClient.goal, margin + 302, 208);
+    y -= 64;
+    labelValue("Preference", selectedClient.foodPreference || "Not set", margin, 150);
+    labelValue("Conditions", selectedClient.conditions || "None noted", margin + 162, 170);
+    labelValue("Allergies", selectedClient.allergies || "None noted", margin + 344, 166);
+    y -= 72;
+
+    if (pdfSettings.includeBodyMetrics) {
+      page.drawText("Body composition snapshot", { x: margin, y, size: 14, font: bold, color: dark });
+      y -= 24;
+      labelValue("Weight", latestEntry?.weight ? `${latestEntry.weight} kg` : "--", margin, 108);
+      labelValue("BMI", calculatedBmi ? calculatedBmi.toFixed(1) : latestEntry?.bmi || "--", margin + 120, 82);
+      labelValue("Body fat", latestEntry?.bodyFat ? `${latestEntry.bodyFat} %` : "--", margin + 214, 92);
+      labelValue("Muscle", latestEntry?.muscleMass ? `${latestEntry.muscleMass} kg` : "--", margin + 318, 92);
+      labelValue("Protein target", estimatedProtein ? `${estimatedProtein} g/day` : "--", margin + 422, 88);
+      y -= 74;
+    }
+
+    page.drawText("Meal plan", { x: margin, y, size: 15, font: bold, color: dark });
+    page.drawText(`Language: ${draftPlan.language}`, { x: pageWidth - 150, y: y + 2, size: 9, font: bold, color: accent });
+    y -= 24;
+
+    draftPlan.meals.forEach((meal, index) => {
+      const notes = meal.notes ? ` - ${meal.notes}` : "";
+      const lines = wrapText(`${meal.meal} (${meal.quantity})${notes}`, 72);
+      const rowHeight = Math.max(44, 22 + lines.length * 12);
+      addPageIfNeeded(rowHeight + 10);
+      page.drawRectangle({ x: margin, y: y - rowHeight + 8, width: pageWidth - margin * 2, height: rowHeight, color: index % 2 ? rgb(1, 1, 1) : light, borderColor: border, borderWidth: 0.6 });
+      page.drawText(meal.time || "Meal", { x: margin + 10, y: y - 12, size: 10, font: bold, color: accent });
+      lines.forEach((line, lineIndex) => {
+        page.drawText(line, { x: margin + 132, y: y - 12 - lineIndex * 12, size: 10, font: regular, color: dark });
+      });
+      y -= rowHeight + 8;
+    });
+
+    addPageIfNeeded(110);
+    page.drawText("Instructions", { x: margin, y, size: 14, font: bold, color: dark });
+    y -= 18;
+    wrapText(draftPlan.summary, 92).forEach((line) => {
+      text(line, margin, 10, regular, dark);
+      y -= 14;
+    });
+    y -= 10;
+    if (pdfSettings.nutritionistName) {
+      page.drawText(`Nutritionist: ${pdfSettings.nutritionistName}`, { x: margin, y, size: 10, font: bold, color: accent });
+      y -= 16;
+    }
+    wrapText(pdfSettings.footerNote, 92).forEach((line) => {
+      text(line, margin, 8, regular, muted);
+      y -= 11;
+    });
+
+    const bytes = await pdf.save();
+    const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${fileSafeName(selectedClient.name)}-${fileSafeName(draftPlan.goal)}-diet-plan.pdf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    setPdfMessage("PDF download started.");
   }
 
   function metricSeries(metricKey: keyof Pick<BodyEntry, "weight" | "bmi" | "bodyFat" | "muscleMass">) {
@@ -743,10 +967,48 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
                       </div>
                     </div>
                     <textarea value={planSummary} onChange={(event) => setPlanSummary(event.target.value)} className="mt-3 min-h-[88px] w-full rounded-md border border-[#dce9e5] p-3 text-[12px] font-bold" placeholder="Plan summary and instructions" />
+                    <div className="mt-3 rounded-lg border border-[#dce9e5] bg-[#fbfdfc] p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[12px] font-black text-[#102323]">Custom PDF</p>
+                          <p className="mt-1 text-[11px] font-bold text-[#74837f]">Customize the printable diet plan before download.</p>
+                        </div>
+                        {pdfMessage ? <span className="rounded bg-white px-2 py-1 text-[10px] font-black text-[#087766]">{pdfMessage}</span> : null}
+                      </div>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <input value={pdfSettings.title} onChange={(event) => setPdfSettings((current) => ({ ...current, title: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="PDF title" />
+                        <input value={pdfSettings.clinicName} onChange={(event) => setPdfSettings((current) => ({ ...current, clinicName: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Clinic / brand name" />
+                        <input value={pdfSettings.nutritionistName} onChange={(event) => setPdfSettings((current) => ({ ...current, nutritionistName: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Nutritionist name" />
+                        <label className="flex h-10 items-center gap-2 rounded-md border border-[#dce9e5] bg-white px-3 text-[12px] font-bold text-[#52605d]">
+                          <input type="checkbox" checked={pdfSettings.includeBodyMetrics} onChange={(event) => setPdfSettings((current) => ({ ...current, includeBodyMetrics: event.target.checked }))} />
+                          Include body metrics
+                        </label>
+                        <textarea value={pdfSettings.footerNote} onChange={(event) => setPdfSettings((current) => ({ ...current, footerNote: event.target.value }))} className="min-h-[68px] rounded-md border border-[#dce9e5] p-3 text-[12px] font-bold sm:col-span-2" placeholder="Footer / disclaimer note" />
+                      </div>
+                    </div>
                     <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                       <button type="button" onClick={saveDietPlan} className="h-10 rounded-md bg-[#0a7d6e] px-4 text-[12px] font-black text-white">Save diet plan</button>
+                      <button type="button" onClick={downloadDietPdf} className="h-10 rounded-md bg-[#102323] px-4 text-[12px] font-black text-white">Download PDF</button>
+                      <button type="button" onClick={saveCurrentAsTemplate} className="h-10 rounded-md border border-[#b8d4cc] px-4 text-[12px] font-black text-[#0a7d6e]">Save as template</button>
                       <button type="button" onClick={() => setMealRows((current) => [...current, { id: nextId("meal"), time: "Custom", meal: "", quantity: "", notes: "" }])} className="h-10 rounded-md border border-[#b8d4cc] px-4 text-[12px] font-black text-[#0a7d6e]">Add meal</button>
                     </div>
+                    {store.customTemplates.length ? (
+                      <div className="mt-3 rounded-lg border border-[#e2ebe8] bg-[#fbfdfc] p-3">
+                        <p className="text-[12px] font-black text-[#102323]">Saved templates</p>
+                        <div className="mt-2 grid gap-2 md:grid-cols-2">
+                          {store.customTemplates.slice(0, 4).map((template) => (
+                            <div key={template.id} className="rounded-md border border-[#dce9e5] bg-white p-2">
+                              <p className="truncate text-[12px] font-black">{template.title}</p>
+                              <p className="mt-1 text-[10px] font-bold text-[#74837f]">{template.meals.length} meals · {compactDate(template.updatedAt)}</p>
+                              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                                <button type="button" onClick={() => applyCustomTemplate(template)} className="h-8 rounded bg-[#0a7d6e] text-[10px] font-black text-white">Apply</button>
+                                <button type="button" onClick={() => saveBuilderIntoTemplate(template.id)} className="h-8 rounded border border-[#b8d4cc] text-[10px] font-black text-[#0a7d6e]">Update</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="rounded-lg border border-[#dce9e5] bg-white p-4">
@@ -812,21 +1074,54 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
                 </section> : null}
               </div>
             ) : showTemplates ? (
-              <section className="grid gap-4 xl:grid-cols-3">
-                {planTemplates.map((template) => (
-                  <article key={template.title} className="rounded-lg border border-[#dce9e5] bg-white p-4">
-                    <span className={`rounded-md px-2 py-1 text-[10px] font-black ${template.tone}`}>Template</span>
-                    <h2 className="mt-4 text-[18px] font-black">{template.title}</h2>
-                    <p className="mt-2 min-h-[58px] text-[12px] font-semibold leading-5 text-[#65716f]">{template.note}</p>
-                    <div className="mt-3 rounded-md bg-[#f7fbfa] p-2 text-[11px] font-bold text-[#65716f]">
-                      {template.meals.length} meal slots ready
+              <div className="space-y-4">
+                <section className="rounded-lg border border-[#dce9e5] bg-white p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-[15px] font-black">Custom templates</h2>
+                      <p className="mt-1 text-[11px] font-bold text-[#74837f]">Save from diet builder, edit here, and reuse anytime.</p>
                     </div>
-                    <button type="button" onClick={() => applyTemplate(template)} className="mt-4 h-10 w-full rounded-md border border-[#b8d4cc] text-[12px] font-black text-[#0a7d6e]">
-                      Use in diet builder
-                    </button>
-                  </article>
-                ))}
-              </section>
+                    <button type="button" onClick={saveCurrentAsTemplate} className="h-10 rounded-md bg-[#102323] px-4 text-[12px] font-black text-white">Create from builder</button>
+                  </div>
+                  <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                    {store.customTemplates.length ? store.customTemplates.map((template) => (
+                      <article key={template.id} className="rounded-lg border border-[#e2ebe8] bg-[#fbfdfc] p-3">
+                        <input value={template.title} onChange={(event) => updateCustomTemplate(template.id, { title: event.target.value })} className="h-10 w-full rounded-md border border-[#dce9e5] bg-white px-3 text-[13px] font-black" placeholder="Template title" />
+                        <textarea value={template.note} onChange={(event) => updateCustomTemplate(template.id, { note: event.target.value })} className="mt-2 min-h-[72px] w-full rounded-md border border-[#dce9e5] bg-white p-3 text-[12px] font-bold" placeholder="Template summary" />
+                        <div className="mt-2 rounded-md bg-white p-2 text-[11px] font-bold text-[#65716f]">
+                          {template.meals.length} meal slots · Updated {compactDate(template.updatedAt)}
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          <button type="button" onClick={() => applyCustomTemplate(template)} className="h-9 rounded-md bg-[#0a7d6e] text-[11px] font-black text-white">Apply</button>
+                          <button type="button" onClick={() => saveBuilderIntoTemplate(template.id)} className="h-9 rounded-md border border-[#b8d4cc] text-[11px] font-black text-[#0a7d6e]">Update</button>
+                          <button type="button" onClick={() => deleteCustomTemplate(template.id)} className="h-9 rounded-md border border-[#ffd6ca] text-[11px] font-black text-[#ba563d]">Delete</button>
+                        </div>
+                      </article>
+                    )) : (
+                      <div className="rounded-lg border border-dashed border-[#c5d8d3] bg-[#fbfdfc] p-5">
+                        <p className="text-[13px] font-black">No custom templates yet.</p>
+                        <p className="mt-1 text-[12px] font-bold text-[#74837f]">Go to Diet builder, edit meal rows, then save as template.</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="grid gap-4 xl:grid-cols-3">
+                  {planTemplates.map((template) => (
+                    <article key={template.title} className="rounded-lg border border-[#dce9e5] bg-white p-4">
+                      <span className={`rounded-md px-2 py-1 text-[10px] font-black ${template.tone}`}>Built-in</span>
+                      <h2 className="mt-4 text-[18px] font-black">{template.title}</h2>
+                      <p className="mt-2 min-h-[58px] text-[12px] font-semibold leading-5 text-[#65716f]">{template.note}</p>
+                      <div className="mt-3 rounded-md bg-[#f7fbfa] p-2 text-[11px] font-bold text-[#65716f]">
+                        {template.meals.length} meal slots ready
+                      </div>
+                      <button type="button" onClick={() => applyTemplate(template)} className="mt-4 h-10 w-full rounded-md border border-[#b8d4cc] text-[12px] font-black text-[#0a7d6e]">
+                        Use in diet builder
+                      </button>
+                    </article>
+                  ))}
+                </section>
+              </div>
             ) : (
               <section className="rounded-lg border border-dashed border-[#c5d8d3] bg-white p-8 text-center">
                 <h2 className="text-[18px] font-black">Add your first nutrition client</h2>
