@@ -63,10 +63,21 @@ function reportFileName(report: LabReport) {
   return `${base || "lab-report"}.pdf`;
 }
 
+function bundleFileName(reports: LabReport[]) {
+  const first = reports[0];
+  const base = `${first?.clientName || "client"}-${first?.reportDate || "reports"}-bundle`
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `${base || "lab-report-bundle"}.pdf`;
+}
+
 export default function LabPdfStudioPage() {
   const { isConfigured, session, status } = useAuth();
   const [reports, setReports] = useState<LabReport[]>([]);
   const [selectedId, setSelectedId] = useState("");
+  const [bundleMode, setBundleMode] = useState(false);
+  const [selectedBundleIds, setSelectedBundleIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [accent, setAccent] = useState<Accent>("teal");
   const [sections, setSections] = useState<Sections>(defaultSections);
@@ -85,6 +96,11 @@ export default function LabPdfStudioPage() {
   const [message, setMessage] = useState("");
 
   const selectedReport = useMemo(() => reports.find((report) => report.id === selectedId) ?? null, [reports, selectedId]);
+  const selectedBundleReports = useMemo(
+    () => selectedBundleIds.flatMap((id) => reports.find((report) => report.id === id) ?? []),
+    [reports, selectedBundleIds],
+  );
+  const activeDocumentKey = bundleMode ? `bundle:${selectedBundleIds.join(",")}` : selectedId;
   const filteredReports = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return reports;
@@ -116,7 +132,9 @@ export default function LabPdfStudioPage() {
         const nextReports: LabReport[] = result?.reports ?? [];
         const linkedId = new URLSearchParams(window.location.search).get("reportId") ?? "";
         setReports(nextReports);
-        setSelectedId(nextReports.some((report) => report.id === linkedId) ? linkedId : nextReports[0]?.id ?? "");
+        const nextSelectedId = nextReports.some((report) => report.id === linkedId) ? linkedId : nextReports[0]?.id ?? "";
+        setSelectedId(nextSelectedId);
+        setSelectedBundleIds(nextSelectedId ? [nextSelectedId] : []);
       } catch (loadError) {
         if (active) setError(loadError instanceof Error ? loadError.message : "Reports could not be loaded.");
       } finally {
@@ -141,10 +159,31 @@ export default function LabPdfStudioPage() {
 
   function selectReport(reportId: string) {
     setSelectedId(reportId);
+    setSelectedBundleIds((current) => current.includes(reportId) ? current : [reportId]);
     resetGeneratedPdf();
     const params = new URLSearchParams(window.location.search);
     params.set("reportId", reportId);
     window.history.replaceState(null, "", `/lab/pdf?${params.toString()}`);
+  }
+
+  function toggleBundleReport(report: LabReport) {
+    setSelectedId(report.id);
+    setSelectedBundleIds((current) => {
+      const next = current.includes(report.id) ? current.filter((id) => id !== report.id) : [...current, report.id];
+      return next.length ? next : [report.id];
+    });
+    resetGeneratedPdf();
+  }
+
+  function selectSameClientDate(report = selectedReport) {
+    if (!report) return;
+    const matchingIds = reports
+      .filter((item) => item.clientPhone === report.clientPhone && item.reportDate === report.reportDate)
+      .map((item) => item.id);
+    setBundleMode(true);
+    setSelectedBundleIds(matchingIds.length ? matchingIds : [report.id]);
+    setSelectedId(report.id);
+    resetGeneratedPdf();
   }
 
   function updateField(id: string, key: "label" | "value", value: string) {
@@ -158,7 +197,8 @@ export default function LabPdfStudioPage() {
   }
 
   async function generatePdf() {
-    if (!selectedReport || !session?.access_token) return null;
+    const reportsForBundle = bundleMode ? selectedBundleReports : [];
+    if ((!bundleMode && !selectedReport) || (bundleMode && !reportsForBundle.length) || !session?.access_token) return null;
     setIsGenerating(true);
     setError("");
     setMessage("");
@@ -170,13 +210,14 @@ export default function LabPdfStudioPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          action: "generate_document",
+          action: bundleMode ? "generate_document_bundle" : "generate_document",
           accent,
           clinicalNotes,
           customFields: customFields.map(({ label, value }) => ({ label, value })),
           customTitle,
           footerText,
-          reportId: selectedReport.id,
+          reportId: selectedReport?.id,
+          reportIds: reportsForBundle.map((report) => report.id),
           sections,
           signatoryName,
           signatoryRole,
@@ -191,8 +232,8 @@ export default function LabPdfStudioPage() {
       const nextUrl = URL.createObjectURL(blob);
       setPreviewUrl(nextUrl);
       setPdfBlob(blob);
-      setGeneratedReportId(selectedReport.id);
-      setMessage("PDF generated. Preview, download or share it now.");
+      setGeneratedReportId(activeDocumentKey);
+      setMessage(bundleMode ? `${reportsForBundle.length} reports bundled. Preview, download or share it now.` : "PDF generated. Preview, download or share it now.");
       return blob;
     } catch (generateError) {
       setError(generateError instanceof Error ? generateError.message : "PDF could not be generated.");
@@ -203,31 +244,36 @@ export default function LabPdfStudioPage() {
   }
 
   async function currentPdf() {
-    if (pdfBlob && generatedReportId === selectedReport?.id) return pdfBlob;
+    if (pdfBlob && generatedReportId === activeDocumentKey) return pdfBlob;
     return generatePdf();
   }
 
   async function downloadPdf() {
-    if (!selectedReport) return;
+    if (!selectedReport && !selectedBundleReports.length) return;
     const blob = await currentPdf();
     if (!blob) return;
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = reportFileName(selectedReport);
+    anchor.download = bundleMode ? bundleFileName(selectedBundleReports) : reportFileName(selectedReport as LabReport);
     anchor.click();
     URL.revokeObjectURL(url);
     setMessage("PDF download started.");
   }
 
   async function sharePdf() {
-    if (!selectedReport) return;
+    if (!selectedReport && !selectedBundleReports.length) return;
     const blob = await currentPdf();
     if (!blob) return;
-    const file = new File([blob], reportFileName(selectedReport), { type: "application/pdf" });
+    const fileName = bundleMode ? bundleFileName(selectedBundleReports) : reportFileName(selectedReport as LabReport);
+    const file = new File([blob], fileName, { type: "application/pdf" });
     if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
       try {
-        await navigator.share({ files: [file], title: selectedReport.title, text: `${selectedReport.reportType} report for ${selectedReport.clientName}` });
+        await navigator.share({
+          files: [file],
+          title: bundleMode ? "Lab report bundle" : selectedReport?.title,
+          text: bundleMode ? `${selectedBundleReports.length} lab reports for ${selectedBundleReports[0]?.clientName}` : `${selectedReport?.reportType} report for ${selectedReport?.clientName}`,
+        });
         setMessage("PDF shared successfully.");
       } catch (shareError) {
         if (shareError instanceof DOMException && shareError.name === "AbortError") return;
@@ -245,13 +291,13 @@ export default function LabPdfStudioPage() {
         <div>
           <p className="text-[12px] font-black uppercase text-[#087766]">Report delivery</p>
           <h1 className="mt-1 text-[27px] font-black text-[#101c1c]">PDF Studio</h1>
-          <p className="mt-1 text-[12px] font-semibold text-[#6f7f7c]">Compose, preview and share a patient-ready report.</p>
+          <p className="mt-1 text-[12px] font-semibold text-[#6f7f7c]">Compose one report or bundle multiple same-day reports into a single patient-ready PDF.</p>
         </div>
         <div className="flex gap-2">
-          <button type="button" disabled={!selectedReport || isGenerating} onClick={generatePdf} className="h-10 rounded-md bg-[#102323] px-4 text-[11px] font-black text-white disabled:opacity-50">
+          <button type="button" disabled={(!bundleMode && !selectedReport) || (bundleMode && !selectedBundleReports.length) || isGenerating} onClick={generatePdf} className="h-10 rounded-md bg-[#102323] px-4 text-[11px] font-black text-white disabled:opacity-50">
             {isGenerating ? "Generating..." : "Generate preview"}
           </button>
-          <button type="button" disabled={!selectedReport || isGenerating} onClick={sharePdf} className="h-10 rounded-md bg-[#0a7d6e] px-4 text-[11px] font-black text-white disabled:opacity-50">Share PDF</button>
+          <button type="button" disabled={(!bundleMode && !selectedReport) || (bundleMode && !selectedBundleReports.length) || isGenerating} onClick={sharePdf} className="h-10 rounded-md bg-[#0a7d6e] px-4 text-[11px] font-black text-white disabled:opacity-50">Share PDF</button>
         </div>
       </div>
 
@@ -261,15 +307,31 @@ export default function LabPdfStudioPage() {
       <div className="mt-5 grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="rounded-md border border-[#dce9e5] bg-white">
           <div className="border-b border-[#e7efed] p-3">
-            <label className="text-[10px] font-black uppercase text-[#74837f]" htmlFor="pdf-report-search">Select report</label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-[10px] font-black uppercase text-[#74837f]" htmlFor="pdf-report-search">{bundleMode ? "Select reports" : "Select report"}</label>
+              <button type="button" onClick={() => { setBundleMode((current) => !current); resetGeneratedPdf(); }} className={`h-7 rounded-md px-2 text-[9px] font-black ${bundleMode ? "bg-[#102323] text-white" : "border border-[#c9dad5] text-[#31534d]"}`}>
+                {bundleMode ? "Bundle on" : "Bundle mode"}
+              </button>
+            </div>
             <input id="pdf-report-search" value={query} onChange={(event) => setQuery(event.target.value)} className="mt-2 h-9 w-full rounded-md border border-[#dce9e5] px-3 text-[11px] font-bold" placeholder="Patient, phone or report ID" />
+            {bundleMode ? (
+              <div className="mt-2 rounded-md bg-[#f4fbf8] p-2">
+                <p className="text-[10px] font-bold text-[#31534d]">{selectedBundleReports.length} selected</p>
+                <button type="button" onClick={() => selectSameClientDate()} disabled={!selectedReport} className="mt-2 h-8 w-full rounded-md border border-[#b8d4cc] bg-white text-[10px] font-black text-[#087766] disabled:opacity-40">
+                  Select same client + date
+                </button>
+              </div>
+            ) : null}
           </div>
           <div className="max-h-[660px] divide-y divide-[#edf3f1] overflow-y-auto">
             {filteredReports.length ? filteredReports.map((report) => (
-              <button key={report.id} type="button" onClick={() => selectReport(report.id)} className={`w-full p-3 text-left ${selectedId === report.id ? "bg-[#eaf9f2]" : "hover:bg-[#f8fbfa]"}`}>
-                <span className="block truncate text-[12px] font-black text-[#17222b]">{report.clientName}</span>
-                <span className="mt-1 block truncate text-[10px] font-bold text-[#52605d]">{report.reportType} · {formatDateLabel(report.reportDate)}</span>
-                <span className="mt-1 block truncate text-[9px] font-semibold text-[#879590]">{report.labReportId} · {report.parameters} results</span>
+              <button key={report.id} type="button" onClick={() => bundleMode ? toggleBundleReport(report) : selectReport(report.id)} className={`flex w-full gap-2 p-3 text-left ${selectedId === report.id || selectedBundleIds.includes(report.id) ? "bg-[#eaf9f2]" : "hover:bg-[#f8fbfa]"}`}>
+                {bundleMode ? <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded border text-[11px] font-black ${selectedBundleIds.includes(report.id) ? "border-[#0a7d6e] bg-[#0a7d6e] text-white" : "border-[#cbd8d5] bg-white text-transparent"}`}>✓</span> : null}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[12px] font-black text-[#17222b]">{report.clientName}</span>
+                  <span className="mt-1 block truncate text-[10px] font-bold text-[#52605d]">{report.reportType} · {formatDateLabel(report.reportDate)}</span>
+                  <span className="mt-1 block truncate text-[9px] font-semibold text-[#879590]">{report.labReportId} · {report.parameters} results</span>
+                </span>
               </button>
             )) : <p className="p-4 text-[11px] font-bold text-[#74837f]">{isLoading ? "Loading reports..." : "No matching reports."}</p>}
           </div>
@@ -280,8 +342,9 @@ export default function LabPdfStudioPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] font-black uppercase text-[#087766]">Document setup</p>
-                <h2 className="mt-1 text-[16px] font-black text-[#17222b]">{selectedReport?.title ?? "Choose a report"}</h2>
-                {selectedReport ? <p className="mt-1 text-[10px] font-semibold text-[#74837f]">{selectedReport.clientName} · {selectedReport.labReportId}</p> : null}
+                <h2 className="mt-1 text-[16px] font-black text-[#17222b]">{bundleMode ? `${selectedBundleReports.length} report bundle` : selectedReport?.title ?? "Choose a report"}</h2>
+                {bundleMode && selectedBundleReports.length ? <p className="mt-1 text-[10px] font-semibold text-[#74837f]">{selectedBundleReports[0].clientName} · {formatDateLabel(selectedBundleReports[0].reportDate)} · {selectedBundleReports.map((report) => report.reportType).join(", ")}</p> : null}
+                {!bundleMode && selectedReport ? <p className="mt-1 text-[10px] font-semibold text-[#74837f]">{selectedReport.clientName} · {selectedReport.labReportId}</p> : null}
               </div>
               <button type="button" disabled={!pdfBlob} onClick={downloadPdf} className="h-9 rounded-md border border-[#bfcfcb] px-3 text-[10px] font-black text-[#31534d] disabled:opacity-40">Download</button>
             </div>

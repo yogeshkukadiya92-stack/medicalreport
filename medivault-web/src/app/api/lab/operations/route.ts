@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PDFDocument } from "pdf-lib";
 import { createLabReportPdf, type LabReportPdfInput } from "@/lib/lab-report-pdf";
 import { addLabAuditLog, getLabContext } from "@/lib/lab-server";
 import type { LabReport } from "@/lib/vault-types";
@@ -48,6 +49,15 @@ type CriticalAck = {
 
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function bundleFileName(reports: LabReport[]) {
+  const first = reports[0];
+  const base = `${first?.clientName || "client"}-${first?.reportDate || "reports"}-lab-report-bundle`
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `${base || "lab-report-bundle"}.pdf`;
 }
 
 function phoneDigits(value: string) {
@@ -194,6 +204,51 @@ export async function POST(request: NextRequest) {
       headers: {
         "Cache-Control": "private, no-store",
         "Content-Disposition": `attachment; filename="${generated.fileName}"`,
+        "Content-Type": "application/pdf",
+      },
+    });
+  }
+
+  if (action === "generate_document_bundle") {
+    const reportIds = Array.isArray(body?.reportIds)
+      ? body.reportIds.map((id) => cleanText(id)).filter(Boolean).slice(0, 20)
+      : [];
+    if (!reportIds.length) return NextResponse.json({ error: "Select at least one report for the PDF bundle." }, { status: 400 });
+
+    const reports = await context.db.collection<LabReport>("labReports").find(
+      { id: { $in: reportIds }, labId: context.lab.id },
+      { projection: { _id: 0 } },
+    ).toArray();
+    const reportById = new Map(reports.map((report) => [report.id, report]));
+    const orderedReports = reportIds.flatMap((id) => reportById.get(id) ? [reportById.get(id) as LabReport] : []);
+    if (!orderedReports.length) return NextResponse.json({ error: "Selected reports were not found." }, { status: 404 });
+
+    const mergedPdf = await PDFDocument.create();
+    for (const report of orderedReports) {
+      const generated = await createLabReportPdf(context.lab, report, body ?? {});
+      const sourcePdf = await PDFDocument.load(generated.bytes);
+      const copiedPages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
+      copiedPages.forEach((page) => mergedPdf.addPage(page));
+    }
+    mergedPdf.setTitle(cleanText(body?.customTitle).slice(0, 140) || `${orderedReports[0].clientName} lab report bundle`);
+    mergedPdf.setAuthor(context.lab.name);
+    mergedPdf.setSubject(`${orderedReports.length} lab reports for ${orderedReports[0].clientName}`);
+    mergedPdf.setCreator("MediVault Lab PDF Studio");
+    mergedPdf.setCreationDate(new Date());
+
+    await addLabAuditLog(context.db, {
+      action: "update",
+      actorUserId: context.userId,
+      labId: context.lab.id,
+      labReportId: orderedReports[0].id,
+      note: `PDF bundle generated with ${orderedReports.length} reports.`,
+    });
+
+    const bytes = await mergedPdf.save();
+    return new NextResponse(Buffer.from(bytes), {
+      headers: {
+        "Cache-Control": "private, no-store",
+        "Content-Disposition": `attachment; filename="${bundleFileName(orderedReports)}"`,
         "Content-Type": "application/pdf",
       },
     });
