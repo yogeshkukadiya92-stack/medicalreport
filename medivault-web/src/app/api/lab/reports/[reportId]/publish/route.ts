@@ -12,74 +12,86 @@ type RouteParams = {
 };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
-  const { reportId } = await params;
-  const context = await getLabContext(request);
-  if ("error" in context) {
-    return NextResponse.json({ error: context.error }, { status: context.status });
-  }
+  try {
+    const { reportId } = await params;
+    const context = await getLabContext(request);
+    if ("error" in context) {
+      return NextResponse.json({ error: context.error }, { status: context.status });
+    }
 
-  const existing = await context.db.collection<LabReport>("labReports").findOne(
-    {
-      id: reportId,
-      labId: context.lab.id,
-    },
-    { projection: { _id: 0 } },
-  );
-
-  if (!existing) {
-    return NextResponse.json({ error: "Report not found." }, { status: 404 });
-  }
-
-  const now = new Date().toISOString();
-  await context.db.collection<LabReport>("labReports").updateOne(
-    {
-      id: existing.id,
-      labId: context.lab.id,
-    },
-    {
-      $set: {
-        publishedAt: existing.publishedAt ?? now,
-        status: "published",
-        updatedAt: now,
-      },
-    },
-  );
-
-  await context.db.collection("clientReportLinks").updateOne(
-    { labReportId: existing.id },
-    {
-      $set: {
+    const existing = await context.db.collection<LabReport>("labReports").findOne(
+      {
+        id: reportId,
         labId: context.lab.id,
-        labReportId: existing.id,
-        normalizedPhone: existing.normalizedClientPhone,
-        state: "unclaimed",
-        updatedAt: now,
       },
-      $setOnInsert: {
-        createdAt: now,
+      { projection: { _id: 0 } },
+    );
+
+    if (!existing) {
+      return NextResponse.json({ error: "Report not found." }, { status: 404 });
+    }
+
+    const now = new Date().toISOString();
+    await context.db.collection<LabReport>("labReports").updateOne(
+      {
+        id: existing.id,
+        labId: context.lab.id,
       },
-    },
-    { upsert: true },
-  );
+      {
+        $set: {
+          publishedAt: existing.publishedAt ?? now,
+          status: "published",
+          updatedAt: now,
+        },
+      },
+    );
 
-  await addLabAuditLog(context.db, {
-    action: "publish",
-    actorUserId: context.userId,
-    labId: context.lab.id,
-    labReportId: existing.id,
-    note: "Lab report published.",
-  });
+    await context.db.collection("clientReportLinks").updateOne(
+      { labReportId: existing.id },
+      {
+        $set: {
+          labId: context.lab.id,
+          labReportId: existing.id,
+          normalizedPhone: existing.normalizedClientPhone,
+          state: "unclaimed",
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          createdAt: now,
+        },
+      },
+      { upsert: true },
+    );
 
-  const report = await context.db.collection<LabReport>("labReports").findOne(
-    {
-      id: existing.id,
+    await addLabAuditLog(context.db, {
+      action: existing.status === "published" ? "update" : "publish",
+      actorUserId: context.userId,
       labId: context.lab.id,
-    },
-    { projection: { _id: 0 } },
-  );
-  if (report) {
-    await syncNormalizedLabReport(context.db, report, context.userId);
-  }
+      labReportId: existing.id,
+      note: existing.status === "published" ? "Lab report synced to patient app link." : "Lab report published.",
+    });
 
-  return NextResponse.json({ report });
+    const report = await context.db.collection<LabReport>("labReports").findOne(
+      {
+        id: existing.id,
+        labId: context.lab.id,
+      },
+      { projection: { _id: 0 } },
+    );
+    let syncWarning = "";
+    if (report) {
+      try {
+        await syncNormalizedLabReport(context.db, report, context.userId);
+      } catch (syncError) {
+        syncWarning = syncError instanceof Error ? syncError.message : "FHIR sync could not finish.";
+      }
+    }
+
+    return NextResponse.json({ report, syncWarning });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Report could not be published." },
+      { status: 500 },
+    );
+  }
 }

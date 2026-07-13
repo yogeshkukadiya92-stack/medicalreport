@@ -405,6 +405,7 @@ export async function syncNormalizedLabReport(db: Db, report: LabReport, actorUs
     updatedAt: now,
     version,
   };
+  const { createdAt: diagnosticCreatedAt, ...diagnosticUpdate } = diagnosticRecord;
 
   const specimenRecord: NormalizedSpecimenRecord = {
     accessionNumber: report.accessionNumber,
@@ -436,8 +437,8 @@ export async function syncNormalizedLabReport(db: Db, report: LabReport, actorUs
   await db.collection<NormalizedDiagnosticRecord>("normalizedDiagnosticReports").updateOne(
     { labId: report.labId, labReportId: report.id },
     {
-      $set: diagnosticRecord,
-      $setOnInsert: { createdAt: report.createdAt },
+      $set: diagnosticUpdate,
+      $setOnInsert: { createdAt: diagnosticCreatedAt },
     },
     { upsert: true },
   );

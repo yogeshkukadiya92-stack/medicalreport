@@ -70,6 +70,7 @@ export default function LabReportsPage() {
   const [reports, setReports] = useState<LabReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<LabReport | null>(null);
   const [error, setError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
   const [fileError, setFileError] = useState("");
   const [isOpeningFileId, setIsOpeningFileId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -87,6 +88,7 @@ export default function LabReportsPage() {
     }
     setIsLoading(true);
     setError("");
+    setActionMessage("");
     const params = buildFilterParams(nextFilters);
     if (nextReportId) params.set("reportId", nextReportId);
     try {
@@ -174,6 +176,7 @@ export default function LabReportsPage() {
 
   async function publishReport(report: LabReport) {
     setError("");
+    setActionMessage("");
     if (!session?.access_token) {
       setError("Sign in again before publishing this report.");
       return;
@@ -194,6 +197,7 @@ export default function LabReportsPage() {
       } else {
         await loadReports(filters, selectedReport?.id ?? "");
       }
+      setActionMessage(result?.syncWarning ? `Published, but sync warning: ${result.syncWarning}` : report.status === "published" ? "Report synced to patient app link." : "Report published and linked to patient app.");
     } catch (publishError) {
       setError(publishError instanceof Error ? publishError.message : "Report could not be published.");
     } finally {
@@ -277,6 +281,7 @@ export default function LabReportsPage() {
       </section>
 
       {error ? <div className="mt-4 rounded-lg bg-[#fff0ec] p-3 text-[13px] font-bold text-[#ba563d]">{error}</div> : null}
+      {actionMessage ? <div className="mt-4 rounded-lg bg-[#eaf9f2] p-3 text-[13px] font-bold text-[#087766]">{actionMessage}</div> : null}
 
       <section className="mt-5 rounded-lg border border-[#e2ebe8] bg-white">
         <div className="grid border-b border-[#edf3f1] p-4 text-[12px] font-black uppercase tracking-normal text-[#6f7f7c] md:grid-cols-[1.1fr_1fr_0.8fr_0.7fr_0.7fr_0.65fr]">
