@@ -160,14 +160,14 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <label className="block">
-            <span className="text-[12px] font-bold text-[#52605d]">Mobile number</span>
+            <span className="text-[12px] font-bold text-[#52605d]">{mode === "signin" ? "Mobile number or admin email" : "Mobile number"}</span>
             <input
-              type="tel"
+              type={mode === "signin" ? "text" : "tel"}
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
-              placeholder="9876543210"
-              inputMode="tel"
-              autoComplete="tel"
+              placeholder={mode === "signin" ? "9876543210 or admin@example.com" : "9876543210"}
+              inputMode={mode === "signin" ? "text" : "tel"}
+              autoComplete={mode === "signin" ? "username" : "tel"}
               required
               aria-invalid={Boolean(error) && !phone}
               className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"

@@ -32,6 +32,10 @@ const sessionMaxAgeSeconds = 60 * 60 * 24 * 30;
 const passwordIterations = 210_000;
 const passwordKeyLength = 32;
 const passwordDigest = "sha256";
+const bootstrapAdminEmail = normalizeEmail(process.env.ADMIN_BOOTSTRAP_EMAIL || "");
+const bootstrapAdminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
+const bootstrapAdminUserId = bootstrapAdminEmail ? `user-admin-${hashToken(bootstrapAdminEmail).slice(0, 18)}` : "";
+const bootstrapAdminLabId = bootstrapAdminEmail ? `lab-admin-${hashToken(`lab:${bootstrapAdminEmail}`).slice(0, 18)}` : "";
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -73,6 +77,13 @@ function hashToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+function verifyBootstrapAdminPassword(password: string) {
+  if (!bootstrapAdminEmail || !bootstrapAdminPassword) return false;
+  const expected = Buffer.from(hashToken(bootstrapAdminPassword), "hex");
+  const received = Buffer.from(hashToken(password), "hex");
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
+}
+
 function publicUser(user: AuthUserDocument): AuthUser {
   return {
     createdAt: user.createdAt,
@@ -93,6 +104,70 @@ async function ensureAuthIndexes(db: Db) {
     db.collection("authSessions").createIndex({ userId: 1 }),
     db.collection("authSessions").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ]);
+}
+
+async function ensureBootstrapAdmin(db: Db, password: string) {
+  if (!verifyBootstrapAdminPassword(password)) return;
+
+  const now = new Date().toISOString();
+  const existingUser = await db.collection<AuthUserDocument>("authUsers").findOne(
+    { email: bootstrapAdminEmail },
+    { projection: { _id: 0 } },
+  );
+  const userId = existingUser?.id || bootstrapAdminUserId;
+  const passwordFields = hashPassword(password);
+
+  await db.collection<AuthUserDocument>("authUsers").updateOne(
+    { email: bootstrapAdminEmail },
+    {
+      $set: {
+        email: bootstrapAdminEmail,
+        name: "Yogesh Admin",
+        passwordHash: passwordFields.hash,
+        passwordIterations: passwordFields.iterations,
+        passwordSalt: passwordFields.salt,
+        updatedAt: now,
+      },
+      $setOnInsert: {
+        createdAt: now,
+        id: userId,
+      },
+    },
+    { upsert: true },
+  );
+
+  await db.collection("labs").updateOne(
+    { id: bootstrapAdminLabId },
+    {
+      $set: {
+        name: "MediVault Lab",
+        ownerUserId: userId,
+        updatedAt: now,
+      },
+      $setOnInsert: {
+        createdAt: now,
+        id: bootstrapAdminLabId,
+      },
+    },
+    { upsert: true },
+  );
+
+  await db.collection("labUsers").updateOne(
+    { labId: bootstrapAdminLabId, userId },
+    {
+      $set: {
+        role: "lab_admin",
+        updatedAt: now,
+      },
+      $setOnInsert: {
+        createdAt: now,
+        id: `${bootstrapAdminLabId}:${userId}`,
+        labId: bootstrapAdminLabId,
+        userId,
+      },
+    },
+    { upsert: true },
+  );
 }
 
 function createToken() {
@@ -232,12 +307,15 @@ export async function loginAuthUserSession(input: { password: string; phone: str
   const db = await getMongoDb();
   await ensureAuthIndexes(db);
   const emailFallback = normalizeEmail(input.phone);
+  if (emailFallback === bootstrapAdminEmail) {
+    await ensureBootstrapAdmin(db, input.password);
+  }
   const user = await db.collection<AuthUserDocument>("authUsers").findOne(
     isValidEmail(emailFallback) ? { $or: [{ phone }, { email: emailFallback }] } : { phone },
     { projection: { _id: 0 } },
   );
   if (!user || !verifyPassword(input.password, user)) {
-    throw new Error("Invalid mobile number or password.");
+    throw new Error("Invalid mobile/email or password.");
   }
 
   const token = await createSession(db, user.id);
