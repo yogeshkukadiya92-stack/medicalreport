@@ -11,6 +11,7 @@ type OrderStage = (typeof stages)[number];
 
 type LabOrder = {
   accessionNumber: string;
+  bookingId?: string;
   createdAt: string;
   createdByUserId: string;
   id: string;
@@ -19,9 +20,16 @@ type LabOrder = {
   patientPhone: string;
   priority: "routine" | "urgent";
   sampleType: string;
+  source?: string;
   stage: OrderStage;
   testName: string;
   updatedAt: string;
+};
+
+type BillingInvoice = {
+  amount?: number;
+  bookingId?: string;
+  status?: string;
 };
 
 type ReportDoc = {
@@ -88,7 +96,7 @@ async function readOperations(context: Exclude<Awaited<ReturnType<typeof getLabC
     context.db.collection<CriticalAck>("criticalValueAcknowledgements").find({ labId }, { projection: { _id: 0 } }).toArray(),
     context.db.collection("analyzerConnections").countDocuments({ labId, enabled: true }),
     context.db.collection("qualityControlRuns").countDocuments({ labId }),
-    context.db.collection("billingInvoices").countDocuments({ labId }),
+    context.db.collection<BillingInvoice>("billingInvoices").find({ labId }, { projection: { _id: 0 } }).sort({ createdAt: -1 }).limit(100).toArray(),
     context.db.collection("labOperationalAudit").find({ labId }, { projection: { _id: 0 } }).sort({ createdAt: -1 }).limit(8).toArray(),
   ]);
 
@@ -123,8 +131,11 @@ async function readOperations(context: Exclude<Awaited<ReturnType<typeof getLabC
 
   const now = Date.now();
   const reportedAccessions = new Set(reports.map((report) => cleanText(report.accessionNumber)).filter(Boolean));
+  const invoiceByBooking = new Map(invoices.map((invoice) => [invoice.bookingId, invoice]));
   const enrichedOrders = orders.map((order) => ({
     ...order,
+    invoiceAmount: order.bookingId ? invoiceByBooking.get(order.bookingId)?.amount : undefined,
+    paymentStatus: order.bookingId ? invoiceByBooking.get(order.bookingId)?.status : undefined,
     stage: reportedAccessions.has(order.accessionNumber) ? "reported" as const : order.stage,
     delayed: order.stage !== "reported" && !reportedAccessions.has(order.accessionNumber) && now - Date.parse(order.createdAt) > 2 * 60 * 60 * 1000,
     elapsedMinutes: Math.max(0, Math.round((now - Date.parse(order.createdAt)) / 60_000)),
@@ -137,7 +148,7 @@ async function readOperations(context: Exclude<Awaited<ReturnType<typeof getLabC
     delivery,
     featureAvailability: {
       analyzer: analyzerConnections > 0,
-      billing: invoices > 0,
+      billing: invoices.length > 0,
       qc: qcRuns > 0,
     },
     metrics: {

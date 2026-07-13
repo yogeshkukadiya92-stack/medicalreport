@@ -273,6 +273,9 @@ export async function createAuthUserSession(input: { email: string; name?: strin
   if (!isValidEmail(email)) {
     throw new Error("Enter a valid email address.");
   }
+  if (email === bootstrapAdminEmail) {
+    throw new Error("Owner admin account cannot be created from public signup.");
+  }
   if (!isValidPhone(phone)) {
     throw new Error("Enter a valid mobile number.");
   }

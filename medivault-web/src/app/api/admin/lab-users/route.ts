@@ -100,6 +100,16 @@ export async function POST(request: NextRequest) {
       },
       { upsert: true },
     );
+    await context.db.collection("platformAuditLogs").insertOne({
+      action: "lab_credential_created",
+      actorUserId: context.userId,
+      createdAt: now,
+      entityId: user.id,
+      entityType: "lab_user",
+      id: `audit-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      labId: context.lab.id,
+      metadata: { email: user.email, role },
+    });
 
     const labUsers = await listLabCredentials(context);
     return NextResponse.json({ labUsers });

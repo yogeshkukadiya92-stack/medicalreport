@@ -66,6 +66,16 @@ export async function PATCH(request: NextRequest) {
       },
     },
   );
+  await context.db.collection("platformAuditLogs").insertOne({
+    action: "lab_settings_updated",
+    actorUserId: context.userId,
+    createdAt: now,
+    entityId: context.lab.id,
+    entityType: "lab",
+    id: `audit-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    labId: context.lab.id,
+    metadata: { name },
+  });
 
   return NextResponse.json({ lab });
 }

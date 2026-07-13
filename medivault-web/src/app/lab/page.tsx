@@ -42,8 +42,10 @@ type OperationsPayload = {
     id: string;
     patientName: string;
     patientPhone: string;
+    paymentStatus?: string;
     priority: "routine" | "urgent";
     sampleType: string;
+    source?: string;
     stage: OrderStage;
     testName: string;
   }>;
@@ -240,7 +242,27 @@ export default function LabDashboardPage() {
         <section id="live-queue" className="overflow-hidden rounded-md border border-[#dbe6e3] bg-white">
           <div className="flex items-center justify-between border-b border-[#e7efed] p-4"><div><h2 className="text-[15px] font-black text-[#17222b]">Live order & sample queue</h2><p className="mt-1 text-[11px] font-semibold text-[#74837f]">Persistent accession workflow and two-hour delay flag</p></div><span className="rounded bg-[#eaf9f2] px-2 py-1 text-[9px] font-black text-[#087766]">LIVE</span></div>
           <div className="hidden grid-cols-[115px_1fr_110px_120px_100px_130px] gap-3 border-b border-[#e7efed] bg-[#f8fbfa] px-4 py-2 text-[9px] font-black uppercase text-[#74837f] md:grid"><span>Accession</span><span>Patient / test</span><span>Sample</span><span>Stage</span><span>Elapsed</span><span>Action</span></div>
-          <div className="divide-y divide-[#e7efed]">{data?.orders.length ? data.orders.map((order) => <div key={order.id} className="grid gap-3 px-4 py-3 md:grid-cols-[115px_1fr_110px_120px_100px_130px] md:items-center"><span className="font-mono text-[11px] font-black text-[#17222b]">{order.accessionNumber}</span><div className="min-w-0"><p className="truncate text-[12px] font-black text-[#17222b]">{order.patientName}</p><p className="mt-0.5 truncate text-[10px] font-semibold text-[#74837f]">{order.testName} · {order.priority}</p></div><span className="text-[11px] font-bold text-[#52605d]">{order.sampleType}</span><span className={`w-fit rounded px-2 py-1 text-[9px] font-black ${stageTone(order.stage, order.delayed)}`}>{order.delayed ? "DELAYED · " : ""}{stageLabels[order.stage]}</span><span className={`text-[11px] font-bold ${order.delayed ? "text-[#ba563d]" : "text-[#52605d]"}`}>{order.elapsedMinutes} min</span><div>{order.stage === "ready_for_verification" ? <Link href={`/lab/create?phone=${encodeURIComponent(order.patientPhone)}&accession=${encodeURIComponent(order.accessionNumber)}`} className="inline-flex h-8 items-center rounded-md bg-[#0d5c46] px-3 text-[10px] font-black text-white">Enter results</Link> : order.stage !== "reported" ? <button type="button" disabled={busyId === order.id} onClick={() => advanceOrder(order.id)} className="h-8 rounded-md border border-[#b8d4cc] px-3 text-[10px] font-black text-[#0d5c46] disabled:opacity-60">{busyId === order.id ? "Updating..." : nextAction[order.stage]}</button> : <span className="text-[10px] font-black text-[#087766]">Complete</span>}</div></div>) : <div className="p-6 text-center"><p className="text-[13px] font-black text-[#17222b]">No active orders yet</p><p className="mt-1 text-[11px] text-[#74837f]">Create a real order to demonstrate sample tracking.</p></div>}</div>
+          <div className="divide-y divide-[#e7efed]">
+            {data?.orders.length ? data.orders.map((order) => (
+              <div key={order.id} className="grid gap-3 px-4 py-3 md:grid-cols-[115px_1fr_110px_120px_100px_130px] md:items-center">
+                <span className="font-mono text-[11px] font-black text-[#17222b]">{order.accessionNumber}</span>
+                <div className="min-w-0">
+                  <p className="truncate text-[12px] font-black text-[#17222b]">{order.patientName}</p>
+                  <p className="mt-0.5 truncate text-[10px] font-semibold text-[#74837f]">{order.testName} · {order.priority}</p>
+                  {order.source === "online_booking" ? (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      <span className="rounded bg-[#e0f5ef] px-1.5 py-0.5 text-[8px] font-black text-[#0d5c46]">ONLINE</span>
+                      <span className={`rounded px-1.5 py-0.5 text-[8px] font-black ${order.paymentStatus === "paid" ? "bg-[#eaf9f2] text-[#087766]" : "bg-[#fff7d8] text-[#8a6500]"}`}>{order.paymentStatus === "paid" ? "PAID" : "PAYMENT DUE"}</span>
+                    </div>
+                  ) : null}
+                </div>
+                <span className="text-[11px] font-bold text-[#52605d]">{order.sampleType}</span>
+                <span className={`w-fit rounded px-2 py-1 text-[9px] font-black ${stageTone(order.stage, order.delayed)}`}>{order.delayed ? "DELAYED · " : ""}{stageLabels[order.stage]}</span>
+                <span className={`text-[11px] font-bold ${order.delayed ? "text-[#ba563d]" : "text-[#52605d]"}`}>{order.elapsedMinutes} min</span>
+                <div>{order.stage === "ready_for_verification" ? <Link href={`/lab/create?phone=${encodeURIComponent(order.patientPhone)}&accession=${encodeURIComponent(order.accessionNumber)}`} className="inline-flex h-8 items-center rounded-md bg-[#0d5c46] px-3 text-[10px] font-black text-white">Enter results</Link> : order.stage !== "reported" ? <button type="button" disabled={busyId === order.id} onClick={() => advanceOrder(order.id)} className="h-8 rounded-md border border-[#b8d4cc] px-3 text-[10px] font-black text-[#0d5c46] disabled:opacity-60">{busyId === order.id ? "Updating..." : nextAction[order.stage]}</button> : <span className="text-[10px] font-black text-[#087766]">Complete</span>}</div>
+              </div>
+            )) : <div className="p-6 text-center"><p className="text-[13px] font-black text-[#17222b]">No active orders yet</p><p className="mt-1 text-[11px] text-[#74837f]">Create a real order to demonstrate sample tracking.</p></div>}
+          </div>
         </section>
 
         <aside id="tat" className="space-y-4">
