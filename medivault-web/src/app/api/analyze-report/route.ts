@@ -19,6 +19,68 @@ const fallbackMarkers: ReportMarker[] = [
   { name: "Report", value: "Uploaded", range: "Needs review", status: "Watch" },
 ];
 
+const bodyCompositionOrder = [
+  "Height",
+  "Weight",
+  "BMI",
+  "PBF",
+  "Skeletal Muscle Mass",
+  "Body Fat Mass",
+  "Total Body Water",
+  "Protein",
+  "Minerals",
+  "InBody Score",
+  "Basal Metabolic Rate",
+  "Waist-Hip Ratio",
+  "Visceral Fat Level",
+  "Obesity Degree",
+  "Target Weight",
+  "Weight Control",
+  "Fat Control",
+  "Muscle Control",
+  "Right Arm Lean",
+  "Left Arm Lean",
+  "Trunk Lean",
+  "Right Leg Lean",
+  "Left Leg Lean",
+  "Right Arm Fat",
+  "Left Arm Fat",
+  "Trunk Fat",
+  "Right Leg Fat",
+  "Left Leg Fat",
+];
+
+const bodyCompositionAliases: Array<[RegExp, string]> = [
+  [/^height|stature/i, "Height"],
+  [/^weight$|body weight|total weight/i, "Weight"],
+  [/^bmi|body mass index/i, "BMI"],
+  [/^pbf|percent body fat|body fat percentage|fat %|body fat %/i, "PBF"],
+  [/^smm|skeletal muscle/i, "Skeletal Muscle Mass"],
+  [/body fat mass|fat mass$/i, "Body Fat Mass"],
+  [/total body water|^tbw\b/i, "Total Body Water"],
+  [/protein/i, "Protein"],
+  [/minerals?/i, "Minerals"],
+  [/inbody score|body score|fitness score/i, "InBody Score"],
+  [/basal metabolic rate|^bmr\b/i, "Basal Metabolic Rate"],
+  [/waist[-\s]?hip|^whr\b/i, "Waist-Hip Ratio"],
+  [/visceral fat level|visceral fat/i, "Visceral Fat Level"],
+  [/obesity degree/i, "Obesity Degree"],
+  [/target weight/i, "Target Weight"],
+  [/weight control/i, "Weight Control"],
+  [/fat control/i, "Fat Control"],
+  [/muscle control/i, "Muscle Control"],
+  [/right arm.*lean|ra.*lean/i, "Right Arm Lean"],
+  [/left arm.*lean|la.*lean/i, "Left Arm Lean"],
+  [/trunk.*lean|torso.*lean/i, "Trunk Lean"],
+  [/right leg.*lean|rl.*lean/i, "Right Leg Lean"],
+  [/left leg.*lean|ll.*lean/i, "Left Leg Lean"],
+  [/right arm.*fat|ra.*fat/i, "Right Arm Fat"],
+  [/left arm.*fat|la.*fat/i, "Left Arm Fat"],
+  [/trunk.*fat|torso.*fat/i, "Trunk Fat"],
+  [/right leg.*fat|rl.*fat/i, "Right Leg Fat"],
+  [/left leg.*fat|ll.*fat/i, "Left Leg Fat"],
+];
+
 function getAiProvider() {
   const provider = (process.env.AI_PROVIDER || "openai").toLowerCase();
   if (provider === "nvidia") {
@@ -65,6 +127,36 @@ function cleanMarker(marker: Partial<ReportMarker>): ReportMarker {
     status,
     value: String(marker.value || "--").slice(0, 60),
   };
+}
+
+function canonicalBodyCompositionName(name: string) {
+  const cleanName = name.trim();
+  const alias = bodyCompositionAliases.find(([pattern]) => pattern.test(cleanName));
+  return alias?.[1] ?? cleanName;
+}
+
+function normalizeBodyCompositionMarkers(markers: ReportMarker[]) {
+  const seen = new Set<string>();
+  const normalized = markers
+    .map((marker) => ({
+      ...marker,
+      name: canonicalBodyCompositionName(marker.name),
+    }))
+    .filter((marker) => {
+      const key = marker.name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  return normalized.sort((left, right) => {
+    const leftIndex = bodyCompositionOrder.indexOf(left.name);
+    const rightIndex = bodyCompositionOrder.indexOf(right.name);
+    if (leftIndex === -1 && rightIndex === -1) return left.name.localeCompare(right.name);
+    if (leftIndex === -1) return 1;
+    if (rightIndex === -1) return -1;
+    return leftIndex - rightIndex;
+  });
 }
 
 function extractJsonObject(content: string) {
@@ -135,11 +227,12 @@ export async function POST(request: NextRequest) {
       ? "Analyze these medical report page images for a personal health vault."
       : "Analyze this medical report page image for a personal health vault.",
     isBodyComposition
-      ? "This is a BMI/body composition report or machine/photo reading. Prioritize body metrics such as Height, Weight, BMI, Body Fat, Skeletal Muscle, Muscle Mass, Visceral Fat, Subcutaneous Fat, Body Water, Bone Mass, Basal Metabolic Rate, Metabolic Age, Protein, Body Score, WHR, and obesity/fitness score if visible."
+      ? "This is a BMI/body composition report or machine/photo reading, often an InBody-style printout. Extract visible values exactly. Prioritize Height, Weight, BMI, PBF, Skeletal Muscle Mass, Body Fat Mass, Total Body Water, Protein, Minerals, InBody Score, Basal Metabolic Rate, Waist-Hip Ratio, Visceral Fat Level, Obesity Degree, Target Weight, Weight Control, Fat Control, Muscle Control, and segmental lean/fat values."
       : "Prioritize clinical lab values and biomarkers visible in the report.",
     "Return only JSON with: title, category, summary, markers.",
     "markers must be an array of {name,value,range,status}; status must be Normal, High, Low, or Watch.",
-    "For body composition values, keep consistent marker names so history graphs work across uploads. Put units in value when visible, for example \"72.4 kg\", \"24.8 %\", or \"1420 kcal\".",
+    "For body composition values, keep consistent marker names so history graphs work across uploads. Use canonical names like Weight, BMI, PBF, Skeletal Muscle Mass, Body Fat Mass, Total Body Water, Protein, Minerals, InBody Score, Basal Metabolic Rate, Waist-Hip Ratio, Visceral Fat Level, Obesity Degree. Put units in value when visible, for example \"67.7 kg\", \"22.8 %\", or \"1499 kcal\".",
+    isBodyComposition ? "If the photo includes body composition history, extract the most recent/current result only, not old history rows." : "",
     "Keep summary short, doctor-ready, and avoid diagnosis. Mention that a doctor should review abnormal results.",
     `Patient/member: ${body.memberName || "Family member"}`,
     `Uploaded title: ${title}`,
@@ -200,7 +293,8 @@ export async function POST(request: NextRequest) {
   const completion = await openAiResponse.json();
   const content = completion?.choices?.[0]?.message?.content;
   const parsed = extractJsonObject(content || "{}") as Partial<AnalysisResponse>;
-  const markers = Array.isArray(parsed.markers) ? parsed.markers.slice(0, isBodyComposition ? 16 : 8).map(cleanMarker) : fallbackMarkers;
+  const rawMarkers = Array.isArray(parsed.markers) ? parsed.markers.slice(0, isBodyComposition ? 28 : 8).map(cleanMarker) : fallbackMarkers;
+  const markers = isBodyComposition ? normalizeBodyCompositionMarkers(rawMarkers).slice(0, 24) : rawMarkers;
   const abnormal = markers.filter((marker) => marker.status !== "Normal").length;
 
   return NextResponse.json({

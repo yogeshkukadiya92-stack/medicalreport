@@ -282,7 +282,7 @@ export default function Upload() {
             <h2 className="mt-5 text-[18px] font-bold text-[#162523]">{fileName || "Select a report file"}</h2>
             <p className="mx-auto mt-2 max-w-[280px] text-[13px] leading-5 text-[#65716f]">
               {reportKind === "body_composition"
-                ? "Upload a body-composition machine photo or screenshot. BMI, fat, muscle and other metrics will be saved for graphs."
+                ? "Upload an InBody, gym scan, or smart-scale photo. The app will detect values and save them for graphs."
                 : "PDF, JPG, or PNG. The app will save it, extract key markers, and prepare a doctor-ready summary."}
             </p>
           </button>
@@ -339,8 +339,23 @@ export default function Upload() {
           </label>
 
           {reportKind === "body_composition" ? (
-            <div className="rounded-lg border border-[#dce9e5] bg-white p-4">
-              <p className="text-[13px] font-black text-[#162523]">Tracked metrics</p>
+            <div className="rounded-lg border border-[#dce9e5] bg-white p-4 shadow-[0_10px_26px_rgba(20,67,60,0.04)]">
+              <div className="flex items-start gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#e8f7f2] text-[#087766]">
+                  <Icon name="trend" className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[13px] font-black text-[#162523]">Photo scan values</p>
+                  <p className="mt-1 text-[12px] leading-5 text-[#65716f]">
+                    InBody-style photos will be read into Weight, BMI, PBF, SMM, Body Fat Mass, Body Water, BMR, WHR, Visceral Fat, InBody Score and segmental values when visible.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {["Weight", "BMI", "PBF", "SMM", "BMR", "Visceral Fat"].map((metric) => (
+                  <span key={metric} className="rounded-md bg-[#f1f7f5] px-2.5 py-1 text-[10px] font-black text-[#31504a]">{metric}</span>
+                ))}
+              </div>
               <p className="mt-1 text-[12px] leading-5 text-[#65716f]">
                 Weight, BMI, body fat, muscle, water, visceral fat, BMR and body score will appear in Analytics with past-history graphs when you upload repeat scans.
               </p>
@@ -374,7 +389,7 @@ export default function Upload() {
           ) : null}
 
           <button disabled={isSaving} type="submit" className="h-12 w-full rounded-lg bg-[#0a7d6e] text-[14px] font-bold text-white shadow-[0_12px_30px_rgba(10,125,110,0.2)] disabled:opacity-70">
-            {isSaving ? "Analyzing report" : "Save report"}
+            {isSaving ? "Scanning values" : reportKind === "body_composition" ? "Scan photo & save values" : "Save report"}
           </button>
           <button type="button" onClick={() => router.push("/reports")} className="h-12 w-full rounded-lg border border-[#dce9e5] bg-white text-[14px] font-bold text-[#102323]">
             View reports
