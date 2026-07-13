@@ -189,6 +189,98 @@ const planTemplates: Array<{ title: string; note: string; tone: string; meals: M
       { id: "guj-4", time: "Dinner", meal: "Khichdi + kadhi + salad", quantity: "1 bowl", notes: "Early dinner." },
     ],
   },
+  {
+    title: "Weight gain",
+    note: "Higher calorie home meals, protein each sitting and easy add-ons.",
+    tone: "bg-[#eef4ff] text-[#315da8]",
+    meals: [
+      { id: "wg-1", time: "Breakfast", meal: "Stuffed paratha / paneer sandwich", quantity: "1 plate", notes: "Add curd or milk." },
+      { id: "wg-2", time: "Mid-meal", meal: "Banana shake / dry fruit milk", quantity: "1 glass", notes: "No skipped snack." },
+      { id: "wg-3", time: "Lunch", meal: "Dal, rice, sabji, salad, curd", quantity: "1 large thali", notes: "Add ghee within digestion comfort." },
+      { id: "wg-4", time: "Evening", meal: "Peanut chikki / nuts + fruit", quantity: "1 serving", notes: "Carry to work." },
+      { id: "wg-5", time: "Dinner", meal: "Paneer/tofu + roti + vegetables", quantity: "1 plate", notes: "Protein first." },
+      { id: "wg-6", time: "Bedtime", meal: "Milk / soy milk", quantity: "1 cup", notes: "Use if tolerated." },
+    ],
+  },
+  {
+    title: "Jain plan",
+    note: "Jain-friendly protein, controlled portions and practical office snacks.",
+    tone: "bg-[#fff8dc] text-[#8a6500]",
+    meals: [
+      { id: "jain-1", time: "Breakfast", meal: "Besan chilla / dhokla + curd", quantity: "1 plate", notes: "Avoid excess chutney." },
+      { id: "jain-2", time: "Mid-meal", meal: "Fruit / roasted makhana", quantity: "1 serving", notes: "Seasonal fruit." },
+      { id: "jain-3", time: "Lunch", meal: "2 rotli, dal, Jain sabji, salad", quantity: "1 thali", notes: "Protein portion fixed." },
+      { id: "jain-4", time: "Evening", meal: "Buttermilk + roasted chana", quantity: "1 serving", notes: "No farsan daily." },
+      { id: "jain-5", time: "Dinner", meal: "Moong dal khichdi / paneer sabji", quantity: "1 plate", notes: "Early dinner." },
+    ],
+  },
+  {
+    title: "PCOS/thyroid support",
+    note: "Protein-first meals, fiber, steady timings and low-sugar swaps.",
+    tone: "bg-[#f5eeff] text-[#6d3fa0]",
+    meals: [
+      { id: "pcos-1", time: "Breakfast", meal: "Moong chilla + curd", quantity: "2 pieces", notes: "No sweet tea." },
+      { id: "pcos-2", time: "Mid-meal", meal: "Nuts / seeds + fruit", quantity: "1 small bowl", notes: "Keep portion measured." },
+      { id: "pcos-3", time: "Lunch", meal: "Salad, dal, sabji, 2 rotli", quantity: "1 thali", notes: "Avoid refined flour." },
+      { id: "pcos-4", time: "Evening", meal: "Sprouts / protein snack", quantity: "1 bowl", notes: "Walk after snack if possible." },
+      { id: "pcos-5", time: "Dinner", meal: "Soup + paneer/tofu + vegetables", quantity: "1 plate", notes: "Light dinner." },
+    ],
+  },
+  {
+    title: "High protein office",
+    note: "Office-friendly portable meals with simple protein anchors.",
+    tone: "bg-[#eaf9f2] text-[#087766]",
+    meals: [
+      { id: "office-1", time: "Breakfast", meal: "Overnight oats / paneer wrap", quantity: "1 serving", notes: "Prepare previous night." },
+      { id: "office-2", time: "Office snack", meal: "Greek curd / sprouts / roasted chana", quantity: "1 box", notes: "Carry from home." },
+      { id: "office-3", time: "Lunch", meal: "Home thali with extra dal/paneer", quantity: "1 box", notes: "Limit fried items." },
+      { id: "office-4", time: "Evening", meal: "Tea + protein snack", quantity: "1 serving", notes: "No biscuits daily." },
+      { id: "office-5", time: "Dinner", meal: "Protein + sabji + controlled carbs", quantity: "1 plate", notes: "Finish early." },
+    ],
+  },
+];
+
+const goalOptions = ["Fat loss", "Muscle gain", "Weight gain", "Diabetes control", "PCOS/thyroid care", "Maintenance"];
+const foodPreferenceOptions = ["Gujarati vegetarian", "Vegetarian", "Jain", "Eggitarian", "Non-vegetarian", "Vegan", "Diabetic-friendly"];
+const activityOptions = ["Desk work", "Light walking", "Moderate walking", "Gym 3-4 days", "Heavy training", "Shift work"];
+const genderOptions = ["Male", "Female", "Other"];
+const packageOptions = ["Trial consultation", "4 week plan", "8 week plan", "12 week transformation", "Maintenance plan"];
+const conditionOptions = ["No known medical condition", "Diabetes", "Thyroid", "BP", "PCOS", "Cholesterol", "Acidity", "Joint pain"];
+const allergyOptions = ["None", "Milk", "Gluten", "Peanuts", "Soy", "Egg", "Seafood"];
+const quickNoteOptions = ["Diet followed well", "Low water intake", "Outside food this week", "Workout missed", "Craving at night", "Weight improving", "Needs stricter portions"];
+const intakePresets = [
+  {
+    label: "Fat loss office",
+    patch: {
+      activityLevel: "Desk work",
+      foodPreference: "Gujarati vegetarian",
+      goal: "Fat loss with muscle maintenance",
+      packageName: "12 week transformation",
+      status: "Active" as const,
+      targetFat: "18",
+    },
+  },
+  {
+    label: "Muscle gain",
+    patch: {
+      activityLevel: "Gym 3-4 days",
+      foodPreference: "Vegetarian",
+      goal: "Muscle gain",
+      packageName: "8 week plan",
+      status: "Active" as const,
+    },
+  },
+  {
+    label: "Diabetes care",
+    patch: {
+      activityLevel: "Light walking",
+      conditions: "Diabetes",
+      foodPreference: "Diabetic-friendly",
+      goal: "Diabetes control",
+      packageName: "Maintenance plan",
+      status: "Active" as const,
+    },
+  },
 ];
 
 const starterClients: NutritionClient[] = [
@@ -313,6 +405,22 @@ function wrapText(text: string, maxChars: number) {
   });
   if (line) lines.push(line);
   return lines.length ? lines : [""];
+}
+
+function addDays(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function toggleCsvValue(current: string, value: string) {
+  if (value === "None" || value === "No known medical condition") return value;
+  const values = current
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item && item !== "None" && item !== "No known medical condition");
+  const exists = values.includes(value);
+  return exists ? values.filter((item) => item !== value).join(", ") : [...values, value].join(", ");
 }
 
 function normalizeClient(client: Partial<NutritionClient>): NutritionClient {
@@ -855,19 +963,92 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
                     <label className="block"><span className="text-[10px] font-black uppercase text-[#74837f]">Follow-up date</span><input type="date" value={selectedClient.followUpDate} onChange={(event) => updateSelectedClient({ followUpDate: event.target.value })} className="mt-1 h-10 w-full rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" /></label>
                     <label className="block"><span className="text-[10px] font-black uppercase text-[#74837f]">Status</span><select value={selectedClient.status} onChange={(event) => updateSelectedClient({ status: event.target.value as NutritionClient["status"] })} className="mt-1 h-10 w-full rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold"><option>Active</option><option>New</option><option>Follow-up</option><option>Paused</option></select></label>
                   </div>
+                  <div className="mt-3 rounded-lg border border-[#e2ebe8] bg-[#fbfdfc] p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#74837f]">Fast intake</span>
+                      {intakePresets.map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => updateSelectedClient(preset.patch)}
+                          className="h-8 rounded-md border border-[#b8d4cc] bg-white px-3 text-[11px] font-black text-[#0a7d6e]"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                      {[7, 14, 30].map((days) => (
+                        <button
+                          key={days}
+                          type="button"
+                          onClick={() => updateSelectedClient({ followUpDate: addDays(days), status: "Follow-up" })}
+                          className="h-8 rounded-md bg-[#e8f7f2] px-3 text-[11px] font-black text-[#087766]"
+                        >
+                          Follow-up {days}d
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
                     <div className="grid gap-2 rounded-lg border border-[#e2ebe8] bg-[#fbfdfc] p-3 sm:grid-cols-2 xl:grid-cols-3">
                       <input value={selectedClient.age} onChange={(event) => updateSelectedClient({ age: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Age" />
-                      <input value={selectedClient.gender} onChange={(event) => updateSelectedClient({ gender: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Gender" />
+                      <select value={selectedClient.gender} onChange={(event) => updateSelectedClient({ gender: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
+                        <option value="">Gender</option>
+                        {selectedClient.gender && !genderOptions.includes(selectedClient.gender) ? <option>{selectedClient.gender}</option> : null}
+                        {genderOptions.map((option) => <option key={option}>{option}</option>)}
+                      </select>
                       <input value={selectedClient.height} onChange={(event) => updateSelectedClient({ height: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Height cm" />
-                      <input value={selectedClient.foodPreference} onChange={(event) => updateSelectedClient({ foodPreference: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Food preference" />
-                      <input value={selectedClient.activityLevel} onChange={(event) => updateSelectedClient({ activityLevel: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Activity level" />
+                      <select value={selectedClient.goal} onChange={(event) => updateSelectedClient({ goal: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
+                        <option value="">Goal</option>
+                        {selectedClient.goal && !goalOptions.includes(selectedClient.goal) ? <option>{selectedClient.goal}</option> : null}
+                        {goalOptions.map((option) => <option key={option}>{option}</option>)}
+                      </select>
+                      <select value={selectedClient.foodPreference} onChange={(event) => updateSelectedClient({ foodPreference: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
+                        <option value="">Food preference</option>
+                        {selectedClient.foodPreference && !foodPreferenceOptions.includes(selectedClient.foodPreference) ? <option>{selectedClient.foodPreference}</option> : null}
+                        {foodPreferenceOptions.map((option) => <option key={option}>{option}</option>)}
+                      </select>
+                      <select value={selectedClient.activityLevel} onChange={(event) => updateSelectedClient({ activityLevel: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
+                        <option value="">Activity level</option>
+                        {selectedClient.activityLevel && !activityOptions.includes(selectedClient.activityLevel) ? <option>{selectedClient.activityLevel}</option> : null}
+                        {activityOptions.map((option) => <option key={option}>{option}</option>)}
+                      </select>
                       <select value={selectedClient.paymentStatus} onChange={(event) => updateSelectedClient({ paymentStatus: event.target.value as NutritionClient["paymentStatus"] })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
                         <option>Trial</option><option>Paid</option><option>Pending</option>
                       </select>
-                      <input value={selectedClient.packageName} onChange={(event) => updateSelectedClient({ packageName: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold sm:col-span-2" placeholder="Package / program" />
+                      <select value={selectedClient.packageName} onChange={(event) => updateSelectedClient({ packageName: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
+                        <option value="">Package / program</option>
+                        {selectedClient.packageName && !packageOptions.includes(selectedClient.packageName) ? <option>{selectedClient.packageName}</option> : null}
+                        {packageOptions.map((option) => <option key={option}>{option}</option>)}
+                      </select>
+                      <input value={selectedClient.packageName} onChange={(event) => updateSelectedClient({ packageName: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Custom package" />
                       <input value={selectedClient.conditions} onChange={(event) => updateSelectedClient({ conditions: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Medical conditions" />
                       <input value={selectedClient.allergies} onChange={(event) => updateSelectedClient({ allergies: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Allergies" />
+                      <div className="sm:col-span-2 xl:col-span-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#74837f]">Tap medical tags</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {conditionOptions.map((option) => {
+                            const isActive = selectedClient.conditions.split(",").map((item) => item.trim()).includes(option);
+                            return (
+                              <button key={option} type="button" onClick={() => updateSelectedClient({ conditions: toggleCsvValue(selectedClient.conditions, option) })} className={`h-8 rounded-md px-2.5 text-[10px] font-black ${isActive ? "bg-[#0a7d6e] text-white" : "border border-[#dce9e5] bg-white text-[#52605d]"}`}>
+                                {option}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2 xl:col-span-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#74837f]">Tap allergy tags</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {allergyOptions.map((option) => {
+                            const isActive = selectedClient.allergies.split(",").map((item) => item.trim()).includes(option);
+                            return (
+                              <button key={option} type="button" onClick={() => updateSelectedClient({ allergies: toggleCsvValue(selectedClient.allergies, option) })} className={`h-8 rounded-md px-2.5 text-[10px] font-black ${isActive ? "bg-[#0a7d6e] text-white" : "border border-[#dce9e5] bg-white text-[#52605d]"}`}>
+                                {option}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 rounded-lg border border-[#e2ebe8] bg-[#102323] p-3 text-white">
                       {[
@@ -947,9 +1128,45 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
                         <h2 className="text-[15px] font-black">Diet builder</h2>
                         <p className="mt-1 text-[11px] font-bold text-[#74837f]">Dashboard-only plan, shareable by WhatsApp.</p>
                       </div>
-                      <select value={planLanguage} onChange={(event) => setPlanLanguage(event.target.value as DietPlan["language"])} className="h-9 rounded-md border border-[#dce9e5] px-3 text-[11px] font-bold">
-                        <option>English</option><option>Gujarati</option><option>Hindi</option>
-                      </select>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <select
+                          value=""
+                          onChange={(event) => {
+                            const template = planTemplates.find((item) => item.title === event.target.value);
+                            if (template) applyTemplate(template);
+                          }}
+                          className="h-9 rounded-md border border-[#dce9e5] px-3 text-[11px] font-bold"
+                          aria-label="Meal template"
+                        >
+                          <option value="">Meal template</option>
+                          {planTemplates.map((template) => <option key={template.title} value={template.title}>{template.title}</option>)}
+                        </select>
+                        <select value={planLanguage} onChange={(event) => setPlanLanguage(event.target.value as DietPlan["language"])} className="h-9 rounded-md border border-[#dce9e5] px-3 text-[11px] font-bold">
+                          <option>English</option><option>Gujarati</option><option>Hindi</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-lg border border-[#e2ebe8] bg-[#fbfdfc] p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[12px] font-black text-[#102323]">Quick meal templates</p>
+                          <p className="mt-1 text-[11px] font-bold text-[#74837f]">Select a ready schedule, then edit meals, quantity and notes below.</p>
+                        </div>
+                        <button type="button" onClick={() => setMealRows(mealTemplate.map((meal) => ({ ...meal, id: nextId("meal") })))} className="h-8 rounded-md border border-[#b8d4cc] bg-white px-3 text-[11px] font-black text-[#0a7d6e]">Reset</button>
+                      </div>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        {planTemplates.slice(0, 8).map((template) => (
+                          <button
+                            key={template.title}
+                            type="button"
+                            onClick={() => applyTemplate(template)}
+                            className="rounded-md border border-[#dce9e5] bg-white p-3 text-left hover:border-[#0a7d6e]"
+                          >
+                            <span className={`inline-flex rounded px-2 py-1 text-[9px] font-black ${template.tone}`}>{template.title}</span>
+                            <span className="mt-2 block text-[11px] font-bold leading-5 text-[#65716f]">{template.note}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div className="mt-4 overflow-hidden rounded-lg border border-[#e2ebe8]">
                       <div className="hidden grid-cols-[0.7fr_1.2fr_0.8fr_1.2fr] gap-2 bg-[#f7faf9] p-2 text-[10px] font-black uppercase text-[#74837f] md:grid">
@@ -1066,6 +1283,18 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
                   <div className="rounded-lg border border-[#dce9e5] bg-white p-4">
                     <h2 className="text-[15px] font-black">Follow-up notes</h2>
                     <textarea value={selectedClient.notes} onChange={(event) => updateSelectedClient({ notes: event.target.value })} className="mt-3 min-h-[148px] w-full rounded-md border border-[#dce9e5] p-3 text-[12px] font-bold" placeholder="Call summary, adherence, next instruction" />
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {quickNoteOptions.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => updateSelectedClient({ notes: selectedClient.notes ? `${selectedClient.notes}; ${option}` : option })}
+                          className="h-8 rounded-md border border-[#dce9e5] bg-[#fbfdfc] px-2.5 text-[10px] font-black text-[#52605d]"
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       <button type="button" onClick={() => updateSelectedClient({ status: "Active" })} className="h-10 rounded-md bg-[#0a7d6e] text-[12px] font-black text-white">Mark active</button>
                       <button type="button" onClick={() => updateSelectedClient({ status: "Follow-up" })} className="h-10 rounded-md border border-[#b8d4cc] text-[12px] font-black text-[#0a7d6e]">Keep follow-up</button>
