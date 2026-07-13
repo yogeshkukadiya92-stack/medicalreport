@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedUserId } from "@/lib/auth-server";
 import type { ReportMarker, ReportStatus } from "@/lib/vault-types";
 
 export const maxDuration = 45;
@@ -79,6 +80,12 @@ function extractJsonObject(content: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const userId = await getAuthenticatedUserId(request);
+
+  if (!userId) {
+    return NextResponse.json({ error: "Sign in is required to analyze reports." }, { status: 401 });
+  }
+
   const aiProvider = getAiProvider();
   const body = await request.json().catch(() => null) as {
     fileDataUrl?: string;

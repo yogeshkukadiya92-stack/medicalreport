@@ -156,6 +156,12 @@ export default function Upload() {
       return;
     }
 
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      setError("Sign in again before uploading reports.");
+      return;
+    }
+
     setIsSaving(true);
     setAnalysisProgress(8);
     setAnalysisStep("Saving report");
@@ -189,7 +195,10 @@ export default function Upload() {
       setAnalysisStep("Uploading securely");
       const response = await fetch("/api/analyze-report", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           fileDataUrls: preparedFile.dataUrls,
           fileName: file.name,

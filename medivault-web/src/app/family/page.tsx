@@ -5,7 +5,7 @@ import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 import { calculateHealthScore } from "@/lib/health-score";
 
-const emptyForm = { name: "", relation: "", age: "", bloodGroup: "", countryCode: "+91", phone: "" };
+const emptyForm = { name: "", relation: "", age: "", bloodGroup: "", phone: "" };
 
 export default function FamilyPage() {
   const { activeMemberId, addMember, deleteMember, familyMembers, reports, setActiveMemberId, updateMember } = useAppData();
@@ -29,7 +29,6 @@ export default function FamilyPage() {
       relation: editingMember.relation,
       age: editingMember.age ? String(editingMember.age) : "",
       bloodGroup: editingMember.bloodGroup,
-      countryCode: editingMember.countryCode ?? "+91",
       phone: editingMember.phone ?? "",
     });
   }, [editingMember]);
@@ -45,7 +44,6 @@ export default function FamilyPage() {
         relation: form.relation.trim() || "Family",
         age: form.age ? Number(form.age) : 0,
         bloodGroup: form.bloodGroup.trim() || "Unknown",
-        countryCode: form.countryCode.trim() || "+91",
         phone: form.phone.trim(),
       });
       setMessage(`${name} updated.`);
@@ -53,7 +51,6 @@ export default function FamilyPage() {
       addMember(name, form.relation.trim() || "Family", {
         age: form.age ? Number(form.age) : 0,
         bloodGroup: form.bloodGroup.trim() || "Unknown",
-        countryCode: form.countryCode.trim() || "+91",
         phone: form.phone.trim(),
       });
       setMessage(`${name} added to your family vault.`);
@@ -118,7 +115,7 @@ export default function FamilyPage() {
                         {member.relation} - {member.age || "Age not set"} - {member.bloodGroup}
                       </p>
                       <p className={`mt-1 text-[11px] ${isActive ? "text-[#aee7d9]" : "text-[#7b8986]"}`}>
-                        {member.phone ? `Phone ${member.countryCode ?? "+91"} ${member.phone}` : "Phone not linked"}
+                        {member.phone ? `Phone ${member.phone}` : "Phone not linked"}
                       </p>
                     </button>
                     <div className="text-right">
@@ -190,26 +187,15 @@ export default function FamilyPage() {
               placeholder="Father, spouse, child"
             />
           </label>
-          <div className="mt-3 grid grid-cols-[96px_1fr] gap-3">
-            <label className="block">
-              <span className="text-[12px] font-bold text-[#52605d]">Code</span>
-              <input
-                value={form.countryCode}
-                onChange={(event) => setForm((current) => ({ ...current, countryCode: event.target.value }))}
-                className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] px-4 text-[14px] font-bold"
-                placeholder="+91"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[12px] font-bold text-[#52605d]">Phone for lab report matching</span>
-              <input
-                value={form.phone}
-                onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-                className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] px-4 text-[14px] font-bold"
-                placeholder="98765 43210"
-              />
-            </label>
-          </div>
+          <label className="mt-3 block">
+            <span className="text-[12px] font-bold text-[#52605d]">Phone for lab report matching</span>
+            <input
+              value={form.phone}
+              onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+              className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] px-4 text-[14px] font-bold"
+              placeholder="+91 98765 43210"
+            />
+          </label>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <label className="block">
               <span className="text-[12px] font-bold text-[#52605d]">Age</span>

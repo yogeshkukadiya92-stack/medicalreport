@@ -1,7 +1,9 @@
 import type { Db } from "mongodb";
+import { GridFSBucket, ObjectId } from "mongodb";
 import { NextRequest } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
+import { ensureNormalizedHealthIndexes, hasLabPermission, type LabPermission } from "@/lib/normalized-health";
 import type { LabProfile, LabReport, LabReportAuditLog, LabUser } from "@/lib/vault-types";
 
 export type LabContext =
@@ -32,7 +34,6 @@ function slugFromText(value: string) {
 async function ensureLabIndexes(db: Db) {
   await Promise.all([
     db.collection("labs").createIndex({ id: 1 }, { unique: true }),
-    db.collection("labs").createIndex({ bookingSlug: 1 }, { unique: true, sparse: true }),
     db.collection("labUsers").createIndex({ userId: 1 }),
     db.collection("labUsers").createIndex({ labId: 1, userId: 1 }, { unique: true }),
     db.collection("labClients").createIndex({ labId: 1, normalizedPhone: 1 }, { unique: true }),
@@ -42,12 +43,8 @@ async function ensureLabIndexes(db: Db) {
     db.collection("labReportAuditLogs").createIndex({ labId: 1, labReportId: 1, createdAt: -1 }),
     db.collection("clientReportLinks").createIndex({ labId: 1, state: 1 }),
     db.collection("clientReportLinks").createIndex({ normalizedPhone: 1, userId: 1 }),
-    db.collection("labServices").createIndex({ labId: 1, active: 1 }),
-    db.collection("labBookings").createIndex({ labId: 1, preferredDate: 1, status: 1 }),
-    db.collection("labBookings").createIndex({ labId: 1, normalizedPhone: 1 }),
-    db.collection("labPaymentOrders").createIndex({ id: 1 }, { unique: true }),
-    db.collection("labPaymentOrders").createIndex({ labId: 1, status: 1 }),
   ]);
+  await ensureNormalizedHealthIndexes(db);
 }
 
 type LabCandidate = {
@@ -147,7 +144,6 @@ export async function getLabContext(request: NextRequest): Promise<LabContext> {
   const lab: LabProfile = {
     id: labId,
     name: "MediVault Lab",
-    bookingSlug: `medivault-lab-${userId.slice(-20)}`,
     ownerUserId: userId,
     createdAt: now,
     updatedAt: now,
@@ -191,4 +187,21 @@ export async function addLabAuditLog(
   };
   await db.collection<LabReportAuditLog>("labReportAuditLogs").insertOne(log);
   return log;
+}
+
+export function requireLabPermission(labUser: LabUser, permission: LabPermission) {
+  if (hasLabPermission(labUser.role, permission)) return null;
+  return {
+    error: `Your ${labUser.role.replace("_", " ")} role cannot ${permission.replace(":", " ")}.`,
+    status: 403,
+  };
+}
+
+export async function userOwnsReportFile(db: Db, fileId: string, userId: string) {
+  if (!fileId) return true;
+  if (!ObjectId.isValid(fileId)) return false;
+
+  const bucket = new GridFSBucket(db, { bucketName: "reportFiles" });
+  const file = await bucket.find({ _id: new ObjectId(fileId), "metadata.userId": userId }).next();
+  return Boolean(file);
 }

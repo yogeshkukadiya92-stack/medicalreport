@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addLabAuditLog, getLabContext } from "@/lib/lab-server";
+import { addLabAuditLog, getLabContext, userOwnsReportFile } from "@/lib/lab-server";
 import { getLabDashboardData, todayDate } from "@/lib/lab-dashboard";
 import { buildLabSummary, normalizePhone, statusFromValue } from "@/lib/lab-utils";
+import { syncNormalizedLabReport } from "@/lib/normalized-health";
 import type { LabClient, LabReport, LabReportValue, ReportMarker } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
@@ -19,12 +20,10 @@ type LabReportInput = {
   accessionNumber?: string;
   client?: {
     age?: number | string;
-    countryCode?: string;
     gender?: string;
     name?: string;
     phone?: string;
   };
-  clientCountryCode?: string;
   clientId?: string;
   clientName?: string;
   clientPhone?: string;
@@ -55,9 +54,8 @@ function cleanText(value: unknown) {
 
 async function upsertClient(context: Exclude<Awaited<ReturnType<typeof getLabContext>>, { error: string; status: number }>, input: LabReportInput) {
   const clientName = cleanText(input.client?.name) || cleanText(input.clientName);
-  const clientCountryCode = cleanText(input.client?.countryCode) || cleanText(input.clientCountryCode) || "+91";
   const clientPhone = cleanText(input.client?.phone) || cleanText(input.clientPhone);
-  const normalizedPhone = normalizePhone(clientPhone, clientCountryCode);
+  const normalizedPhone = normalizePhone(clientPhone);
   const ageInput = input.client?.age;
   const parsedAge = ageInput === "" || ageInput === undefined ? undefined : Number(ageInput);
   const gender = cleanText(input.client?.gender) || undefined;
@@ -83,7 +81,6 @@ async function upsertClient(context: Exclude<Awaited<ReturnType<typeof getLabCon
     id: existing?.id ?? newId("client"),
     labId: context.lab.id,
     name: clientName,
-    countryCode: clientCountryCode,
     phone: clientPhone,
     normalizedPhone,
     age: typeof parsedAge === "number" && Number.isFinite(parsedAge) ? parsedAge : existing?.age,
@@ -242,6 +239,11 @@ export async function POST(request: NextRequest) {
   const values = cleanValues(body.values ?? [], context.lab.id, reportId, now);
   const abnormal = values.filter((value) => value.status !== "Normal").length;
   const labReportId = cleanText(body.labReportId) || cleanText(body.accessionNumber) || `LR-${Date.now()}`;
+  const fileId = cleanText(body.fileId);
+  if (fileId && !(await userOwnsReportFile(context.db, fileId, context.userId))) {
+    return NextResponse.json({ error: "Attachment is not available for this user." }, { status: 403 });
+  }
+
   const report: LabReport = {
     id: reportId,
     labId: context.lab.id,
@@ -249,7 +251,6 @@ export async function POST(request: NextRequest) {
     labReportId,
     clientId: clientResult.client.id,
     clientName: clientResult.client.name,
-    clientCountryCode: clientResult.client.countryCode,
     clientPhone: clientResult.client.phone,
     normalizedClientPhone: clientResult.client.normalizedPhone,
     reportType,
@@ -260,7 +261,7 @@ export async function POST(request: NextRequest) {
     abnormal,
     parameters: values.length,
     summary: buildLabSummary(values),
-    fileId: cleanText(body.fileId) || undefined,
+    fileId: fileId || undefined,
     fileName: cleanText(body.fileName) || undefined,
     fileMimeType: cleanText(body.fileMimeType) || undefined,
     fileSizeBytes: typeof body.fileSizeBytes === "number" && Number.isFinite(body.fileSizeBytes) ? body.fileSizeBytes : undefined,
@@ -308,6 +309,7 @@ export async function POST(request: NextRequest) {
     labReportId: report.id,
     note: "Report auto-published to matching client vaults.",
   });
+  await syncNormalizedLabReport(context.db, report, context.userId);
 
   return NextResponse.json({
     duplicateWarning: duplicate

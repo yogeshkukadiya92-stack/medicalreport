@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLabContext } from "@/lib/lab-server";
-import { getRazorpayPublicConfig } from "@/lib/razorpay";
 import type { LabProfile, LabReport } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
@@ -23,7 +22,6 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     lab: context.lab,
-    razorpay: getRazorpayPublicConfig(),
     role: context.labUser.role,
   });
 }

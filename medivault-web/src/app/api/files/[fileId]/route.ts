@@ -2,7 +2,7 @@ import { Readable } from "node:stream";
 import { GridFSBucket, ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
-import { phoneMatchKeys } from "@/lib/lab-utils";
+import { normalizePhone } from "@/lib/lab-utils";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
 import type { LabReport, LabUser, VaultSnapshot } from "@/lib/vault-types";
 
@@ -37,7 +37,7 @@ async function canViewLabFile(fileId: string, userId: string) {
   const phones = [
     ...new Set(
       (vault?.snapshot?.familyMembers ?? [])
-        .flatMap((member) => phoneMatchKeys(member.phone ?? "", member.countryCode))
+        .map((member) => normalizePhone(member.phone ?? ""))
         .filter((phone) => phone.length >= 8),
     ),
   ];

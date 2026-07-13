@@ -5,7 +5,6 @@ export type FamilyMember = {
   score: number;
   bloodGroup: string;
   age: number;
-  countryCode?: string;
   phone?: string;
 };
 
@@ -35,7 +34,6 @@ export type AppReport = {
   labId?: string;
   labName?: string;
   labReportId?: string;
-  clientCountryCode?: string;
   clientPhone?: string;
   publishedAt?: string;
   createdByLabUserId?: string;
@@ -59,7 +57,7 @@ export type VaultSnapshot = {
   reports: AppReport[];
 };
 
-export type LabRole = "lab_admin" | "lab_staff";
+export type LabRole = "lab_admin" | "lab_staff" | "pathologist" | "technician" | "cashier" | "collector";
 
 export type LabProfile = {
   id: string;
@@ -86,7 +84,6 @@ export type LabClient = {
   id: string;
   labId: string;
   name: string;
-  countryCode?: string;
   phone: string;
   normalizedPhone: string;
   age?: number;
@@ -96,6 +93,24 @@ export type LabClient = {
 };
 
 export type LabReportStatus = "draft" | "published" | "unclaimed";
+
+export type LabOrderStatus =
+  | "ordered"
+  | "accessioned"
+  | "sample_collected"
+  | "sample_received"
+  | "sample_rejected"
+  | "in_analysis"
+  | "ready_for_verification"
+  | "verified"
+  | "reported"
+  | "cancelled";
+
+export type LabSampleEventType = "barcode_printed" | "collected" | "received" | "rejected" | "aliquoted" | "transferred";
+
+export type LabBillingStatus = "draft" | "issued" | "part_paid" | "paid" | "refunded" | "void";
+
+export type LabDeliveryChannel = "whatsapp" | "sms" | "email";
 
 export type LabReportValue = {
   id: string;
@@ -118,7 +133,6 @@ export type LabReport = {
   labReportId: string;
   clientId: string;
   clientName: string;
-  clientCountryCode?: string;
   clientPhone: string;
   normalizedClientPhone: string;
   reportType: string;
@@ -164,58 +178,4 @@ export type LabTemplate = {
   name: string;
   category: string;
   tests: LabTemplateTest[];
-};
-
-export type LabService = {
-  id: string;
-  labId: string;
-  name: string;
-  description?: string;
-  price?: number;
-  durationMinutes?: number;
-  sampleType?: string;
-  homeCollection: boolean;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type LabBookingStatus = "requested" | "confirmed" | "sample_collected" | "report_ready" | "cancelled";
-
-export type LabBooking = {
-  id: string;
-  labId: string;
-  labName: string;
-  clientName: string;
-  clientPhone: string;
-  normalizedPhone: string;
-  serviceId?: string;
-  serviceName: string;
-  preferredDate: string;
-  preferredTime: string;
-  collectionType: "lab_visit" | "home_collection";
-  address?: string;
-  notes?: string;
-  paymentAmount?: number;
-  paymentCurrency?: string;
-  paymentMethod: "pay_at_lab" | "razorpay";
-  paymentOrderId?: string;
-  paymentPaymentId?: string;
-  paymentStatus: "not_required" | "pending" | "paid";
-  status: LabBookingStatus;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type LabPaymentOrder = {
-  id: string;
-  labId: string;
-  amount: number;
-  currency: string;
-  receipt: string;
-  serviceId?: string;
-  serviceName: string;
-  status: "created" | "paid" | "expired";
-  createdAt: string;
-  updatedAt: string;
 };

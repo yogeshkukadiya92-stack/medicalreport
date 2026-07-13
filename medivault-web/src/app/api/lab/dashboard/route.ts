@@ -20,15 +20,9 @@ export async function GET(request: NextRequest) {
       .limit(8)
       .toArray(),
   ]);
-  const origin = request.nextUrl.origin;
-  const bookingSlug = context.lab.bookingSlug ?? context.lab.id;
 
   return NextResponse.json({
     ...dashboard,
-    bookingOps: {
-      ...dashboard.bookingOps,
-      bookingLink: `${origin}/book/${bookingSlug}`,
-    },
     lab: context.lab,
     reports,
   });

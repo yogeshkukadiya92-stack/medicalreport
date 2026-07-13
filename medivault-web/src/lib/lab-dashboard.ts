@@ -1,5 +1,5 @@
 import type { Db } from "mongodb";
-import type { LabBooking, LabClient, LabProfile, LabReport, LabService } from "@/lib/vault-types";
+import type { LabClient, LabProfile, LabReport } from "@/lib/vault-types";
 
 export type LabKpis = {
   abnormalReports: number;
@@ -39,19 +39,9 @@ export type SyncStatus = {
 };
 
 export type LabDashboardPayload = {
-  bookingOps: {
-    activeServices: number;
-    bookingLink: string;
-    completedToday: number;
-    homeCollections: number;
-    pendingBookings: number;
-    samplesToCollect: number;
-    todayBookings: number;
-  };
   criticalAlerts: CriticalAlert[];
   kpis: LabKpis;
   recentActivity: Record<string, unknown>[];
-  recentBookings: LabBooking[];
   syncStatus: SyncStatus;
   workQueue: WorkQueue;
 };
@@ -97,13 +87,6 @@ export async function getLabDashboardData(db: Db, lab: Pick<LabProfile, "id">): 
     missingAttachment,
     recentActivity,
     criticalAlerts,
-    pendingBookings,
-    todayBookings,
-    homeCollections,
-    samplesToCollect,
-    completedToday,
-    activeServices,
-    recentBookings,
   ] = await Promise.all([
     db.collection<LabReport>("labReports").countDocuments({ labId: lab.id, reportDate: today }),
     db.collection<LabClient>("labClients").countDocuments({ labId: lab.id }),
@@ -146,31 +129,10 @@ export async function getLabDashboardData(db: Db, lab: Pick<LabProfile, "id">): 
         },
       ])
       .toArray(),
-    db.collection<LabBooking>("labBookings").countDocuments({ labId: lab.id, status: { $in: ["requested", "confirmed"] } }),
-    db.collection<LabBooking>("labBookings").countDocuments({ labId: lab.id, preferredDate: today }),
-    db.collection<LabBooking>("labBookings").countDocuments({ labId: lab.id, collectionType: "home_collection", status: { $in: ["requested", "confirmed"] } }),
-    db.collection<LabBooking>("labBookings").countDocuments({ labId: lab.id, preferredDate: today, status: "confirmed" }),
-    db.collection<LabBooking>("labBookings").countDocuments({ labId: lab.id, preferredDate: today, status: { $in: ["sample_collected", "report_ready"] } }),
-    db.collection<LabService>("labServices").countDocuments({ labId: lab.id, active: true }),
-    db
-      .collection<LabBooking>("labBookings")
-      .find({ labId: lab.id }, { projection: { _id: 0 } })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .toArray(),
   ]);
   const claimPercentage = publishedReports ? Math.round((claimedReports / publishedReports) * 100) : 0;
 
   return {
-    bookingOps: {
-      activeServices,
-      bookingLink: "",
-      completedToday,
-      homeCollections,
-      pendingBookings,
-      samplesToCollect,
-      todayBookings,
-    },
     criticalAlerts,
     kpis: {
       abnormalReports,
@@ -180,7 +142,6 @@ export async function getLabDashboardData(db: Db, lab: Pick<LabProfile, "id">): 
       totalClients,
     },
     recentActivity,
-    recentBookings,
     syncStatus: {
       claimPercentage,
       claimedReports,

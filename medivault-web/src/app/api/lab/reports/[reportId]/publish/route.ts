@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addLabAuditLog, getLabContext } from "@/lib/lab-server";
+import { syncNormalizedLabReport } from "@/lib/normalized-health";
 import type { LabReport } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
@@ -76,6 +77,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     },
     { projection: { _id: 0 } },
   );
+  if (report) {
+    await syncNormalizedLabReport(context.db, report, context.userId);
+  }
 
   return NextResponse.json({ report });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addLabAuditLog, getLabContext } from "@/lib/lab-server";
+import { addLabAuditLog, getLabContext, userOwnsReportFile } from "@/lib/lab-server";
 import { buildLabSummary, normalizePhone, statusFromValue } from "@/lib/lab-utils";
+import { syncNormalizedLabReport } from "@/lib/normalized-health";
 import type { LabReport, LabReportValue, ReportMarker } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
@@ -22,7 +23,6 @@ type LabReportValueInput = {
 
 type PatchInput = {
   accessionNumber?: string;
-  clientCountryCode?: string;
   clientName?: string;
   clientPhone?: string;
   doctorName?: string;
@@ -121,20 +121,22 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
   });
 
+  if (patch.fileId && !(await userOwnsReportFile(context.db, patch.fileId, context.userId))) {
+    return NextResponse.json({ error: "Attachment is not available for this user." }, { status: 403 });
+  }
+
   if (typeof body.fileSizeBytes === "number" && Number.isFinite(body.fileSizeBytes)) {
     patch.fileSizeBytes = body.fileSizeBytes;
   }
 
   const clientName = cleanText(body.clientName);
-  const clientCountryCode = cleanText(body.clientCountryCode);
   const clientPhone = cleanText(body.clientPhone);
   if (clientName) patch.clientName = clientName;
   if (clientPhone) {
-    const normalizedPhone = normalizePhone(clientPhone, clientCountryCode || existing.clientCountryCode || "+91");
+    const normalizedPhone = normalizePhone(clientPhone);
     if (normalizedPhone.length < 8) {
       return NextResponse.json({ error: "A valid client phone number is required." }, { status: 400 });
     }
-    patch.clientCountryCode = clientCountryCode || existing.clientCountryCode || "+91";
     patch.clientPhone = clientPhone;
     patch.normalizedClientPhone = normalizedPhone;
   }
@@ -180,6 +182,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     labReportId: existing.id,
     note: "Lab report updated.",
   });
+  if (report) {
+    await syncNormalizedLabReport(context.db, report, context.userId);
+  }
 
   return NextResponse.json({ report });
 }

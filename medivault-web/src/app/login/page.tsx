@@ -168,6 +168,8 @@ export default function LoginPage() {
               placeholder="9876543210"
               inputMode="tel"
               autoComplete="tel"
+              required
+              aria-invalid={Boolean(error) && !phone}
               className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
             />
           </label>
@@ -181,6 +183,7 @@ export default function LoginPage() {
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="you@example.com"
                 autoComplete="email"
+                required
                 className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
               />
             </label>
@@ -195,6 +198,8 @@ export default function LoginPage() {
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Minimum 6 characters"
                 autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                minLength={6}
+                required
                 className="h-12 w-full rounded-lg border border-[#dce9e5] bg-white py-0 pl-4 pr-12 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
               />
               <button
@@ -233,6 +238,9 @@ export default function LoginPage() {
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     disabled={!isOtpSent}
+                    maxLength={4}
+                    pattern="[0-9]{4}"
+                    required={isOtpSent}
                     className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[16px] font-black tracking-[0.28em] text-[#162523] outline-none focus:border-[#0a7d6e] disabled:bg-[#edf3f1] disabled:text-[#8a9794]"
                   />
                 </label>
@@ -250,8 +258,10 @@ export default function LoginPage() {
             </div>
           ) : null}
 
-          {error ? <p className="rounded-lg bg-[#fff0ec] p-3 text-[13px] font-bold text-[#ba563d]">{error}</p> : null}
-          {message ? <p className="rounded-lg bg-[#eaf9f2] p-3 text-[13px] font-bold text-[#087766]">{message}</p> : null}
+          <div aria-live="polite" aria-atomic="true">
+            {error ? <p role="alert" className="rounded-lg bg-[#fff0ec] p-3 text-[13px] font-bold text-[#ba563d]">{error}</p> : null}
+            {message ? <p role="status" className="rounded-lg bg-[#eaf9f2] p-3 text-[13px] font-bold text-[#087766]">{message}</p> : null}
+          </div>
 
           <button
             type="submit"

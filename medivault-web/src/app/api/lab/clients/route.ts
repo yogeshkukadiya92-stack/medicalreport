@@ -7,7 +7,6 @@ export const runtime = "nodejs";
 
 type ClientInput = {
   age?: number | string;
-  countryCode?: string;
   gender?: string;
   name?: string;
   phone?: string;
@@ -15,12 +14,11 @@ type ClientInput = {
 
 function cleanClientInput(input: ClientInput | null) {
   const name = input?.name?.trim() || "";
-  const countryCode = input?.countryCode?.trim() || "+91";
   const phone = input?.phone?.trim() || "";
-  const normalizedPhone = normalizePhone(phone, countryCode);
+  const normalizedPhone = normalizePhone(phone);
   const parsedAge = input?.age === "" || input?.age === undefined ? undefined : Number(input.age);
   const gender = input?.gender?.trim() || undefined;
-  return { age: typeof parsedAge === "number" && Number.isFinite(parsedAge) ? parsedAge : undefined, countryCode, gender, name, normalizedPhone, phone };
+  return { age: typeof parsedAge === "number" && Number.isFinite(parsedAge) ? parsedAge : undefined, gender, name, normalizedPhone, phone };
 }
 
 export async function GET(request: NextRequest) {
@@ -36,7 +34,6 @@ export async function GET(request: NextRequest) {
       { name: { $regex: search, $options: "i" } },
       { phone: { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } },
       { normalizedPhone: { $regex: normalizePhone(search), $options: "i" } },
-      { normalizedPhone: { $regex: search.replace(/\D/g, ""), $options: "i" } },
     ];
   }
 
@@ -80,7 +77,6 @@ export async function POST(request: NextRequest) {
     id: existing?.id ?? `client-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     labId: context.lab.id,
     name: input.name,
-    countryCode: input.countryCode,
     phone: input.phone,
     normalizedPhone: input.normalizedPhone,
     age: input.age,

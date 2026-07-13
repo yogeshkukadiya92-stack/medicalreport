@@ -22,7 +22,7 @@ type ManualReportInput = {
   title: string;
 };
 
-type MemberDetails = Partial<Pick<FamilyMember, "age" | "bloodGroup" | "countryCode" | "phone">>;
+type MemberDetails = Partial<Pick<FamilyMember, "age" | "bloodGroup" | "phone">>;
 
 type AppDataContextValue = {
   activeMember: FamilyMember | null;
@@ -33,7 +33,7 @@ type AppDataContextValue = {
   deleteMember: (memberId: string) => void;
   deleteReport: (reportId: string) => void;
   familyMembers: FamilyMember[];
-  updateMember: (memberId: string, patch: Partial<Pick<FamilyMember, "name" | "relation" | "age" | "bloodGroup" | "countryCode" | "phone">>) => void;
+  updateMember: (memberId: string, patch: Partial<Pick<FamilyMember, "name" | "relation" | "age" | "bloodGroup" | "phone">>) => void;
   updateReport: (reportId: string, patch: ReportPatch) => void;
   markReviewed: (reportId: string) => void;
   reports: AppReport[];
@@ -76,20 +76,12 @@ function normalizeReport(report: AppReport): AppReport {
 function normalizeMember(member: FamilyMember): FamilyMember {
   return {
     ...member,
-    countryCode: typeof member.countryCode === "string" ? member.countryCode : "+91",
     phone: typeof member.phone === "string" ? member.phone : "",
   };
 }
 
 function localReportsOnly(reports: AppReport[]) {
   return reports.filter((report) => report.source !== "lab");
-}
-
-function sameReportList(first: AppReport[], second: AppReport[]) {
-  if (first.length !== second.length) return false;
-  const firstIds = first.map((report) => `${report.id}:${report.createdAt ?? ""}:${report.summary ?? ""}`).sort();
-  const secondIds = second.map((report) => `${report.id}:${report.createdAt ?? ""}:${report.summary ?? ""}`).sort();
-  return firstIds.every((id, index) => id === secondIds[index]);
 }
 
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
@@ -196,26 +188,17 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(cloudSaveTimerRef.current);
     }
 
-    cloudSaveTimerRef.current = setTimeout(async () => {
-      const response = await fetch("/api/vault", {
+    cloudSaveTimerRef.current = setTimeout(() => {
+      fetch("/api/vault", {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${session.access_token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ activeMemberId, familyMembers, reports: localReportsOnly(reports) } satisfies VaultSnapshot),
-      }).catch(() => null);
-
-      if (!response?.ok) {
+      }).catch(() => {
         // Local storage remains the immediate offline fallback when cloud sync is unavailable.
-        return;
-      }
-
-      const result = (await response.json().catch(() => null)) as { vault?: VaultSnapshot } | null;
-      if (result?.vault?.reports) {
-        const mergedReports = result.vault.reports.map(normalizeReport);
-        setReports((current) => (sameReportList(current, mergedReports) ? current : mergedReports));
-      }
+      });
     }, 450);
 
     return () => {
@@ -224,37 +207,6 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, [activeMemberId, authStatus, familyMembers, isCloudLoaded, isHydrated, reports, session?.access_token]);
-
-  useEffect(() => {
-    if (!isHydrated || !isCloudLoaded || authStatus !== "authenticated" || !session?.access_token) return;
-
-    let isCancelled = false;
-    async function refreshLabReports() {
-      const response = await fetch("/api/vault", {
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-      }).catch(() => null);
-      if (!response?.ok || isCancelled) return;
-      const result = (await response.json().catch(() => null)) as { vault?: VaultSnapshot | null } | null;
-      if (result?.vault?.reports) {
-        const mergedReports = result.vault.reports.map(normalizeReport);
-        setReports((current) => (sameReportList(current, mergedReports) ? current : mergedReports));
-      }
-    }
-
-    const intervalId = window.setInterval(refreshLabReports, 30000);
-    const onFocus = () => {
-      refreshLabReports();
-    };
-    window.addEventListener("focus", onFocus);
-
-    return () => {
-      isCancelled = true;
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [authStatus, isCloudLoaded, isHydrated, session?.access_token]);
 
   useEffect(() => {
     if (!isHydrated || !familyMembers.length) return;
@@ -282,7 +234,6 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           score: 0,
           bloodGroup: details?.bloodGroup?.trim() || "Unknown",
           age: details?.age ?? 0,
-          countryCode: details?.countryCode?.trim() || "+91",
           phone: details?.phone?.trim() || "",
         };
         setFamilyMembers((current) => [...current, nextMember]);

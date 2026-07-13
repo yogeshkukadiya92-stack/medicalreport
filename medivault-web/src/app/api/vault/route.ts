@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
-import { labReportToAppReport, normalizePhone, phoneMatchKeys } from "@/lib/lab-utils";
+import { labReportToAppReport, normalizePhone } from "@/lib/lab-utils";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
 import type { FamilyMember, LabReport, VaultSnapshot } from "@/lib/vault-types";
 
@@ -30,12 +30,11 @@ function cleanFamilyMember(member: FamilyMember): FamilyMember {
 async function mergePublishedLabReports(userId: string, snapshot: VaultSnapshot): Promise<VaultSnapshot> {
   const db = await getMongoDb();
   const phoneMatches = snapshot.familyMembers
-    .flatMap((member) =>
-      phoneMatchKeys(member.phone ?? "", member.countryCode).map((normalizedPhone) => ({
-        member,
-        normalizedPhone,
-      })),
-    );
+    .map((member) => ({
+      member,
+      normalizedPhone: normalizePhone(member.phone ?? ""),
+    }))
+    .filter((entry) => entry.normalizedPhone.length >= 8);
 
   if (!phoneMatches.length) {
     return snapshot;
@@ -74,7 +73,7 @@ async function mergePublishedLabReports(userId: string, snapshot: VaultSnapshot)
             $set: {
               claimedAt: now,
               memberId: report.memberId,
-              normalizedPhone: normalizePhone(report.clientPhone ?? "", report.clientCountryCode),
+              normalizedPhone: normalizePhone(report.clientPhone ?? ""),
               state: "claimed",
               updatedAt: now,
               userId,
@@ -152,7 +151,5 @@ export async function PUT(request: NextRequest) {
     { upsert: true },
   );
 
-  const mergedSnapshot = await mergePublishedLabReports(userId, snapshot || emptyVault);
-
-  return NextResponse.json({ isConfigured: true, saved: true, vault: mergedSnapshot });
+  return NextResponse.json({ isConfigured: true, saved: true, vault: snapshot || emptyVault });
 }
