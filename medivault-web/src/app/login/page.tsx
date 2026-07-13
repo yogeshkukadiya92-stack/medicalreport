@@ -6,6 +6,8 @@ import { useAuth } from "@/components/auth-provider";
 
 type Mode = "signin" | "signup";
 
+const indiaPhonePrefix = "+91 ";
+
 function safeRedirectPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/dashboard";
   try {
@@ -28,7 +30,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(indiaPhonePrefix);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
@@ -51,8 +53,8 @@ export default function LoginPage() {
       return;
     }
 
-    if (!phone || !password) {
-      setError("Enter mobile number and password.");
+    if (!phone || phone === indiaPhonePrefix || !password) {
+      setError(mode === "signin" ? "Enter mobile/email and password." : "Enter mobile number and password.");
       return;
     }
 
@@ -87,7 +89,7 @@ export default function LoginPage() {
     setError("");
     setMessage("");
 
-    if (!phone || phone.replace(/\D/g, "").length < 10) {
+    if (!phone || phone.replace(/\D/g, "").length < 12) {
       setError("Enter a valid mobile number before sending OTP.");
       return;
     }
@@ -110,6 +112,17 @@ export default function LoginPage() {
     setMessage("");
     setOtp("");
     setIsOtpSent(false);
+    setPhone((current) => (current.includes("@") ? indiaPhonePrefix : current || indiaPhonePrefix));
+  }
+
+  function updatePhoneInput(value: string) {
+    if (mode === "signin" && /[a-z@]/i.test(value)) {
+      setPhone(value.replace(/^\+91\s*/i, "").trim());
+      return;
+    }
+    const digits = value.replace(/\D/g, "");
+    const withoutCountry = digits.startsWith("91") ? digits.slice(2) : digits;
+    setPhone(`${indiaPhonePrefix}${withoutCountry.slice(0, 10)}`);
   }
 
   return (
@@ -164,8 +177,11 @@ export default function LoginPage() {
             <input
               type={mode === "signin" ? "text" : "tel"}
               value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              placeholder={mode === "signin" ? "9876543210 or admin@example.com" : "9876543210"}
+              onChange={(event) => updatePhoneInput(event.target.value)}
+              onFocus={() => {
+                if (!phone) setPhone(indiaPhonePrefix);
+              }}
+              placeholder={mode === "signin" ? "+91 9876543210 or admin@example.com" : "+91 9876543210"}
               inputMode={mode === "signin" ? "text" : "tel"}
               autoComplete={mode === "signin" ? "username" : "tel"}
               required

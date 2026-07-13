@@ -73,6 +73,7 @@ export default function LabReportsPage() {
   const [fileError, setFileError] = useState("");
   const [isOpeningFileId, setIsOpeningFileId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [publishingReportId, setPublishingReportId] = useState("");
 
   async function loadReports(nextFilters = filters, nextReportId = reportIdFromUrl()) {
     if (!isConfigured) {
@@ -171,6 +172,35 @@ export default function LabReportsPage() {
     }
   }
 
+  async function publishReport(report: LabReport) {
+    setError("");
+    if (!session?.access_token) {
+      setError("Sign in again before publishing this report.");
+      return;
+    }
+
+    setPublishingReportId(report.id);
+    try {
+      const response = await fetch(`/api/lab/reports/${encodeURIComponent(report.id)}/publish`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error ?? "Report could not be published.");
+      const nextReport = result?.report as LabReport | undefined;
+      if (nextReport) {
+        setReports((current) => current.map((item) => (item.id === nextReport.id ? nextReport : item)));
+        setSelectedReport((current) => (current?.id === nextReport.id ? nextReport : current));
+      } else {
+        await loadReports(filters, selectedReport?.id ?? "");
+      }
+    } catch (publishError) {
+      setError(publishError instanceof Error ? publishError.message : "Report could not be published.");
+    } finally {
+      setPublishingReportId("");
+    }
+  }
+
   return (
     <LabShell>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -249,17 +279,29 @@ export default function LabReportsPage() {
       {error ? <div className="mt-4 rounded-lg bg-[#fff0ec] p-3 text-[13px] font-bold text-[#ba563d]">{error}</div> : null}
 
       <section className="mt-5 rounded-lg border border-[#e2ebe8] bg-white">
-        <div className="grid border-b border-[#edf3f1] p-4 text-[12px] font-black uppercase tracking-normal text-[#6f7f7c] md:grid-cols-[1.1fr_1fr_0.8fr_0.7fr_0.7fr]">
+        <div className="grid border-b border-[#edf3f1] p-4 text-[12px] font-black uppercase tracking-normal text-[#6f7f7c] md:grid-cols-[1.1fr_1fr_0.8fr_0.7fr_0.7fr_0.65fr]">
           <span>Report</span>
           <span>Client</span>
           <span>Type</span>
           <span>Date</span>
           <span>Status</span>
+          <span>Action</span>
         </div>
         <div className="divide-y divide-[#edf3f1]">
           {reports.length ? (
             reports.map((report) => (
-              <button key={report.id} onClick={() => openReport(report)} className="grid w-full gap-3 p-4 text-left hover:bg-[#f7fbfa] md:grid-cols-[1.1fr_1fr_0.8fr_0.7fr_0.7fr] md:items-center">
+              <div
+                key={report.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => openReport(report)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  openReport(report);
+                }}
+                className="grid w-full cursor-pointer gap-3 p-4 text-left hover:bg-[#f7fbfa] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#bfe9df] md:grid-cols-[1.1fr_1fr_0.8fr_0.7fr_0.7fr_0.65fr] md:items-center"
+              >
                 <span className="min-w-0">
                   <span className="block truncate text-[14px] font-black text-[#162523]">{report.title}</span>
                   <span className="mt-1 block truncate text-[12px] font-bold text-[#6f7f7c]">{report.labReportId}</span>
@@ -273,7 +315,25 @@ export default function LabReportsPage() {
                 <span className={`w-fit rounded-md px-2 py-1 text-[11px] font-bold ${report.abnormal ? "bg-[#fff0ec] text-[#ba563d]" : "bg-[#eaf9f2] text-[#087766]"}`}>
                   {report.abnormal ? `${report.abnormal} flagged` : report.status}
                 </span>
-              </button>
+                <span className="flex justify-start">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      publishReport(report);
+                    }}
+                    disabled={publishingReportId === report.id}
+                    className={`inline-flex h-9 min-w-[92px] items-center justify-center rounded-md px-3 text-[11px] font-black disabled:opacity-60 ${
+                      report.status === "published"
+                        ? "border border-[#b8d4cc] bg-white text-[#0a7d6e]"
+                        : "bg-[#0a7d6e] text-white"
+                    }`}
+                    aria-label={report.status === "published" ? `Sync ${report.title} to app` : `Publish ${report.title}`}
+                  >
+                    {publishingReportId === report.id ? "Saving..." : report.status === "published" ? "Sync app" : "Publish"}
+                  </button>
+                </span>
+              </div>
             ))
           ) : (
             <div className="p-5 text-[13px] font-bold text-[#6f7f7c]">{isLoading ? "Loading reports..." : "No reports found."}</div>
