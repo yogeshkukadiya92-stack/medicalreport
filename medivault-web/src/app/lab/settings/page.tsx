@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { CountryPhoneInput } from "@/components/country-phone-input";
 import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
 import type { LabProfile, LabRole } from "@/lib/vault-types";
@@ -94,14 +95,15 @@ export default function LabSettingsPage() {
               className="mt-2 h-11 w-full rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
             />
           </label>
-          <label className="mt-3 block">
-            <span className="text-[12px] font-bold text-[#52605d]">Phone</span>
-            <input
-              value={form.phone}
-              onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-              className="mt-2 h-11 w-full rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
-            />
-          </label>
+          <CountryPhoneInput
+            className="mt-3"
+            label="Phone"
+            value={form.phone}
+            onChange={(phone) => setForm((current) => ({ ...current, phone }))}
+            size="sm"
+            inputClassName="h-11 text-[13px]"
+            selectClassName="h-11 text-[12px]"
+          />
           <label className="mt-3 block">
             <span className="text-[12px] font-bold text-[#52605d]">Address</span>
             <textarea

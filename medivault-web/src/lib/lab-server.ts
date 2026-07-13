@@ -139,40 +139,7 @@ export async function getLabContext(request: NextRequest): Promise<LabContext> {
     return { db, lab, labUser, userId };
   }
 
-  const now = isoNow();
-  const labId = `lab-${userId}`;
-  const lab: LabProfile = {
-    id: labId,
-    name: "MediVault Lab",
-    ownerUserId: userId,
-    createdAt: now,
-    updatedAt: now,
-  };
-  const labUser: LabUser = {
-    id: `${labId}:${userId}`,
-    userId,
-    labId,
-    role: "lab_admin",
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await db.collection<LabProfile>("labs").updateOne(
-    { id: labId },
-    {
-      $setOnInsert: lab,
-    },
-    { upsert: true },
-  );
-  await db.collection<LabUser>("labUsers").updateOne(
-    { labId, userId },
-    {
-      $setOnInsert: labUser,
-    },
-    { upsert: true },
-  );
-
-  return { db, lab, labUser, userId };
+  return { error: "Lab portal access must be created from the owner admin panel.", status: 403 };
 }
 
 export async function addLabAuditLog(

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useAppData } from "@/components/app-data-provider";
+import { CountryPhoneInput } from "@/components/country-phone-input";
 import { Icon, MobileShell } from "@/components/mobile-shell";
 import { calculateHealthScore } from "@/lib/health-score";
 
@@ -187,15 +188,13 @@ export default function FamilyPage() {
               placeholder="Father, spouse, child"
             />
           </label>
-          <label className="mt-3 block">
-            <span className="text-[12px] font-bold text-[#52605d]">Phone for lab report matching</span>
-            <input
-              value={form.phone}
-              onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-              className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] px-4 text-[14px] font-bold"
-              placeholder="+91 98765 43210"
-            />
-          </label>
+          <CountryPhoneInput
+            className="mt-3"
+            label="Phone for lab report matching"
+            value={form.phone}
+            onChange={(phone) => setForm((current) => ({ ...current, phone }))}
+            placeholder="98765 43210"
+          />
           <div className="mt-3 grid grid-cols-2 gap-3">
             <label className="block">
               <span className="text-[12px] font-bold text-[#52605d]">Age</span>

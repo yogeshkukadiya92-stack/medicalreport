@@ -1,6 +1,7 @@
 import type { Db } from "mongodb";
 import type { NextRequest } from "next/server";
 import type { AdminClientSummary, AdminReportRow, AdminTask } from "@/lib/admin-types";
+import { isBootstrapAdminUserId } from "@/lib/auth-server";
 import { getLabContext } from "@/lib/lab-server";
 import type { LabClient, LabReport } from "@/lib/vault-types";
 
@@ -29,9 +30,8 @@ export async function getAdminContext(request: NextRequest) {
   const context = await getLabContext(request);
   if ("error" in context) return context;
 
-  const isOwner = context.lab.ownerUserId === context.userId;
-  if (!isOwner && context.labUser.role !== "lab_admin") {
-    return { error: "Lab administrator access is required for this workspace.", status: 403 as const };
+  if (!isBootstrapAdminUserId(context.userId)) {
+    return { error: "Only the owner admin can open this panel.", status: 403 as const };
   }
 
   await ensureAdminIndexes(context.db);

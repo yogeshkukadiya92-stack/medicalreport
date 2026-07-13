@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AdminShell } from "@/components/admin-shell";
 import { useAuth } from "@/components/auth-provider";
+import { CountryPhoneInput } from "@/components/country-phone-input";
 import type { AdminDashboardPayload, AdminTask } from "@/lib/admin-types";
+import type { LabRole } from "@/lib/vault-types";
 import { readNutritionAdminClients } from "@/lib/nutrition-admin";
 import { AdminEmpty, AdminError, AdminPageHeader, AdminSkeleton, AdminStatCard, StatusPill } from "@/app/admin/_components/admin-ui";
 
@@ -26,12 +28,30 @@ function taskTone(task: AdminTask) {
   return "neutral" as const;
 }
 
+type LabCredentialRow = {
+  createdAt: string;
+  email?: string;
+  id: string;
+  name?: string;
+  phone?: string;
+  role: LabRole;
+  updatedAt: string;
+};
+
+const labRoles: LabRole[] = ["lab_admin", "pathologist", "technician", "collector", "cashier", "lab_staff"];
+const emptyLabCredentialForm = { email: "", name: "", password: "", phone: "", role: "lab_staff" as LabRole };
+
 export default function AdminPage() {
   const { session, status } = useAuth();
   const [data, setData] = useState<AdminDashboardPayload | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [nutrition, setNutrition] = useState({ bodyScans: 0, clients: 0, followUps: 0, plans: 0 });
+  const [labCredentialForm, setLabCredentialForm] = useState(emptyLabCredentialForm);
+  const [labCredentials, setLabCredentials] = useState<LabCredentialRow[]>([]);
+  const [labCredentialError, setLabCredentialError] = useState("");
+  const [labCredentialMessage, setLabCredentialMessage] = useState("");
+  const [isSavingLabCredential, setIsSavingLabCredential] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     if (status === "loading") return;
@@ -56,7 +76,23 @@ export default function AdminPage() {
     }
   }, [session?.access_token, status]);
 
+  const loadLabCredentials = useCallback(async () => {
+    if (status === "loading" || !session?.access_token) return;
+    try {
+      const response = await fetch("/api/admin/lab-users", {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error ?? "Lab credentials could not be loaded.");
+      setLabCredentials(result?.labUsers ?? []);
+    } catch (loadError) {
+      setLabCredentialError(loadError instanceof Error ? loadError.message : "Lab credentials could not be loaded.");
+    }
+  }, [session?.access_token, status]);
+
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
+  useEffect(() => { loadLabCredentials(); }, [loadLabCredentials]);
   useEffect(() => {
     const clients = readNutritionAdminClients();
     const today = new Date().toISOString().slice(0, 10);
@@ -67,6 +103,33 @@ export default function AdminPage() {
       plans: clients.reduce((sum, client) => sum + (client.dietPlans?.length ?? 0), 0),
     });
   }, []);
+
+  async function createLabCredential(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.access_token) return;
+    setIsSavingLabCredential(true);
+    setLabCredentialError("");
+    setLabCredentialMessage("");
+    try {
+      const response = await fetch("/api/admin/lab-users", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(labCredentialForm),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error ?? "Lab credential could not be created.");
+      setLabCredentials(result?.labUsers ?? []);
+      setLabCredentialForm(emptyLabCredentialForm);
+      setLabCredentialMessage("Lab login created. Share the email/mobile and password with that staff member.");
+    } catch (createError) {
+      setLabCredentialError(createError instanceof Error ? createError.message : "Lab credential could not be created.");
+    } finally {
+      setIsSavingLabCredential(false);
+    }
+  }
 
   const maxTrend = Math.max(1, ...(data?.trend.map((item) => item.reports) ?? [1]));
 
@@ -182,6 +245,67 @@ export default function AdminPage() {
         <section className="rounded-md border border-[#dbe6e3] bg-white p-4"><p className="text-[10px] font-black uppercase text-[#087766]">Background jobs</p><p className="mt-2 text-[24px] font-black">{data?.operations.queuedJobs ?? "--"}</p><p className="mt-1 text-[10px] font-semibold text-[#71817d]">Queued or running · {data?.operations.failedJobs ?? 0} failed</p></section>
         <section className="rounded-md border border-[#dbe6e3] bg-white p-4"><p className="text-[10px] font-black uppercase text-[#087766]">Audit coverage</p><p className="mt-2 text-[24px] font-black">{data?.operations.auditEvents ?? "--"}</p><p className="mt-1 text-[10px] font-semibold text-[#71817d]">Traceable lab and platform actions</p></section>
       </div>
+
+      <section className="mt-4 rounded-md border border-[#dbe6e3] bg-white">
+        <div className="flex flex-col gap-1 border-b border-[#e8efed] p-4">
+          <p className="text-[10px] font-black uppercase text-[#087766]">Owner controlled access</p>
+          <h2 className="text-[15px] font-black text-[#17302b]">Lab credentials</h2>
+          <p className="text-[10px] font-semibold text-[#71817d]">Only the owner admin can create lab portal logins. Public users will not get lab/admin access automatically.</p>
+        </div>
+        <div className="grid gap-4 p-4 xl:grid-cols-[420px_1fr]">
+          <form onSubmit={createLabCredential} className="space-y-3 rounded-md border border-[#e2ebe8] bg-[#f8fbfa] p-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-[10px] font-black uppercase text-[#71817d]">Name</span>
+                <input value={labCredentialForm.name} onChange={(event) => setLabCredentialForm((current) => ({ ...current, name: event.target.value }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold" placeholder="Staff name" />
+              </label>
+              <label className="block">
+                <span className="text-[10px] font-black uppercase text-[#71817d]">Role</span>
+                <select value={labCredentialForm.role} onChange={(event) => setLabCredentialForm((current) => ({ ...current, role: event.target.value as LabRole }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold">
+                  {labRoles.map((role) => <option key={role} value={role}>{role.replace("_", " ")}</option>)}
+                </select>
+              </label>
+            </div>
+            <label className="block">
+              <span className="text-[10px] font-black uppercase text-[#71817d]">Email</span>
+              <input type="email" required value={labCredentialForm.email} onChange={(event) => setLabCredentialForm((current) => ({ ...current, email: event.target.value }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold" placeholder="staff@example.com" />
+            </label>
+            <CountryPhoneInput
+              label="Mobile"
+              required
+              value={labCredentialForm.phone}
+              onChange={(phone) => setLabCredentialForm((current) => ({ ...current, phone }))}
+              placeholder="9876543210"
+              size="sm"
+              inputClassName="h-10 rounded-md text-[12px]"
+              selectClassName="h-10 rounded-md text-[11px]"
+            />
+            <label className="block">
+              <span className="text-[10px] font-black uppercase text-[#71817d]">Password</span>
+              <input type="password" required minLength={6} value={labCredentialForm.password} onChange={(event) => setLabCredentialForm((current) => ({ ...current, password: event.target.value }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold" placeholder="Minimum 6 characters" />
+            </label>
+            {labCredentialError ? <p className="rounded-md bg-[#fff0ec] p-2 text-[11px] font-bold text-[#ba563d]">{labCredentialError}</p> : null}
+            {labCredentialMessage ? <p className="rounded-md bg-[#eaf9f2] p-2 text-[11px] font-bold text-[#087766]">{labCredentialMessage}</p> : null}
+            <button disabled={isSavingLabCredential} className="h-10 w-full rounded-md bg-[#0b6f61] text-[11px] font-black text-white disabled:opacity-60">
+              {isSavingLabCredential ? "Creating..." : "Create lab login"}
+            </button>
+          </form>
+          <div className="overflow-hidden rounded-md border border-[#e2ebe8]">
+            <div className="grid grid-cols-[1fr_130px_120px] gap-3 border-b border-[#edf2f1] bg-[#f8fbfa] px-3 py-2 text-[9px] font-black uppercase text-[#71817d]">
+              <span>User</span><span>Role</span><span>Mobile</span>
+            </div>
+            <div className="divide-y divide-[#edf2f1]">
+              {labCredentials.length ? labCredentials.map((credential) => (
+                <div key={credential.id} className="grid grid-cols-[1fr_130px_120px] gap-3 px-3 py-3 text-[11px]">
+                  <div className="min-w-0"><p className="truncate font-black text-[#17302b]">{credential.name || credential.email || "Lab user"}</p><p className="mt-1 truncate text-[10px] font-semibold text-[#71817d]">{credential.email}</p></div>
+                  <StatusPill tone={credential.role === "lab_admin" ? "green" : "neutral"}>{credential.role.replace("_", " ")}</StatusPill>
+                  <p className="truncate font-bold text-[#53645f]">{credential.phone || "--"}</p>
+                </div>
+              )) : <AdminEmpty title="No lab credentials yet" description="Create the first staff login from this panel." />}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <p className="mt-4 text-right text-[9px] font-semibold text-[#7b8986]">{data ? `Live data refreshed ${formatDate(data.generatedAt)}` : "Waiting for live data"}</p>
     </AdminShell>

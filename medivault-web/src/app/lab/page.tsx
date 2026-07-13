@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { CountryPhoneInput } from "@/components/country-phone-input";
 import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/mobile-shell";
@@ -189,7 +190,46 @@ export default function LabDashboardPage() {
         <div className="flex gap-2"><button type="button" onClick={() => setShowOrderForm((current) => !current)} className="h-10 rounded-md border border-[#b8d4cc] bg-white px-4 text-[12px] font-black text-[#0d5c46]">{showOrderForm ? "Close" : "+ New order"}</button><Link href="/lab/create" className="inline-flex h-10 items-center gap-2 rounded-md bg-[#0d5c46] px-4 text-[12px] font-black text-white"><Icon name="upload" className="h-4 w-4" />Create report</Link></div>
       </header>
 
-      {showOrderForm ? <form onSubmit={createOrder} className="mt-4 grid gap-2 rounded-md border border-[#b8d4cc] bg-[#f4fbf8] p-3 sm:grid-cols-2 xl:grid-cols-[1fr_0.8fr_1fr_0.7fr_0.65fr_auto] xl:items-end"><label><span className="mb-1 block text-[10px] font-black text-[#61716d]">PATIENT NAME</span><input required value={orderForm.patientName} onChange={(event) => setOrderForm((current) => ({ ...current, patientName: event.target.value }))} className="clinical-field" placeholder="Patient name" /></label><label><span className="mb-1 block text-[10px] font-black text-[#61716d]">MOBILE</span><input required value={orderForm.patientPhone} onChange={(event) => setOrderForm((current) => ({ ...current, patientPhone: event.target.value }))} className="clinical-field" placeholder="Mobile number" /></label><label><span className="mb-1 block text-[10px] font-black text-[#61716d]">TEST / PANEL</span><input required value={orderForm.testName} onChange={(event) => setOrderForm((current) => ({ ...current, testName: event.target.value }))} className="clinical-field" placeholder="CBC" /></label><label><span className="mb-1 block text-[10px] font-black text-[#61716d]">SAMPLE</span><select value={orderForm.sampleType} onChange={(event) => setOrderForm((current) => ({ ...current, sampleType: event.target.value }))} className="clinical-field"><option>Blood</option><option>Serum</option><option>Plasma</option><option>Urine</option><option>Swab</option></select></label><label><span className="mb-1 block text-[10px] font-black text-[#61716d]">PRIORITY</span><select value={orderForm.priority} onChange={(event) => setOrderForm((current) => ({ ...current, priority: event.target.value }))} className="clinical-field"><option value="routine">Routine</option><option value="urgent">Urgent</option></select></label><button disabled={busyId === "create_order"} className="h-9 rounded-md bg-[#0d5c46] px-4 text-[11px] font-black text-white disabled:opacity-60">{busyId === "create_order" ? "Creating..." : "Create order"}</button></form> : null}
+      {showOrderForm ? (
+        <form onSubmit={createOrder} className="mt-4 grid gap-2 rounded-md border border-[#b8d4cc] bg-[#f4fbf8] p-3 sm:grid-cols-2 xl:grid-cols-[1fr_1.05fr_1fr_0.7fr_0.65fr_auto] xl:items-end">
+          <label>
+            <span className="mb-1 block text-[10px] font-black text-[#61716d]">PATIENT NAME</span>
+            <input required value={orderForm.patientName} onChange={(event) => setOrderForm((current) => ({ ...current, patientName: event.target.value }))} className="clinical-field" placeholder="Patient name" />
+          </label>
+          <CountryPhoneInput
+            label="MOBILE"
+            required
+            value={orderForm.patientPhone}
+            onChange={(patientPhone) => setOrderForm((current) => ({ ...current, patientPhone }))}
+            placeholder="Mobile number"
+            size="sm"
+            inputClassName="clinical-field"
+            selectClassName="clinical-field"
+          />
+          <label>
+            <span className="mb-1 block text-[10px] font-black text-[#61716d]">TEST / PANEL</span>
+            <input required value={orderForm.testName} onChange={(event) => setOrderForm((current) => ({ ...current, testName: event.target.value }))} className="clinical-field" placeholder="CBC" />
+          </label>
+          <label>
+            <span className="mb-1 block text-[10px] font-black text-[#61716d]">SAMPLE</span>
+            <select value={orderForm.sampleType} onChange={(event) => setOrderForm((current) => ({ ...current, sampleType: event.target.value }))} className="clinical-field">
+              <option>Blood</option>
+              <option>Serum</option>
+              <option>Plasma</option>
+              <option>Urine</option>
+              <option>Swab</option>
+            </select>
+          </label>
+          <label>
+            <span className="mb-1 block text-[10px] font-black text-[#61716d]">PRIORITY</span>
+            <select value={orderForm.priority} onChange={(event) => setOrderForm((current) => ({ ...current, priority: event.target.value }))} className="clinical-field">
+              <option value="routine">Routine</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </label>
+          <button disabled={busyId === "create_order"} className="h-9 rounded-md bg-[#0d5c46] px-4 text-[11px] font-black text-white disabled:opacity-60">{busyId === "create_order" ? "Creating..." : "Create order"}</button>
+        </form>
+      ) : null}
 
       {error ? <div className="mt-4 flex items-center justify-between rounded-md border border-[#ffd6ca] bg-[#fff0ec] p-3 text-[12px] font-bold text-[#ba563d]"><span>{error}</span><button type="button" onClick={loadOperations} className="rounded border border-current px-3 py-1.5">Retry</button></div> : null}
       {message ? <div className="mt-4 rounded-md border border-[#bfe9df] bg-[#eaf9f2] p-3 text-[12px] font-bold text-[#087766]">{message}</div> : null}

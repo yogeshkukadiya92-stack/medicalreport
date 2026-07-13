@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { CountryPhoneInput } from "@/components/country-phone-input";
 import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
 import { localDateKey } from "@/lib/date-client";
@@ -383,11 +384,13 @@ export default function LabCreateReportPage() {
                   className="clinical-field"
                 placeholder="Client name"
               />
-              <input
+              <CountryPhoneInput
                 value={clientForm.phone}
-                onChange={(event) => setClientForm((current) => ({ ...current, phone: event.target.value }))}
-                  className="clinical-field"
-                placeholder="Phone"
+                onChange={(phone) => setClientForm((current) => ({ ...current, phone }))}
+                placeholder="Mobile number"
+                size="sm"
+                inputClassName="clinical-field"
+                selectClassName="clinical-field"
               />
               <div className="grid grid-cols-2 gap-2">
                 <input

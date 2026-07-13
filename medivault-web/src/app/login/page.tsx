@@ -3,10 +3,9 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
+import { CountryPhoneInput, localPhoneDigits } from "@/components/country-phone-input";
 
 type Mode = "signin" | "signup";
-
-const indiaPhonePrefix = "+91 ";
 
 function safeRedirectPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/dashboard";
@@ -30,7 +29,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
-  const [phone, setPhone] = useState(indiaPhonePrefix);
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
@@ -53,7 +52,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (!phone || phone === indiaPhonePrefix || !password) {
+    if (!phone || !password) {
       setError(mode === "signin" ? "Enter mobile/email and password." : "Enter mobile number and password.");
       return;
     }
@@ -89,7 +88,7 @@ export default function LoginPage() {
     setError("");
     setMessage("");
 
-    if (!phone || phone.replace(/\D/g, "").length < 12) {
+    if (!phone || localPhoneDigits(phone).length < 10) {
       setError("Enter a valid mobile number before sending OTP.");
       return;
     }
@@ -112,17 +111,7 @@ export default function LoginPage() {
     setMessage("");
     setOtp("");
     setIsOtpSent(false);
-    setPhone((current) => (current.includes("@") ? indiaPhonePrefix : current || indiaPhonePrefix));
-  }
-
-  function updatePhoneInput(value: string) {
-    if (mode === "signin" && /[a-z@]/i.test(value)) {
-      setPhone(value.replace(/^\+91\s*/i, "").trim());
-      return;
-    }
-    const digits = value.replace(/\D/g, "");
-    const withoutCountry = digits.startsWith("91") ? digits.slice(2) : digits;
-    setPhone(`${indiaPhonePrefix}${withoutCountry.slice(0, 10)}`);
+    setPhone((current) => (nextMode === "signup" && current.includes("@") ? "" : current));
   }
 
   return (
@@ -172,23 +161,16 @@ export default function LoginPage() {
         ) : null}
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          <label className="block">
-            <span className="text-[12px] font-bold text-[#52605d]">{mode === "signin" ? "Mobile number or admin email" : "Mobile number"}</span>
-            <input
-              type={mode === "signin" ? "text" : "tel"}
-              value={phone}
-              onChange={(event) => updatePhoneInput(event.target.value)}
-              onFocus={() => {
-                if (!phone) setPhone(indiaPhonePrefix);
-              }}
-              placeholder={mode === "signin" ? "+91 9876543210 or admin@example.com" : "+91 9876543210"}
-              inputMode={mode === "signin" ? "text" : "tel"}
-              autoComplete={mode === "signin" ? "username" : "tel"}
-              required
-              aria-invalid={Boolean(error) && !phone}
-              className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
-            />
-          </label>
+          <CountryPhoneInput
+            allowEmail={mode === "signin"}
+            autoComplete={mode === "signin" ? "username" : "tel"}
+            label={mode === "signin" ? "Mobile number or admin email" : "Mobile number"}
+            value={phone}
+            onChange={setPhone}
+            placeholder="9876543210"
+            required
+            inputClassName="font-semibold"
+          />
 
           {mode === "signup" ? (
             <label className="block">

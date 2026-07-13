@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AuthSetupRequired, SessionLoading } from "@/components/auth-gate";
 import { useAppData } from "@/components/app-data-provider";
 import { useAuth } from "@/components/auth-provider";
+import { CountryPhoneInput } from "@/components/country-phone-input";
 import { Icon } from "@/components/mobile-shell";
 
 type BodyEntry = {
@@ -942,9 +943,16 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
                 {copy.description}
               </p>
             </div>
-            <form onSubmit={addClient} className="grid gap-2 rounded-lg border border-[#dce9e5] bg-white p-2 sm:grid-cols-[1fr_0.8fr_1fr_auto]">
+            <form onSubmit={addClient} className="grid gap-2 rounded-lg border border-[#dce9e5] bg-white p-2 sm:grid-cols-[1fr_1.05fr_1fr_auto]">
               <input value={clientForm.name} onChange={(event) => setClientForm((current) => ({ ...current, name: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Client name" />
-              <input value={clientForm.phone} onChange={(event) => setClientForm((current) => ({ ...current, phone: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Mobile number" />
+              <CountryPhoneInput
+                value={clientForm.phone}
+                onChange={(phone) => setClientForm((current) => ({ ...current, phone }))}
+                placeholder="Mobile number"
+                size="sm"
+                inputClassName="h-10 rounded-md text-[12px]"
+                selectClassName="h-10 rounded-md text-[11px]"
+              />
               <input value={clientForm.goal} onChange={(event) => setClientForm((current) => ({ ...current, goal: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Goal" />
               <button className="h-10 rounded-md bg-[#0a7d6e] px-4 text-[12px] font-black text-white">Add client</button>
             </form>

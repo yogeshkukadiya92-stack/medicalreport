@@ -32,7 +32,7 @@ const sessionMaxAgeSeconds = 60 * 60 * 24 * 30;
 const passwordIterations = 210_000;
 const passwordKeyLength = 32;
 const passwordDigest = "sha256";
-const bootstrapAdminEmail = normalizeEmail(process.env.ADMIN_BOOTSTRAP_EMAIL || "");
+const bootstrapAdminEmail = normalizeEmail(process.env.ADMIN_BOOTSTRAP_EMAIL || "yogeshkukadiya92@gmail.com");
 const bootstrapAdminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
 const bootstrapAdminUserId = bootstrapAdminEmail ? `user-admin-${hashToken(bootstrapAdminEmail).slice(0, 18)}` : "";
 const bootstrapAdminLabId = bootstrapAdminEmail ? `lab-admin-${hashToken(`lab:${bootstrapAdminEmail}`).slice(0, 18)}` : "";
@@ -93,6 +93,14 @@ function publicUser(user: AuthUserDocument): AuthUser {
     phone: user.phone,
     updatedAt: user.updatedAt,
   };
+}
+
+export function isBootstrapAdminUser(user: Pick<AuthUser, "email" | "id"> | null | undefined) {
+  return Boolean(user && user.email === bootstrapAdminEmail && user.id === bootstrapAdminUserId);
+}
+
+export function isBootstrapAdminUserId(userId: string) {
+  return Boolean(userId && userId === bootstrapAdminUserId);
 }
 
 async function ensureAuthIndexes(db: Db) {
@@ -296,6 +304,51 @@ export async function createAuthUserSession(input: { email: string; name?: strin
   await db.collection<AuthUserDocument>("authUsers").insertOne(user);
   const token = await createSession(db, user.id);
   return { token, user: publicUser(user) };
+}
+
+export async function createManagedAuthUser(input: { email: string; name?: string; password: string; phone: string }) {
+  if (!isMongoConfigured()) {
+    throw new Error("MongoDB is not configured.");
+  }
+
+  const email = normalizeEmail(input.email);
+  const phone = normalizePhone(input.phone);
+  if (!isValidEmail(email)) {
+    throw new Error("Enter a valid email address.");
+  }
+  if (!isValidPhone(phone)) {
+    throw new Error("Enter a valid mobile number.");
+  }
+  if (input.password.length < 6) {
+    throw new Error("Password must be at least 6 characters.");
+  }
+  if (email === bootstrapAdminEmail) {
+    throw new Error("Owner admin credentials are reserved.");
+  }
+
+  const db = await getMongoDb();
+  await ensureAuthIndexes(db);
+  const existing = await db.collection<AuthUserDocument>("authUsers").findOne({ $or: [{ email }, { phone }] });
+  if (existing) {
+    throw new Error(existing.phone === phone ? "An account with this mobile number already exists." : "An account with this email already exists.");
+  }
+
+  const now = new Date().toISOString();
+  const password = hashPassword(input.password);
+  const user: AuthUserDocument = {
+    id: `user-${Date.now()}-${crypto.randomBytes(8).toString("hex")}`,
+    createdAt: now,
+    email,
+    name: cleanName(email, input.name),
+    passwordHash: password.hash,
+    passwordIterations: password.iterations,
+    passwordSalt: password.salt,
+    phone,
+    updatedAt: now,
+  };
+
+  await db.collection<AuthUserDocument>("authUsers").insertOne(user);
+  return publicUser(user);
 }
 
 export async function loginAuthUserSession(input: { password: string; phone: string }) {

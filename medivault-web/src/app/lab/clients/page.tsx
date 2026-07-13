@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { CountryPhoneInput } from "@/components/country-phone-input";
 import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
 import type { LabClient } from "@/lib/vault-types";
@@ -98,15 +99,15 @@ export default function LabClientsPage() {
                 placeholder="Client full name"
               />
             </label>
-            <label className="block">
-              <span className="text-[12px] font-bold text-[#52605d]">Phone</span>
-              <input
-                value={form.phone}
-                onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-                className="mt-2 h-11 w-full rounded-lg border border-[#dce9e5] px-3 text-[13px] font-bold"
-                placeholder="+91 98765 43210"
-              />
-            </label>
+            <CountryPhoneInput
+              label="Phone"
+              value={form.phone}
+              onChange={(phone) => setForm((current) => ({ ...current, phone }))}
+              placeholder="98765 43210"
+              size="sm"
+              inputClassName="h-11 text-[13px]"
+              selectClassName="h-11 text-[12px]"
+            />
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="text-[12px] font-bold text-[#52605d]">Age</span>
