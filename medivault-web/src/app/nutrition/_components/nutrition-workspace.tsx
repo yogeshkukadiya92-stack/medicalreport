@@ -245,7 +245,7 @@ const foodPreferenceOptions = ["Gujarati vegetarian", "Vegetarian", "Jain", "Egg
 const activityOptions = ["Desk work", "Light walking", "Moderate walking", "Gym 3-4 days", "Heavy training", "Shift work"];
 const genderOptions = ["Male", "Female", "Other"];
 const packageOptions = ["Trial consultation", "4 week plan", "8 week plan", "12 week transformation", "Maintenance plan"];
-const conditionOptions = ["No known medical condition", "Diabetes", "Thyroid", "BP", "PCOS", "Cholesterol", "Acidity", "Joint pain"];
+const conditionOptions = ["No known medical condition", "Diabetes", "Thyroid", "BP", "PCOS", "Cholesterol", "Anemia", "Vitamin deficiency", "Uric acid", "Liver support", "Kidney support", "Inflammation", "Acidity", "Joint pain"];
 const allergyOptions = ["None", "Milk", "Gluten", "Peanuts", "Soy", "Egg", "Seafood"];
 const quickNoteOptions = ["Diet followed well", "Low water intake", "Outside food this week", "Workout missed", "Craving at night", "Weight improving", "Needs stricter portions"];
 const intakePresets = [
@@ -340,6 +340,21 @@ function numberFromText(value: string) {
 
 function metricName(name: string) {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function conditionFromMarker(name: string) {
+  const metric = metricName(name);
+  if (/(hba1c|glucose|sugar|insulin)/.test(metric)) return "Diabetes";
+  if (/(tsh|freet3|freet4|thyroid|^t3$|^t4$)/.test(metric)) return "Thyroid";
+  if (/(cholesterol|ldl|hdl|triglycerides|vldl|lipid)/.test(metric)) return "Cholesterol";
+  if (/(hemoglobin|haemoglobin|ferritin|iron|rbc|mcv|mch|mchc)/.test(metric)) return "Anemia";
+  if (/(vitamind|vitaminb12|folate|calcium)/.test(metric)) return "Vitamin deficiency";
+  if (/uricacid/.test(metric)) return "Uric acid";
+  if (/(sgpt|sgot|alt|ast|bilirubin|alkalinephosphatase|albumin)/.test(metric)) return "Liver support";
+  if (/(creatinine|urea|bloodureanitrogen|bun|egfr)/.test(metric)) return "Kidney support";
+  if (/(crp|esr)/.test(metric)) return "Inflammation";
+  if (/(bodyfat|visceralfat|bmi)/.test(metric)) return "Body composition";
+  return "";
 }
 
 function todayLabel() {
@@ -530,6 +545,41 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
       }))
       .filter((point): point is { date: string; name: string; source: string; value: number } => typeof point.value === "number" && Number.isFinite(point.value)),
   );
+  const autoMedicalTags = Array.from(
+    linkedReports
+      .flatMap((report) =>
+        report.markers.flatMap((marker) => {
+          const condition = conditionFromMarker(marker.name);
+          if (!condition || condition === "Body composition" || marker.status === "Normal") return [];
+          return [{
+            condition,
+            date: report.date,
+            markerName: marker.name,
+            status: marker.status,
+            value: marker.value,
+          }];
+        }),
+      )
+      .reduce((map, tag) => {
+        const current = map.get(tag.condition);
+        if (!current || Date.parse(tag.date) >= Date.parse(current.date)) map.set(tag.condition, tag);
+        return map;
+      }, new Map<string, { condition: string; date: string; markerName: string; status: string; value: string }>())
+      .values(),
+  );
+  const latestLinkedBodyDate = linkedBodyPoints.reduce((latest, point) => (!latest || Date.parse(point.date) > Date.parse(latest) ? point.date : latest), "");
+  const linkedBodySnapshot = linkedBodyPoints
+    .filter((point) => point.date === latestLinkedBodyDate)
+    .reduce((snapshot, point) => {
+      const metric = metricName(point.name);
+      if (metric === "weight") snapshot.weight = String(point.value);
+      if (metric === "bmi") snapshot.bmi = String(point.value);
+      if (metric === "bodyfat") snapshot.bodyFat = String(point.value);
+      if (metric === "musclemass" || metric === "skeletalmuscle") snapshot.muscleMass = String(point.value);
+      if (metric === "visceralfat") snapshot.visceralFat = String(point.value);
+      if (metric === "basalmetabolicrate") snapshot.bmr = String(point.value);
+      return snapshot;
+    }, { bmr: "", bmi: "", bodyFat: "", muscleMass: "", visceralFat: "", weight: "" });
 
   const clientsFiltered = store.clients.filter((client) => {
     const needle = query.trim().toLowerCase();
@@ -753,10 +803,10 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
     if (pdfSettings.includeBodyMetrics) {
       page.drawText("Body composition snapshot", { x: margin, y, size: 14, font: bold, color: dark });
       y -= 24;
-      labelValue("Weight", latestEntry?.weight ? `${latestEntry.weight} kg` : "--", margin, 108);
-      labelValue("BMI", calculatedBmi ? calculatedBmi.toFixed(1) : latestEntry?.bmi || "--", margin + 120, 82);
-      labelValue("Body fat", latestEntry?.bodyFat ? `${latestEntry.bodyFat} %` : "--", margin + 214, 92);
-      labelValue("Muscle", latestEntry?.muscleMass ? `${latestEntry.muscleMass} kg` : "--", margin + 318, 92);
+      labelValue("Weight", latestWeight ? `${latestWeight} kg` : "--", margin, 108);
+      labelValue("BMI", calculatedBmi ? calculatedBmi.toFixed(1) : "--", margin + 120, 82);
+      labelValue("Body fat", latestBodyFat ? `${latestBodyFat} %` : "--", margin + 214, 92);
+      labelValue("Muscle", latestMuscleMass ? `${latestMuscleMass} kg` : "--", margin + 318, 92);
       labelValue("Protein target", estimatedProtein ? `${estimatedProtein} g/day` : "--", margin + 422, 88);
       y -= 74;
     }
@@ -836,10 +886,15 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
       points,
     };
   });
-  const latestWeight = numberFromText(latestEntry?.weight ?? "");
+  const latestMetricValue = (key: "weight" | "bmi" | "bodyFat" | "muscleMass") => graphMetrics.find((metric) => metric.key === key)?.latest?.value ?? null;
+  const latestWeight = latestMetricValue("weight") ?? numberFromText(latestEntry?.weight ?? "");
+  const latestBmi = latestMetricValue("bmi") ?? numberFromText(latestEntry?.bmi ?? "");
+  const latestBodyFat = latestMetricValue("bodyFat") ?? numberFromText(latestEntry?.bodyFat ?? "");
+  const latestMuscleMass = latestMetricValue("muscleMass") ?? numberFromText(latestEntry?.muscleMass ?? "");
+  const latestBodyRecordDate = graphMetrics.flatMap((metric) => metric.latest ? [metric.latest.date] : []).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? latestEntry?.date ?? "";
   const targetWeight = numberFromText(selectedClient?.targetWeight ?? "");
   const heightCm = numberFromText(selectedClient?.height ?? "");
-  const calculatedBmi = latestWeight && heightCm ? latestWeight / ((heightCm / 100) ** 2) : null;
+  const calculatedBmi = latestBmi ?? (latestWeight && heightCm ? latestWeight / ((heightCm / 100) ** 2) : null);
   const estimatedCalories = latestWeight ? Math.round(latestWeight * 28) : null;
   const estimatedProtein = latestWeight ? Math.round(latestWeight * 1.6) : null;
   const weightGap = latestWeight && targetWeight ? Number((latestWeight - targetWeight).toFixed(1)) : null;
@@ -1023,6 +1078,44 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
                       <input value={selectedClient.packageName} onChange={(event) => updateSelectedClient({ packageName: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Custom package" />
                       <input value={selectedClient.conditions} onChange={(event) => updateSelectedClient({ conditions: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Medical conditions" />
                       <input value={selectedClient.allergies} onChange={(event) => updateSelectedClient({ allergies: event.target.value })} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Allergies" />
+                      {autoMedicalTags.length ? (
+                        <div className="sm:col-span-2 xl:col-span-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#0a7d6e]">Auto from reports</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const existing = selectedClient.conditions.split(",").map((item) => item.trim()).filter(Boolean);
+                                const merged = Array.from(new Set([...existing.filter((item) => item !== "No known medical condition"), ...autoMedicalTags.map((tag) => tag.condition)]));
+                                updateSelectedClient({ conditions: merged.join(", ") });
+                              }}
+                              className="h-7 rounded-md bg-[#e8f7f2] px-2.5 text-[10px] font-black text-[#087766]"
+                            >
+                              Apply all
+                            </button>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {autoMedicalTags.map((tag) => {
+                              const isActive = selectedClient.conditions.split(",").map((item) => item.trim()).includes(tag.condition);
+                              return (
+                                <button
+                                  key={`${tag.condition}-${tag.markerName}`}
+                                  type="button"
+                                  onClick={() => updateSelectedClient({ conditions: toggleCsvValue(selectedClient.conditions, tag.condition) })}
+                                  className={`rounded-md px-2.5 py-1.5 text-left text-[10px] font-black ${isActive ? "bg-[#0a7d6e] text-white" : "border border-[#b8d4cc] bg-white text-[#0a7d6e]"}`}
+                                  title={`${tag.markerName}: ${tag.value} (${tag.status})`}
+                                >
+                                  {tag.condition} · {tag.markerName} {tag.status}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : linkedReports.length ? (
+                        <div className="rounded-md bg-[#f1f6f4] px-3 py-2 text-[11px] font-bold text-[#65716f] sm:col-span-2 xl:col-span-3">
+                          Linked reports found, but no abnormal nutrition tags detected.
+                        </div>
+                      ) : null}
                       <div className="sm:col-span-2 xl:col-span-3">
                         <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#74837f]">Tap medical tags</p>
                         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1054,6 +1147,8 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
                       {[
                         ["BMI", calculatedBmi ? calculatedBmi.toFixed(1) : latestEntry?.bmi || "--"],
                         ["Wt gap", weightGap !== null ? `${weightGap} kg` : "--"],
+                        ["Body fat", latestBodyFat ? `${latestBodyFat} %` : "--"],
+                        ["Muscle", latestMuscleMass ? `${latestMuscleMass} kg` : "--"],
                         ["Calories", estimatedCalories ? `${estimatedCalories}` : "--"],
                         ["Protein", estimatedProtein ? `${estimatedProtein} g` : "--"],
                       ].map(([label, value]) => (
@@ -1073,7 +1168,7 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
                         <h2 className="text-[15px] font-black">Body composition progress</h2>
                         <p className="mt-1 text-[11px] font-bold text-[#74837f]">Dashboard entries plus linked patient app scan data.</p>
                       </div>
-                      <span className="rounded-md bg-[#f1f6f4] px-2 py-1 text-[11px] font-black text-[#65716f]">{latestEntry ? compactDate(latestEntry.date) : "No scan"}</span>
+                      <span className="rounded-md bg-[#f1f6f4] px-2 py-1 text-[11px] font-black text-[#65716f]">{latestBodyRecordDate ? compactDate(latestBodyRecordDate) : "No scan"}</span>
                     </div>
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                       {graphMetrics.map((metric) => (
@@ -1107,6 +1202,36 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
 
                   <form onSubmit={addBodyEntry} className="rounded-lg border border-[#dce9e5] bg-white p-4">
                     <h2 className="text-[15px] font-black">Add scan</h2>
+                    {latestLinkedBodyDate ? (
+                      <div className="mt-3 rounded-lg border border-[#b8d4cc] bg-[#f7fffc] p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[#0a7d6e]">Linked body scan</p>
+                            <p className="mt-1 text-[11px] font-bold text-[#65716f]">From patient app report · {compactDate(latestLinkedBodyDate)}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEntryForm((current) => ({
+                              ...current,
+                              ...linkedBodySnapshot,
+                              date: latestLinkedBodyDate,
+                              notes: current.notes || "Imported from linked patient app body composition report",
+                            }))}
+                            className="h-8 rounded-md bg-[#0a7d6e] px-3 text-[10px] font-black text-white"
+                          >
+                            Import
+                          </button>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] font-black text-[#102323]">
+                          <span>Weight: {linkedBodySnapshot.weight || "--"}</span>
+                          <span>BMI: {linkedBodySnapshot.bmi || "--"}</span>
+                          <span>Fat: {linkedBodySnapshot.bodyFat || "--"}</span>
+                          <span>Muscle: {linkedBodySnapshot.muscleMass || "--"}</span>
+                          <span>Visceral: {linkedBodySnapshot.visceralFat || "--"}</span>
+                          <span>BMR: {linkedBodySnapshot.bmr || "--"}</span>
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                       <input type="date" value={entryForm.date} onChange={(event) => setEntryForm((current) => ({ ...current, date: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" />
                       <input value={entryForm.weight} onChange={(event) => setEntryForm((current) => ({ ...current, weight: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Weight kg" />
