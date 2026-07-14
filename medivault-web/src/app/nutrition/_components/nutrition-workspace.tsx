@@ -55,11 +55,24 @@ type ShareLog = {
   summary: string;
 };
 
+type BillingItem = {
+  id: string;
+  amount: string;
+  createdAt: string;
+  dueDate: string;
+  mode: "Cash" | "UPI" | "Card" | "Bank transfer" | "Online link";
+  note: string;
+  packageName: string;
+  reference: string;
+  status: "Paid" | "Pending" | "Partial" | "Refunded";
+};
+
 type NutritionClient = {
   id: string;
   activityLevel: string;
   age: string;
   allergies: string;
+  billingItems: BillingItem[];
   conditions: string;
   name: string;
   phone: string;
@@ -95,7 +108,7 @@ type PdfSettings = {
 
 const storageKey = "medivault-nutrition-dashboard-v1";
 
-export type NutritionSection = "dashboard" | "clients" | "body-composition" | "diet-builder" | "follow-ups" | "templates";
+export type NutritionSection = "dashboard" | "clients" | "body-composition" | "diet-builder" | "follow-ups" | "billing" | "templates";
 
 const sectionRoutes: Array<{ href: string; key: NutritionSection; label: string }> = [
   { href: "/nutrition", key: "dashboard", label: "Dashboard" },
@@ -103,6 +116,7 @@ const sectionRoutes: Array<{ href: string; key: NutritionSection; label: string 
   { href: "/nutrition/body-composition", key: "body-composition", label: "Body composition" },
   { href: "/nutrition/diet-builder", key: "diet-builder", label: "Diet builder" },
   { href: "/nutrition/follow-ups", key: "follow-ups", label: "Follow-ups" },
+  { href: "/nutrition/billing", key: "billing", label: "Billing" },
   { href: "/nutrition/templates", key: "templates", label: "Templates" },
 ];
 
@@ -131,6 +145,11 @@ const sectionCopy: Record<NutritionSection, { eyebrow: string; title: string; de
     eyebrow: "Retention desk",
     title: "Follow-ups",
     description: "See due clients, plan history, notes and next actions so no nutrition client slips from the schedule.",
+  },
+  billing: {
+    eyebrow: "Revenue desk",
+    title: "Nutrition billing",
+    description: "Track packages, invoices, payment references, outstanding balances and renewal follow-ups for every nutrition client.",
   },
   templates: {
     eyebrow: "Reusable protocols",
@@ -290,6 +309,19 @@ const starterClients: NutritionClient[] = [
     activityLevel: "Moderate walking, desk work",
     age: "24",
     allergies: "None",
+    billingItems: [
+      {
+        id: "bill-demo-1",
+        amount: "12000",
+        createdAt: "2026-07-01",
+        dueDate: "",
+        mode: "UPI",
+        note: "12 week transformation package",
+        packageName: "12 week transformation",
+        reference: "UPI-DEMO-12000",
+        status: "Paid",
+      },
+    ],
     conditions: "No known medical condition",
     foodPreference: "Gujarati vegetarian",
     gender: "Male",
@@ -314,6 +346,17 @@ const starterClients: NutritionClient[] = [
 ];
 
 const emptyCustomTemplates: CustomTemplate[] = [];
+const emptyBillingForm: BillingItem = {
+  id: "",
+  amount: "",
+  createdAt: new Date().toISOString().slice(0, 10),
+  dueDate: "",
+  mode: "UPI",
+  note: "",
+  packageName: "12 week transformation",
+  reference: "",
+  status: "Paid",
+};
 
 const emptyEntry = (): BodyEntry => ({
   id: `body-${Date.now()}`,
@@ -337,6 +380,10 @@ function normalizePhone(phone: string) {
 function numberFromText(value: string) {
   const match = value.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
   return match ? Number(match[0]) : null;
+}
+
+function currency(value: number) {
+  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0, style: "currency", currency: "INR" }).format(value);
 }
 
 function metricName(name: string) {
@@ -445,6 +492,7 @@ function normalizeClient(client: Partial<NutritionClient>): NutritionClient {
     activityLevel: client.activityLevel || "",
     age: client.age || "",
     allergies: client.allergies || "",
+    billingItems: Array.isArray(client.billingItems) ? client.billingItems : [],
     bodyEntries: Array.isArray(client.bodyEntries) ? client.bodyEntries : [],
     conditions: client.conditions || "",
     dietPlans: Array.isArray(client.dietPlans) ? client.dietPlans : [],
@@ -497,6 +545,7 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
     nutritionistName: "",
     title: "Personalized Diet Plan",
   });
+  const [billingForm, setBillingForm] = useState<BillingItem>(emptyBillingForm);
 
   useEffect(() => {
     if (isConfigured && status === "unauthenticated") {
@@ -588,6 +637,10 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
   });
   const activeClients = store.clients.filter((client) => client.status === "Active").length;
   const followUps = store.clients.filter((client) => client.status === "Follow-up" || (client.followUpDate && client.followUpDate <= new Date().toISOString().slice(0, 10))).length;
+  const allBillingItems = store.clients.flatMap((client) => client.billingItems.map((item) => ({ ...item, clientName: client.name, clientPhone: client.phone })));
+  const paidRevenue = allBillingItems.filter((item) => item.status === "Paid").reduce((sum, item) => sum + (numberFromText(item.amount) ?? 0), 0);
+  const pendingRevenue = allBillingItems.filter((item) => item.status === "Pending" || item.status === "Partial").reduce((sum, item) => sum + (numberFromText(item.amount) ?? 0), 0);
+  const billingDueCount = allBillingItems.filter((item) => item.status !== "Paid" && item.status !== "Refunded").length;
   const latestEntry = selectedClient?.bodyEntries.at(-1);
   const selectedPlan = selectedClient?.dietPlans[0] ?? null;
   const copy = sectionCopy[section];
@@ -597,6 +650,7 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
   const showBodyComposition = section === "dashboard" || section === "body-composition";
   const showDietBuilder = section === "dashboard" || section === "diet-builder";
   const showFollowUps = section === "follow-ups";
+  const showBilling = section === "dashboard" || section === "billing";
   const showTemplates = section === "templates";
   const dueClients = store.clients.filter((client) => client.status === "Follow-up" || (client.followUpDate && client.followUpDate <= new Date().toISOString().slice(0, 10)));
 
@@ -618,6 +672,7 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
       activityLevel: "",
       age: "",
       allergies: "",
+      billingItems: [],
       conditions: "",
       foodPreference: "",
       gender: "",
@@ -638,6 +693,31 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
     };
     setStore((current) => ({ ...current, clients: [nextClient, ...current.clients], selectedClientId: nextClient.id }));
     setClientForm({ goal: "", name: "", phone: "" });
+  }
+
+  function addBillingItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedClient || !billingForm.amount.trim()) return;
+    const nextItem: BillingItem = {
+      ...billingForm,
+      id: nextId("nutrition-bill"),
+      createdAt: billingForm.createdAt || new Date().toISOString().slice(0, 10),
+      packageName: billingForm.packageName || selectedClient.packageName || "Nutrition package",
+    };
+    updateSelectedClient({
+      billingItems: [nextItem, ...selectedClient.billingItems],
+      packageName: nextItem.packageName,
+      paymentStatus: nextItem.status === "Paid" ? "Paid" : nextItem.status === "Refunded" ? selectedClient.paymentStatus : "Pending",
+    });
+    setBillingForm({ ...emptyBillingForm, createdAt: new Date().toISOString().slice(0, 10), packageName: nextItem.packageName });
+  }
+
+  function updateBillingStatus(itemId: string, statusValue: BillingItem["status"]) {
+    if (!selectedClient) return;
+    const nextItems = selectedClient.billingItems.map((item) => (item.id === itemId ? { ...item, status: statusValue } : item));
+    const hasPending = nextItems.some((item) => item.status === "Pending" || item.status === "Partial");
+    const hasPaid = nextItems.some((item) => item.status === "Paid");
+    updateSelectedClient({ billingItems: nextItems, paymentStatus: hasPending ? "Pending" : hasPaid ? "Paid" : selectedClient.paymentStatus });
   }
 
   function addBodyEntry(event: FormEvent<HTMLFormElement>) {
@@ -958,20 +1038,60 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
             </form>
           </header>
 
-          {showOverview ? <div id="dashboard" className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              ["Clients", store.clients.length, "Total tracked"],
-              ["Active", activeClients, "Currently in plan"],
-              ["Follow-ups", followUps, "Due or flagged"],
-              ["Linked records", linkedBodyPoints.length, "From client app"],
-            ].map(([label, value, caption]) => (
-              <section key={label} className="rounded-lg border border-[#dce9e5] bg-white p-4">
-                <p className="text-[10px] font-black uppercase text-[#74837f]">{label}</p>
-                <p className="mt-2 text-[30px] font-black text-[#102323]">{value}</p>
-                <p className="mt-1 text-[11px] font-bold text-[#7b8986]">{caption}</p>
+          {showOverview ? (
+            <div id="dashboard" className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+              <section className="overflow-hidden rounded-xl border border-[#cfe0db] bg-[#0b302b] text-white shadow-[0_22px_70px_rgba(8,58,49,0.18)]">
+                <div className="grid gap-4 p-5 lg:grid-cols-[1fr_auto] lg:items-end">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#83f4df]">Premium nutrition command</p>
+                    <h2 className="mt-2 max-w-xl text-[30px] font-black tracking-[-0.03em]">Client progress, diet delivery and revenue in one control room.</h2>
+                    <p className="mt-2 max-w-2xl text-[13px] font-semibold text-white/64">Use this screen for daily clinic review: who paid, who is due, whose body composition improved, and which plan needs sharing.</p>
+                  </div>
+                  <Link href="/nutrition/billing" className="inline-flex h-11 items-center justify-center rounded-md bg-[#16c7a7] px-4 text-[12px] font-black text-[#062f2a]">Open billing</Link>
+                </div>
+                <div className="grid border-t border-white/10 sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    ["Paid revenue", currency(paidRevenue), "Collected packages"],
+                    ["Outstanding", currency(pendingRevenue), `${billingDueCount} payment items`],
+                    ["Active clients", activeClients, "Currently in plan"],
+                    ["Linked body data", linkedBodyPoints.length, "Patient app records"],
+                  ].map(([label, value, caption]) => (
+                    <div key={label} className="border-t border-white/10 p-4 sm:border-r sm:border-t-0 sm:last:border-r-0">
+                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/45">{label}</p>
+                      <p className="mt-2 text-[24px] font-black">{value}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-white/54">{caption}</p>
+                    </div>
+                  ))}
+                </div>
               </section>
-            ))}
-          </div> : null}
+
+              <section className="rounded-xl border border-[#dce9e5] bg-white p-4 shadow-[0_18px_50px_rgba(9,48,41,0.08)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#0a7d6e]">Today focus</p>
+                    <h2 className="mt-1 text-[18px] font-black">Follow-up and renewals</h2>
+                  </div>
+                  <span className="rounded-md bg-[#fff8dc] px-2.5 py-1.5 text-[11px] font-black text-[#8a6500]">{followUps} due</span>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {store.clients.slice(0, 4).map((client) => {
+                    const lastBill = client.billingItems[0];
+                    return (
+                      <button key={client.id} type="button" onClick={() => setStore((current) => ({ ...current, selectedClientId: client.id }))} className="grid w-full gap-2 rounded-lg border border-[#edf3f1] bg-[#fbfdfc] p-3 text-left hover:border-[#0a7d6e] sm:grid-cols-[1fr_auto]">
+                        <span>
+                          <span className="block text-[12px] font-black">{client.name}</span>
+                          <span className="mt-1 block text-[10px] font-bold text-[#74837f]">{client.packageName || "No package"} · {client.status}</span>
+                        </span>
+                        <span className={`w-fit rounded px-2 py-1 text-[9px] font-black ${client.paymentStatus === "Paid" ? "bg-[#eaf9f2] text-[#087766]" : "bg-[#fff0ec] text-[#ba563d]"}`}>
+                          {lastBill ? `${client.paymentStatus} ${lastBill.amount ? currency(numberFromText(lastBill.amount) ?? 0) : ""}` : client.paymentStatus}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>
+          ) : null}
 
           <div className={`mt-4 grid gap-4 ${showClientDirectory ? "xl:grid-cols-[320px_minmax(0,1fr)]" : ""}`}>
             {showClientDirectory ? <section id="clients" className="rounded-lg border border-[#dce9e5] bg-white">
@@ -1170,7 +1290,80 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
                 </section>
 
                 {showBodyComposition ? <section id="body-composition" className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-                  <div className="rounded-lg border border-[#dce9e5] bg-white p-4">
+	                {showBilling ? (
+	                  <section id="billing" className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+	                    <div className="rounded-lg border border-[#dce9e5] bg-white">
+	                      <div className="flex flex-col gap-2 border-b border-[#e7efed] p-4 sm:flex-row sm:items-center sm:justify-between">
+	                        <div>
+	                          <h2 className="text-[15px] font-black">Billing & packages</h2>
+	                          <p className="mt-1 text-[11px] font-bold text-[#74837f]">Create invoices, save payment reference and track renewals for this client.</p>
+	                        </div>
+	                        <span className={`w-fit rounded-md px-2.5 py-1.5 text-[10px] font-black ${selectedClient.paymentStatus === "Paid" ? "bg-[#eaf9f2] text-[#087766]" : "bg-[#fff0ec] text-[#ba563d]"}`}>{selectedClient.paymentStatus}</span>
+	                      </div>
+	                      <form onSubmit={addBillingItem} className="grid gap-2 p-4 md:grid-cols-3">
+	                        <input value={billingForm.packageName} onChange={(event) => setBillingForm((current) => ({ ...current, packageName: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Package / service" />
+	                        <input value={billingForm.amount} onChange={(event) => setBillingForm((current) => ({ ...current, amount: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" placeholder="Amount" />
+	                        <select value={billingForm.status} onChange={(event) => setBillingForm((current) => ({ ...current, status: event.target.value as BillingItem["status"] }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
+	                          <option>Paid</option><option>Pending</option><option>Partial</option><option>Refunded</option>
+	                        </select>
+	                        <input type="date" value={billingForm.createdAt} onChange={(event) => setBillingForm((current) => ({ ...current, createdAt: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" />
+	                        <input type="date" value={billingForm.dueDate} onChange={(event) => setBillingForm((current) => ({ ...current, dueDate: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold" />
+	                        <select value={billingForm.mode} onChange={(event) => setBillingForm((current) => ({ ...current, mode: event.target.value as BillingItem["mode"] }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
+	                          <option>UPI</option><option>Cash</option><option>Card</option><option>Bank transfer</option><option>Online link</option>
+	                        </select>
+	                        <input value={billingForm.reference} onChange={(event) => setBillingForm((current) => ({ ...current, reference: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold md:col-span-2" placeholder="Payment reference / transaction ID" />
+	                        <button className="h-10 rounded-md bg-[#0a7d6e] px-4 text-[12px] font-black text-white">Add invoice</button>
+	                        <input value={billingForm.note} onChange={(event) => setBillingForm((current) => ({ ...current, note: event.target.value }))} className="h-10 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold md:col-span-3" placeholder="Billing note" />
+	                      </form>
+	                      <div className="divide-y divide-[#e7efed] border-t border-[#e7efed]">
+	                        {selectedClient.billingItems.length ? selectedClient.billingItems.map((item) => {
+	                          const amount = numberFromText(item.amount) ?? 0;
+	                          return (
+	                            <div key={item.id} className="grid gap-2 p-4 md:grid-cols-[1fr_120px_130px_120px] md:items-center">
+	                              <div>
+	                                <p className="text-[13px] font-black text-[#102323]">{item.packageName || "Nutrition package"}</p>
+	                                <p className="mt-1 text-[11px] font-bold text-[#74837f]">{compactDate(item.createdAt)} · {item.mode}{item.reference ? ` · ${item.reference}` : ""}</p>
+	                                {item.note ? <p className="mt-1 text-[11px] text-[#65716f]">{item.note}</p> : null}
+	                              </div>
+	                              <p className="text-[15px] font-black text-[#102323]">{currency(amount)}</p>
+	                              <select value={item.status} onChange={(event) => updateBillingStatus(item.id, event.target.value as BillingItem["status"])} className="h-9 rounded-md border border-[#dce9e5] px-2 text-[11px] font-black">
+	                                <option>Paid</option><option>Pending</option><option>Partial</option><option>Refunded</option>
+	                              </select>
+	                              <p className="text-[10px] font-bold text-[#74837f]">{item.dueDate ? `Due ${compactDate(item.dueDate)}` : "No due date"}</p>
+	                            </div>
+	                          );
+	                        }) : <p className="p-5 text-[12px] font-bold text-[#74837f]">No invoices yet. Add package amount to start billing history.</p>}
+	                      </div>
+	                    </div>
+
+	                    <aside className="space-y-3">
+	                      <section className="rounded-lg bg-[#102323] p-4 text-white">
+	                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#83f4df]">Client balance</p>
+	                        <p className="mt-3 text-[28px] font-black">
+	                          {currency(selectedClient.billingItems.filter((item) => item.status === "Pending" || item.status === "Partial").reduce((sum, item) => sum + (numberFromText(item.amount) ?? 0), 0))}
+	                        </p>
+	                        <p className="mt-1 text-[11px] font-semibold text-white/58">Outstanding for {selectedClient.name}</p>
+	                      </section>
+	                      <section className="rounded-lg border border-[#dce9e5] bg-white p-4">
+	                        <h3 className="text-[13px] font-black">Revenue summary</h3>
+	                        <div className="mt-3 space-y-2">
+	                          {[
+	                            ["All paid", currency(paidRevenue)],
+	                            ["All pending", currency(pendingRevenue)],
+	                            ["Invoices", String(allBillingItems.length)],
+	                          ].map(([label, value]) => (
+	                            <div key={label} className="flex items-center justify-between rounded-md bg-[#f7fbfa] px-3 py-2">
+	                              <span className="text-[11px] font-bold text-[#65716f]">{label}</span>
+	                              <span className="text-[12px] font-black text-[#102323]">{value}</span>
+	                            </div>
+	                          ))}
+	                        </div>
+	                      </section>
+	                    </aside>
+	                  </section>
+	                ) : null}
+
+	                  <div className="rounded-lg border border-[#dce9e5] bg-white p-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-[15px] font-black">Body composition progress</h2>
