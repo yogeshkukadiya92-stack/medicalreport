@@ -77,6 +77,23 @@ function numericMarkerValue(value: string) {
   return match ? Number(match[0]) : null;
 }
 
+function normalizedMarkerName(name: string) {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+const bodyCompositionCards = [
+  { keys: ["weight"], label: "Weight" },
+  { keys: ["bmi"], label: "BMI" },
+  { keys: ["pbf", "percentbodyfat", "bodyfatpercentage", "bodyfat"], label: "Fat %" },
+  { keys: ["skeletalmusclemass", "smm", "musclemass"], label: "Muscle" },
+  { keys: ["bodyfatmass"], label: "Fat mass" },
+  { keys: ["totalbodywater", "tbw"], label: "Water" },
+  { keys: ["basalmetabolicrate", "bmr"], label: "BMR" },
+  { keys: ["waisthipratio", "whr"], label: "WHR" },
+  { keys: ["visceralfatlevel", "visceralfat"], label: "Visceral fat" },
+  { keys: ["inbodyscore", "bodyscore"], label: "Score" },
+];
+
 function trendPath(values: number[]) {
   if (!values.length) return "";
   const min = Math.min(...values);
@@ -181,6 +198,13 @@ export default function Analytics() {
   }, [rangedReports]);
   const selectedTrend = selectedParameterName ? historyTrends.find((trend) => trend.name === selectedParameterName) ?? null : null;
   const featuredTrends = useMemo(() => historyTrends.slice(0, 6), [historyTrends]);
+  const bodyCompositionMetrics = useMemo(() => {
+    return bodyCompositionCards.flatMap((card) => {
+      const trend = historyTrends.find((item) => card.keys.includes(normalizedMarkerName(item.name)));
+      if (!trend) return [];
+      return [{ ...card, trend }];
+    });
+  }, [historyTrends]);
   const latestSummary = rangedReports.find((report) => report.summary)?.summary;
   const selectParameter = (name: string) => {
     setSelectedParameterName(name);
@@ -316,6 +340,38 @@ export default function Analytics() {
             </div>
           </div>
         </div>
+
+        <div className="mt-6 flex items-center justify-between">
+          <h2 className="text-[18px] font-black text-[#101c1c]">Body composition</h2>
+          {bodyCompositionMetrics.length ? <span className="rounded-md bg-[#e8f7f2] px-2 py-1 text-[11px] font-bold text-[#087766]">{bodyCompositionMetrics.length} values</span> : null}
+        </div>
+
+        {hasMember && bodyCompositionMetrics.length ? (
+          <div className="mt-3 rounded-lg border border-[#dce9e5] bg-white p-3 shadow-[0_10px_28px_rgba(20,67,60,0.05)]">
+            <div className="grid grid-cols-2 gap-2">
+              {bodyCompositionMetrics.slice(0, 10).map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => selectParameter(item.trend.name)}
+                  className="rounded-lg border border-[#e2ebe8] bg-[#f8fbfa] p-3 text-left hover:border-[#0a7d6e]"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#74837f]">{item.label}</p>
+                  <p className="mt-1 text-[18px] font-black text-[#162523]">
+                    {item.trend.latest.value}
+                    {item.trend.latest.unit ? ` ${item.trend.latest.unit}` : ""}
+                  </p>
+                  <p className="mt-1 text-[10px] font-bold text-[#087766]">{item.trend.changeText === "New" ? "Open graph" : item.trend.changeText}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : hasMember ? (
+          <div className="mt-3 rounded-lg border border-dashed border-[#c5d8d3] bg-white p-4">
+            <p className="text-[13px] font-black text-[#162523]">No body composition values detected yet</p>
+            <p className="mt-1 text-[12px] leading-5 text-[#65716f]">Upload as Body composition and use a clear InBody/gym scan photo so Weight, BMI, Fat %, Muscle, BMR and visceral fat are saved as data.</p>
+          </div>
+        ) : null}
 
         <div className="mt-6 flex items-center justify-between">
           <h2 className="text-[18px] font-black text-[#101c1c]">Past history</h2>
