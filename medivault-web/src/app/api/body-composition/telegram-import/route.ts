@@ -30,11 +30,18 @@ function detectImageMime(buffer: Buffer) {
   return "";
 }
 
-function uploadFile(bucket: GridFSBucket, file: File, buffer: Buffer, userId: string, contentType: string) {
+function uploadFile(
+  bucket: GridFSBucket,
+  file: File,
+  buffer: Buffer,
+  userId: string,
+  contentType: string,
+  source: "telegram" | "webhook",
+) {
   return new Promise<string>((resolve, reject) => {
-    const stream = bucket.openUploadStream(file.name || "telegram-inbody-report", {
+    const stream = bucket.openUploadStream(file.name || `${source}-inbody-report`, {
       contentType,
-      metadata: { originalName: file.name, source: "telegram", uploadedAt: new Date(), userId },
+      metadata: { originalName: file.name, source, uploadedAt: new Date(), userId },
     });
     stream.on("error", reject);
     stream.on("finish", () => resolve(stream.id.toString()));
@@ -42,7 +49,10 @@ function uploadFile(bucket: GridFSBucket, file: File, buffer: Buffer, userId: st
   });
 }
 
-export async function POST(request: NextRequest) {
+export async function handleBodyCompositionImport(
+  request: NextRequest,
+  source: "telegram" | "webhook" = "telegram",
+) {
   const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() || "";
   if (!tokenMatches(bearer)) return NextResponse.json({ error: "Import authorization failed." }, { status: 401 });
   if (!isMongoConfigured() || !isLocalAnalysisWorkerEnabled()) {
@@ -50,7 +60,7 @@ export async function POST(request: NextRequest) {
   }
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
-  if (!(file instanceof File)) return NextResponse.json({ error: "Telegram attachment is required." }, { status: 400 });
+  if (!(file instanceof File)) return NextResponse.json({ error: "InBody attachment is required." }, { status: 400 });
   if (file.size > maxFileSize) return NextResponse.json({ error: "Attachment exceeds 12 MB." }, { status: 413 });
   const sourceId = clean(form?.get("sourceId") ?? null, 160);
   const clientName = clean(form?.get("clientName") ?? null, 120);
@@ -77,17 +87,24 @@ export async function POST(request: NextRequest) {
   const context = await getAutomationLabContext(db, user.id);
   if (!context) return NextResponse.json({ error: "Automation owner has no lab access." }, { status: 503 });
 
-  const fileId = await uploadFile(new GridFSBucket(db, { bucketName: "reportFiles" }), file, buffer, user.id, mime);
+  const fileId = await uploadFile(
+    new GridFSBucket(db, { bucketName: "reportFiles" }),
+    file,
+    buffer,
+    user.id,
+    mime,
+    source,
+  );
   const now = new Date();
   const reportDate = clean(form?.get("reportDate") ?? null, 20) || now.toISOString().slice(0, 10);
   const job: BodyAnalysisJob = {
     id: `body-job-${Date.now()}-${crypto.randomBytes(8).toString("hex")}`,
     attempts: 0,
-    automation: { clientName, clientPhone, reportDate, source: "telegram", sourceId },
+    automation: { clientName, clientPhone, reportDate, source, sourceId },
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
     fileId,
-    fileName: file.name || "telegram-inbody-report",
+    fileName: file.name || `${source}-inbody-report`,
     imageDataUrls: [`data:${mime};base64,${buffer.toString("base64")}`],
     lab: context.lab.name,
     labId: context.lab.id,
@@ -106,4 +123,8 @@ export async function POST(request: NextRequest) {
     updatedAt: now.toISOString(),
   });
   return NextResponse.json({ accepted: true, jobId: job.id, status: job.status }, { status: 202 });
+}
+
+export async function POST(request: NextRequest) {
+  return handleBodyCompositionImport(request, "telegram");
 }

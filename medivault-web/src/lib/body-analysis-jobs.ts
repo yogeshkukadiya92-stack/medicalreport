@@ -33,7 +33,7 @@ export type BodyAnalysisJob = {
     clientName: string;
     clientPhone: string;
     reportDate: string;
-    source: "telegram";
+    source: "telegram" | "webhook";
     sourceId: string;
   };
   savedReportId?: string;
