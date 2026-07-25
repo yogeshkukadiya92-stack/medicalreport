@@ -66,6 +66,31 @@ Railway cannot access Ollama running on a developer Mac through `localhost`. For
 
 Body composition uploads use the configured vision provider first and retain local OCR as a fallback. Extracted medical values still enter the verification workflow before patient-app publishing.
 
+### Local Ollama Worker
+
+The production MediVault service can queue body-composition images for an Ollama worker running privately on a Mac. The Mac polls Railway over HTTPS, so Ollama port `11434` does not need to be publicly exposed.
+
+Railway variables:
+
+```bash
+LOCAL_ANALYSIS_WORKER_ENABLED=true
+LOCAL_ANALYSIS_WORKER_TOKEN=generate-a-long-random-token
+```
+
+Generate a token with `openssl rand -hex 32`. On the Mac, install a vision model and start the worker with the same token:
+
+```bash
+ollama pull qwen3-vl:2b
+
+cd medivault-web
+MEDIVAULT_BASE_URL=https://mr.yogeshaihub.in \
+MEDIVAULT_WORKER_TOKEN=the-same-railway-token \
+OLLAMA_MODEL=qwen3-vl:2b \
+npm run ollama:worker
+```
+
+The worker claims one job at a time, retries failed jobs up to three times, and sends only structured results back to MediVault. Queued image data expires automatically and is removed from the job after successful processing.
+
 MediVault reads Supabase public config at runtime from `/api/public-config`. After changing Railway variables, let Railway redeploy or restart the service so the runtime process sees the new values.
 
 ## Production Checks

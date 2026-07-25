@@ -68,6 +68,10 @@ async function prepareForAi(file: File) {
   throw new Error("Upload a JPG, PNG or PDF body-composition report.");
 }
 
+function wait(duration: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, duration));
+}
+
 export default function CreateBodyCompositionPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -157,25 +161,72 @@ export default function CreateBodyCompositionPage() {
         selectedFile ? storeFile(file) : storedFile ? Promise.resolve(storedFile) : storeFile(file),
       ]);
       setStoredFile(stored);
-      const response = await fetch("/api/analyze-report", {
+      const queueResponse = await fetch("/api/body-composition/analysis-jobs", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          fileDataUrls: dataUrls,
+          fileId: stored.fileId,
           fileName: file.name,
+          imageDataUrls: dataUrls,
           lab: "Body Composition Center",
           memberName: client.name || "Client",
-          mimeType: "image/jpeg",
-          originalMimeType: file.type,
-          reportKind: "body_composition",
           title,
         }),
       });
-      const result = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(result?.error ?? "Body scan analysis failed.");
-      const markers = (Array.isArray(result?.markers) ? result.markers : []) as ReportMarker[];
+      let result: Record<string, unknown> | null = null;
+      if (queueResponse.status === 202) {
+        const queued = await queueResponse.json().catch(() => null);
+        const jobId = queued?.job?.id;
+        if (!jobId) throw new Error("Local analysis job could not be created.");
+        setMessage("Report is queued for your local Ollama analyzer. Keep the Mac worker running.");
+        for (let attempt = 0; attempt < 120; attempt += 1) {
+          await wait(3_000);
+          const pollResponse = await fetch(`/api/body-composition/analysis-jobs/${encodeURIComponent(jobId)}`, {
+            cache: "no-store",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const polled = await pollResponse.json().catch(() => null);
+          if (!pollResponse.ok) throw new Error(polled?.error ?? "Local analysis status could not be checked.");
+          if (polled?.job?.status === "completed") {
+            result = polled.job.result as Record<string, unknown>;
+            break;
+          }
+          if (polled?.job?.status === "failed") {
+            throw new Error(polled.job.error || "Local Ollama could not analyze this report.");
+          }
+          if (attempt > 0 && attempt % 10 === 0) {
+            setMessage(`Local Ollama is analyzing ${file.name}. You can keep this page open.`);
+          }
+        }
+        if (!result) {
+          throw new Error("Local analysis is still pending. Keep the Mac worker running, then use Scan again.");
+        }
+      } else {
+        const queueError = await queueResponse.json().catch(() => null);
+        if (queueResponse.status !== 503 || queueError?.workerEnabled !== false) {
+          throw new Error(queueError?.error ?? "Local analysis job could not be created.");
+        }
+        const response = await fetch("/api/analyze-report", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileDataUrls: dataUrls,
+            fileName: file.name,
+            lab: "Body Composition Center",
+            memberName: client.name || "Client",
+            mimeType: "image/jpeg",
+            originalMimeType: file.type,
+            reportKind: "body_composition",
+            title,
+          }),
+        });
+        result = await response.json().catch(() => null);
+        if (!response.ok) throw new Error((result?.error as string) ?? "Body scan analysis failed.");
+      }
+      if (!result) throw new Error("Body scan analysis returned no result.");
+      const markers = (Array.isArray(result.markers) ? result.markers : []) as ReportMarker[];
       if (!markers.length || (markers.length === 1 && markers[0]?.name === "Report")) {
-        throw new Error(result?.summary ?? "No structured body values were detected. Try a clearer, straight photo.");
+        throw new Error((result?.summary as string) ?? "No structured body values were detected. Try a clearer, straight photo.");
       }
       setValues((current) => {
         const remaining = [...current];
@@ -196,8 +247,8 @@ export default function CreateBodyCompositionPage() {
         return [...detected, ...remaining];
       });
       setAiConfidence(Number(result.aiConfidence) || 0);
-      setSummary(result.summary ?? "");
-      setTitle(result.title || title);
+      setSummary(typeof result.summary === "string" ? result.summary : "");
+      setTitle(typeof result.title === "string" ? result.title : title);
       setMessage(`${markers.length} values automatically extracted from ${file.name}. Review highlighted fields before saving.`);
     } catch (analysisError) {
       setError(analysisError instanceof Error ? analysisError.message : "Body scan analysis failed.");

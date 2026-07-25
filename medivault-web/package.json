@@ -10,6 +10,7 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "node .next/standalone/server.js",
+    "ollama:worker": "node scripts/ollama-worker.mjs",
     "lint": "next lint",
     "format": "prettier --write \"src/**/*.{ts,tsx,md}\""
   },
