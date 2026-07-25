@@ -54,29 +54,26 @@ async function analyze(job) {
     `Client: ${job.memberName || "Client"}`,
     `Title: ${job.title || "BMI & Body Composition"}`,
   ].join("\n");
-  const imageContent = (job.imageDataUrls || []).map((url) => ({
-    type: "image_url",
-    image_url: { url },
-  }));
-  const response = await fetch(`${ollamaBaseUrl}/v1/chat/completions`, {
+  const images = (job.imageDataUrls || []).map((url) => url.slice(url.indexOf(",") + 1));
+  const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
     method: "POST",
     headers: {
-      Authorization: "Bearer ollama",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...imageContent] }],
+      format: "json",
+      messages: [{ role: "user", content: prompt, images }],
       model: ollamaModel,
-      response_format: { type: "json_object" },
+      options: { num_predict: 2048, temperature: 0.1 },
       stream: false,
-      temperature: 0.1,
+      think: false,
     }),
   });
   if (!response.ok) {
     throw new Error(`Ollama ${response.status}: ${(await response.text()).slice(0, 240)}`);
   }
   const completion = await response.json();
-  const parsed = extractJson(completion?.choices?.[0]?.message?.content);
+  const parsed = extractJson(completion?.message?.content || completion?.message?.thinking);
   return { ...parsed, aiConfidence: Number(parsed.aiConfidence) || 86 };
 }
 
