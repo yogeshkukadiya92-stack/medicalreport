@@ -16,6 +16,7 @@
   "dependencies": {
     "axios": "^1.6.0",
     "clsx": "^2.0.0",
+    "jsbarcode": "^3.12.3",
     "mongodb": "^6.21.0",
     "next": "^16.2.10",
     "pdf-lib": "^1.17.1",
@@ -27,6 +28,7 @@
     "postcss": "$postcss"
   },
   "devDependencies": {
+    "@types/jsbarcode": "^3.11.4",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

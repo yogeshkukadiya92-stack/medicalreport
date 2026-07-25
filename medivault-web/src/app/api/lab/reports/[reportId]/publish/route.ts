@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addLabAuditLog, getLabContext } from "@/lib/lab-server";
+import { addLabAuditLog, getLabContext, requireLabPermission } from "@/lib/lab-server";
 import { syncNormalizedLabReport } from "@/lib/normalized-health";
 import type { LabReport } from "@/lib/vault-types";
 
@@ -18,6 +18,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if ("error" in context) {
       return NextResponse.json({ error: context.error }, { status: context.status });
     }
+    const denied = requireLabPermission(context.labUser, "reports:publish");
+    if (denied) {
+      return NextResponse.json({ error: denied.error }, { status: denied.status });
+    }
 
     const existing = await context.db.collection<LabReport>("labReports").findOne(
       {
@@ -29,6 +33,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (!existing) {
       return NextResponse.json({ error: "Report not found." }, { status: 404 });
+    }
+    if (existing.status === "draft" && existing.accessionNumber && existing.workflowStatus !== "pathologist_verified") {
+      return NextResponse.json(
+        { error: "Technician review and pathologist verification are required before publish." },
+        { status: 409 },
+      );
     }
 
     const now = new Date().toISOString();

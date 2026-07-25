@@ -152,6 +152,11 @@ export type LabReport = {
   accessionNumber?: string;
   sampleCollectedAt?: string;
   duplicateOfReportId?: string;
+  workflowStatus?: "entered" | "technician_reviewed" | "pathologist_verified";
+  technicianReviewedAt?: string;
+  technicianReviewedByUserId?: string;
+  verifiedAt?: string;
+  verifiedByUserId?: string;
   publishedAt?: string;
   createdAt: string;
   updatedAt: string;

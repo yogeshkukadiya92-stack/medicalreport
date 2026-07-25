@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import { createLabReportPdf, type LabReportPdfInput } from "@/lib/lab-report-pdf";
-import { addLabAuditLog, getLabContext } from "@/lib/lab-server";
+import { addLabAuditLog, getLabContext, requireLabPermission } from "@/lib/lab-server";
 import type { LabReport } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
@@ -266,6 +266,8 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "create_order") {
+    const denied = requireLabPermission(context.labUser, "orders:manage");
+    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status });
     const patientName = cleanText(body?.patientName);
     const patientPhone = phoneDigits(cleanText(body?.patientPhone));
     const testName = cleanText(body?.testName);
@@ -297,12 +299,59 @@ export async function POST(request: NextRequest) {
     const orderId = cleanText(body?.orderId);
     const order = await context.db.collection<LabOrder>("labOrders").findOne({ id: orderId, labId: context.lab.id }, { projection: { _id: 0 } });
     if (!order) return NextResponse.json({ error: "Order was not found." }, { status: 404 });
+    const permissionByStage: Partial<Record<OrderStage, "samples:collect" | "samples:receive" | "reports:enter">> = {
+      ordered: "samples:collect",
+      sample_collected: "samples:receive",
+      sample_received: "reports:enter",
+      in_analysis: "reports:enter",
+    };
+    const permission = permissionByStage[order.stage];
+    const denied = permission ? requireLabPermission(context.labUser, permission) : null;
+    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status });
     const currentIndex = stages.indexOf(order.stage);
     if (currentIndex < 0 || currentIndex === stages.length - 1) return NextResponse.json({ error: "Order is already complete." }, { status: 409 });
     const nextStage = stages[currentIndex + 1];
     await context.db.collection<LabOrder>("labOrders").updateOne({ id: order.id, labId: context.lab.id }, { $set: { stage: nextStage, updatedAt: now } });
+    const sampleEventByStage: Partial<Record<OrderStage, string>> = {
+      sample_collected: "collected",
+      sample_received: "received",
+      in_analysis: "transferred",
+    };
+    const sampleEvent = sampleEventByStage[nextStage];
+    if (sampleEvent) {
+      await context.db.collection("sampleEvents").insertOne({
+        accessionNumber: order.accessionNumber,
+        createdAt: now,
+        eventType: sampleEvent,
+        id: `sample-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        labId: context.lab.id,
+        note: `${order.sampleType} sample moved to ${nextStage.replace(/_/g, " ")}.`,
+        performedByUserId: context.userId,
+        sampleType: order.sampleType,
+      });
+    }
     await context.db.collection("labOperationalAudit").insertOne({ action: "order_advanced", createdAt: now, entityId: order.id, labId: context.lab.id, note: `${order.accessionNumber} moved to ${nextStage.replace(/_/g, " ")}.`, userId: context.userId });
     return NextResponse.json({ nextStage, operations: await readOperations(context) });
+  }
+
+  if (action === "barcode_printed") {
+    const denied = requireLabPermission(context.labUser, "samples:collect");
+    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status });
+    const orderId = cleanText(body?.orderId);
+    const order = await context.db.collection<LabOrder>("labOrders").findOne({ id: orderId, labId: context.lab.id }, { projection: { _id: 0 } });
+    if (!order) return NextResponse.json({ error: "Order was not found." }, { status: 404 });
+    await context.db.collection("sampleEvents").insertOne({
+      accessionNumber: order.accessionNumber,
+      createdAt: now,
+      eventType: "barcode_printed",
+      id: `sample-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      labId: context.lab.id,
+      note: `Barcode label printed for ${order.sampleType} sample.`,
+      performedByUserId: context.userId,
+      sampleType: order.sampleType,
+    });
+    await context.db.collection("labOperationalAudit").insertOne({ action: "barcode_printed", createdAt: now, entityId: order.id, labId: context.lab.id, note: `${order.accessionNumber} barcode label printed.`, userId: context.userId });
+    return NextResponse.json({ operations: await readOperations(context) });
   }
 
   if (action === "acknowledge_critical") {

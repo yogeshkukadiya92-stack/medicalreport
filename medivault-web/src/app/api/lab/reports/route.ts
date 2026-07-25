@@ -243,6 +243,14 @@ export async function POST(request: NextRequest) {
   if (fileId && !(await userOwnsReportFile(context.db, fileId, context.userId))) {
     return NextResponse.json({ error: "Attachment is not available for this user." }, { status: 403 });
   }
+  const accessionNumber = cleanText(body.accessionNumber);
+  const workflowOrder = accessionNumber
+    ? await context.db.collection("labOrders").findOne(
+        { accessionNumber, labId: context.lab.id },
+        { projection: { _id: 0, id: 1 } },
+      )
+    : null;
+  const usesVerificationWorkflow = Boolean(workflowOrder);
 
   const report: LabReport = {
     id: reportId,
@@ -256,7 +264,7 @@ export async function POST(request: NextRequest) {
     reportType,
     reportDate,
     title: cleanText(body.title) || `${reportType} - ${clientResult.client.name}`,
-    status: "published",
+    status: usesVerificationWorkflow ? "draft" : "published",
     values,
     abnormal,
     parameters: values.length,
@@ -267,10 +275,11 @@ export async function POST(request: NextRequest) {
     fileSizeBytes: typeof body.fileSizeBytes === "number" && Number.isFinite(body.fileSizeBytes) ? body.fileSizeBytes : undefined,
     createdByLabUserId: context.userId,
     doctorName: cleanText(body.doctorName) || undefined,
-    accessionNumber: cleanText(body.accessionNumber) || undefined,
+    accessionNumber: accessionNumber || undefined,
     sampleCollectedAt: cleanText(body.sampleCollectedAt) || undefined,
     duplicateOfReportId: duplicate?.id,
-    publishedAt: now,
+    workflowStatus: usesVerificationWorkflow ? "entered" : undefined,
+    publishedAt: usesVerificationWorkflow ? undefined : now,
     createdAt: now,
     updatedAt: now,
   };
@@ -279,22 +288,37 @@ export async function POST(request: NextRequest) {
   if (values.length) {
     await context.db.collection<LabReportValue>("labReportValues").insertMany(values);
   }
-  await context.db.collection("clientReportLinks").updateOne(
-    { labReportId: report.id },
-    {
-      $set: {
-        labId: context.lab.id,
-        labReportId: report.id,
-        normalizedPhone: report.normalizedClientPhone,
-        state: "unclaimed",
-        updatedAt: now,
+  if (usesVerificationWorkflow) {
+    await context.db.collection("labOrders").updateOne(
+      { id: workflowOrder?.id, labId: context.lab.id },
+      { $set: { stage: "ready_for_verification", updatedAt: now } },
+    );
+    await context.db.collection("labOperationalAudit").insertOne({
+      action: "results_entered",
+      createdAt: now,
+      entityId: report.id,
+      labId: context.lab.id,
+      note: `${report.accessionNumber} results entered and sent for technician review.`,
+      userId: context.userId,
+    });
+  } else {
+    await context.db.collection("clientReportLinks").updateOne(
+      { labReportId: report.id },
+      {
+        $set: {
+          labId: context.lab.id,
+          labReportId: report.id,
+          normalizedPhone: report.normalizedClientPhone,
+          state: "unclaimed",
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          createdAt: now,
+        },
       },
-      $setOnInsert: {
-        createdAt: now,
-      },
-    },
-    { upsert: true },
-  );
+      { upsert: true },
+    );
+  }
   await addLabAuditLog(context.db, {
     action: "create",
     actorUserId: context.userId,
@@ -302,19 +326,22 @@ export async function POST(request: NextRequest) {
     labReportId: report.id,
     note: "Structured lab report created.",
   });
-  await addLabAuditLog(context.db, {
-    action: "publish",
-    actorUserId: context.userId,
-    labId: context.lab.id,
-    labReportId: report.id,
-    note: "Report auto-published to matching client vaults.",
-  });
-  await syncNormalizedLabReport(context.db, report, context.userId);
+  if (!usesVerificationWorkflow) {
+    await addLabAuditLog(context.db, {
+      action: "publish",
+      actorUserId: context.userId,
+      labId: context.lab.id,
+      labReportId: report.id,
+      note: "Report auto-published to matching client vaults.",
+    });
+    await syncNormalizedLabReport(context.db, report, context.userId);
+  }
 
   return NextResponse.json({
     duplicateWarning: duplicate
       ? `A ${reportType} report already exists for ${clientResult.client.name} on ${reportDate}.`
       : null,
     report,
+    workflowMessage: usesVerificationWorkflow ? "Results saved to verification worklist. Patient app will update after pathologist approval and publish." : null,
   });
 }

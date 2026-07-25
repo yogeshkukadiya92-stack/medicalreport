@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { CountryPhoneInput } from "@/components/country-phone-input";
 import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
+import { parseAnalyzerResults } from "@/lib/analyzer-import";
 import { localDateKey } from "@/lib/date-client";
 import { getLabTemplate } from "@/lib/lab-templates";
 import { normalizePhone, statusFromValue } from "@/lib/lab-utils";
@@ -84,6 +85,7 @@ function normalizeMetricName(value: string) {
 export default function LabCreateReportPage() {
   const { isConfigured, session, status } = useAuth();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const analyzerInputRef = useRef<HTMLInputElement | null>(null);
   const [mode, setMode] = useState<BuilderMode>("template");
   const [templates, setTemplates] = useState<LabTemplate[]>([]);
   const [clients, setClients] = useState<LabClient[]>([]);
@@ -99,6 +101,7 @@ export default function LabCreateReportPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
   const [hasAppliedUrlPrefill, setHasAppliedUrlPrefill] = useState(false);
+  const [analyzerImport, setAnalyzerImport] = useState<{ fileName: string; imported: number; unmapped: number } | null>(null);
 
   async function loadInitialData() {
     if (!isConfigured) {
@@ -230,6 +233,48 @@ export default function LabCreateReportPage() {
     );
   }
 
+  async function importAnalyzerFile(file: File | null) {
+    if (!file) return;
+    setError("");
+    setMessage("");
+
+    try {
+      if (file.size > 2 * 1024 * 1024) throw new Error("Analyzer file must be smaller than 2 MB.");
+      const importedResults = parseAnalyzerResults(await file.text());
+      if (!importedResults.length) {
+        throw new Error("No analyzer results found. Use CSV/TXT headers: code or test, value, unit, range and flag.");
+      }
+
+      const remaining = [...values];
+      let unmatchedCount = 0;
+      const merged = importedResults.map((result) => {
+        const normalizedName = normalizeMetricName(result.name);
+        const matchIndex = remaining.findIndex((item) => normalizeMetricName(item.name) === normalizedName);
+        const match = matchIndex >= 0 ? remaining.splice(matchIndex, 1)[0] : null;
+        if (!match) unmatchedCount += 1;
+        const referenceRange = result.referenceRange || match?.referenceRange || "";
+        const inferredStatus = statusFromValue(result.value, referenceRange);
+        return {
+          id: match?.id ?? newId(),
+          name: result.name,
+          notes: result.notes || (result.code ? `Analyzer code: ${result.code}` : ""),
+          referenceRange,
+          status: result.status === "Watch" ? inferredStatus : result.status,
+          unit: result.unit || match?.unit || "",
+          value: result.value,
+        };
+      });
+      setValues([...merged, ...remaining]);
+      setAnalyzerImport({ fileName: file.name, imported: importedResults.length, unmapped: unmatchedCount });
+      setMessage(`${importedResults.length} analyzer results imported. Review values before publishing.`);
+    } catch (importError) {
+      setAnalyzerImport(null);
+      setError(importError instanceof Error ? importError.message : "Analyzer file could not be imported.");
+    } finally {
+      if (analyzerInputRef.current) analyzerInputRef.current.value = "";
+    }
+  }
+
   function applyBmiEstimate() {
     setValues((current) => {
       const height = current.find((item) => normalizeMetricName(item.name) === "height");
@@ -301,13 +346,14 @@ export default function LabCreateReportPage() {
         throw new Error(result?.error ?? "Report could not be saved.");
       }
 
-      setMessage(result?.duplicateWarning ?? "Report published to matching client app.");
+      setMessage(result?.duplicateWarning ?? result?.workflowMessage ?? "Report published to matching client app.");
       setSelectedClientId("");
       setClientForm(emptyClient);
       setReportForm(createEmptyReport());
       setSelectedTemplateId("cbc");
       setValues(draftFromTemplate("cbc"));
       setStoredFile(null);
+      setAnalyzerImport(null);
       if (inputRef.current) inputRef.current.value = "";
       loadInitialData();
     } catch (saveError) {
@@ -351,7 +397,7 @@ export default function LabCreateReportPage() {
           ))}
             </div>
             <button disabled={isSaving} className="h-9 rounded-md bg-[#0d5c46] px-4 text-[12px] font-black text-white shadow-[0_4px_12px_rgba(13,92,70,0.16)] hover:bg-[#0a4938] disabled:opacity-60">
-              {isSaving ? "Publishing..." : "Verify & publish"}
+              {isSaving ? "Saving..." : reportForm.accessionNumber ? "Save for verification" : "Verify & publish"}
             </button>
           </div>
         </header>
@@ -426,6 +472,30 @@ export default function LabCreateReportPage() {
               </div>
               <input ref={inputRef} type="file" accept="application/pdf,image/*" className="mt-2 w-full rounded-md border border-dashed border-[#bfcfcb] bg-[#f8fbfa] p-2 text-[10px] font-bold text-[#52605d]" />
               {storedFile ? <p className="mt-2 rounded bg-[#eaf9f2] p-2 text-[10px] font-bold text-[#087766]">{storedFile.fileName} stored.</p> : null}
+            </section>
+
+            <section className="rounded-md border border-[#b8d4cc] bg-[#f4fbf8] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-[12px] font-black text-[#17222b]">Analyzer import</h2>
+                  <p className="mt-0.5 text-[9px] font-bold text-[#74837f]">CSV, TSV or TXT · max 2 MB</p>
+                </div>
+                <span className="rounded bg-[#e0f5ef] px-2 py-1 text-[9px] font-black text-[#0d5c46]">AUTO MAP</span>
+              </div>
+              <input
+                ref={analyzerInputRef}
+                type="file"
+                accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
+                onChange={(event) => void importAnalyzerFile(event.target.files?.[0] ?? null)}
+                className="mt-2 w-full rounded-md border border-dashed border-[#9fc9bd] bg-white p-2 text-[10px] font-bold text-[#52605d]"
+              />
+              <p className="mt-2 text-[9px] font-semibold leading-4 text-[#60716d]">Required: code/test + value. Optional: unit, range, flag, notes.</p>
+              {analyzerImport ? (
+                <div className="mt-2 rounded-md bg-[#eaf9f2] p-2 text-[10px] font-bold text-[#087766]">
+                  <p className="truncate">{analyzerImport.fileName}</p>
+                  <p className="mt-0.5">{analyzerImport.imported} imported · {analyzerImport.unmapped} new parameters</p>
+                </div>
+              ) : null}
             </section>
 
             <section className="rounded-md bg-[#0d5c46] p-3 text-white">
@@ -543,7 +613,7 @@ export default function LabCreateReportPage() {
             ) : null}
                 {message ? <p className="mb-2 rounded bg-[#eaf9f2] p-2 text-[11px] font-bold text-[#087766]">{message}</p> : null}
                 {error ? <p className="mb-2 rounded bg-[#fff0ec] p-2 text-[11px] font-bold text-[#ba563d]">{error}</p> : null}
-                <div className="flex items-center justify-between gap-3"><p className="text-[10px] font-semibold text-[#74837f]">Status colors update automatically from reference ranges.</p><button disabled={isSaving} className="h-9 shrink-0 rounded-md bg-[#0d5c46] px-4 text-[11px] font-black text-white disabled:opacity-60">{isSaving ? "Publishing..." : "Verify & publish"}</button></div>
+                <div className="flex items-center justify-between gap-3"><p className="text-[10px] font-semibold text-[#74837f]">Status colors update automatically from reference ranges.</p><button disabled={isSaving} className="h-9 shrink-0 rounded-md bg-[#0d5c46] px-4 text-[11px] font-black text-white disabled:opacity-60">{isSaving ? "Saving..." : reportForm.accessionNumber ? "Save for verification" : "Verify & publish"}</button></div>
           </div>
         </section>
           </section>
