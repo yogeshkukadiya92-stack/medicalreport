@@ -25,9 +25,10 @@ type TimelineResult = {
 };
 
 function reportTimestamp(report: { createdAt?: number; date: string }) {
-  if (typeof report.createdAt === "number" && Number.isFinite(report.createdAt)) return report.createdAt;
   const parsed = Date.parse(report.date);
-  return Number.isFinite(parsed) ? parsed : 0;
+  if (Number.isFinite(parsed)) return parsed;
+  if (typeof report.createdAt === "number" && Number.isFinite(report.createdAt)) return report.createdAt;
+  return 0;
 }
 
 function numericValue(value: string) {
