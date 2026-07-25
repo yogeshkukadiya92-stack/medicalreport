@@ -152,6 +152,8 @@ export type LabReport = {
   accessionNumber?: string;
   sampleCollectedAt?: string;
   duplicateOfReportId?: string;
+  entrySource?: "manual" | "photo" | "machine";
+  aiConfidence?: number;
   workflowStatus?: "entered" | "technician_reviewed" | "pathologist_verified";
   technicianReviewedAt?: string;
   technicianReviewedByUserId?: string;

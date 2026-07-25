@@ -7,7 +7,7 @@ import { Icon, MobileShell } from "@/components/mobile-shell";
 import { SignOutButton } from "@/components/sign-out-button";
 import { calculateHealthScore } from "@/lib/health-score";
 
-const filters = ["All", "Blood", "Diabetes", "Thyroid", "Liver", "Kidney"] as const;
+const filters = ["All", "Body", "Blood", "Diabetes", "Thyroid", "Liver", "Kidney"] as const;
 type FilterName = (typeof filters)[number];
 
 type TimelineResult = {
@@ -37,6 +37,7 @@ function numericValue(value: string) {
 
 function testGroup(item: TimelineResult) {
   const source = `${item.category} ${item.reportTitle} ${item.name}`.toLowerCase();
+  if (/body composition|inbody|\bbmi\b|body fat|skeletal muscle|visceral fat|body water/.test(source)) return "Body";
   if (/thyroid|tsh|\bt3\b|\bt4\b/.test(source)) return "Thyroid";
   if (/diabetes|glucose|hba1c|sugar|insulin/.test(source)) return "Diabetes";
   if (/liver|bilirubin|sgpt|sgot|alt|ast|albumin/.test(source)) return "Liver";

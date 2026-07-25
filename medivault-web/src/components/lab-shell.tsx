@@ -15,6 +15,7 @@ const labNav = [
   { href: "/lab/create", icon: "upload", label: "Create report" },
   { href: "/lab/analyzer", icon: "analytics", label: "Analyzer inbox" },
   { href: "/lab/worklist", icon: "shield", label: "Verification" },
+  { href: "/body-composition", icon: "trend", label: "Body composition" },
   { href: "/lab/reports", icon: "reports", label: "History" },
   { href: "/lab/pdf", icon: "reports", label: "PDF Studio" },
   { href: "/lab/registration", icon: "calendar", label: "Registration" },
