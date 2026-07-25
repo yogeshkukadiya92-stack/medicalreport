@@ -15,7 +15,7 @@ export default function BodyCompositionDashboardPage() {
     <BodyCompositionShell>
       <header className="flex flex-col gap-3 border-b border-[#dbe6e3] pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div><p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#0b806b]">Live body intelligence</p><h1 className="mt-1 text-[26px] font-black">Command dashboard</h1><p className="mt-1 text-[12px] font-semibold text-[#697875]">Scans, composition risk, verification and patient-app delivery from one workspace.</p></div>
-        <div className="flex gap-2"><button type="button" onClick={() => void reload()} className="h-10 rounded-md border border-[#bdd4ce] bg-white px-4 text-[11px] font-black text-[#075b4e]">Refresh</button><Link href="/body-composition/create" className="inline-flex h-10 items-center rounded-md bg-[#075b4e] px-4 text-[11px] font-black text-white">+ Add body scan</Link></div>
+        <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void reload()} className="h-10 rounded-md border border-[#bdd4ce] bg-white px-4 text-[11px] font-black text-[#075b4e]">Refresh</button><Link href="/body-composition/create?mode=upload" className="inline-flex h-10 items-center rounded-md border border-[#75b9a7] bg-white px-4 text-[11px] font-black text-[#075b4e]">Upload PDF / Photo</Link><Link href="/body-composition/create" className="inline-flex h-10 items-center rounded-md bg-[#075b4e] px-4 text-[11px] font-black text-white">+ Manual scan</Link></div>
       </header>
       {error ? <p className="mt-4 rounded-md bg-[#fff0ec] p-3 text-[11px] font-bold text-[#ba563d]">{error}</p> : null}
 

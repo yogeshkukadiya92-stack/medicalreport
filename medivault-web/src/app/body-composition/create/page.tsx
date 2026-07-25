@@ -50,16 +50,20 @@ async function prepareForAi(file: File) {
     const pdfjs = await import("pdfjs-dist");
     pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
     const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
-    const page = await pdf.getPage(1);
-    const base = page.getViewport({ scale: 1 });
-    const viewport = page.getViewport({ scale: Math.min(2, 1500 / Math.max(base.width, base.height)) });
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("PDF rendering is unavailable.");
-    await page.render({ canvasContext: context, viewport }).promise;
-    return [canvas.toDataURL("image/jpeg", 0.82)];
+    const pages: string[] = [];
+    for (let pageNumber = 1; pageNumber <= Math.min(pdf.numPages, 3); pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const base = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: Math.min(2, 1500 / Math.max(base.width, base.height)) });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("PDF rendering is unavailable.");
+      await page.render({ canvasContext: context, viewport }).promise;
+      pages.push(canvas.toDataURL("image/jpeg", 0.82));
+    }
+    return pages;
   }
   throw new Error("Upload a JPG, PNG or PDF body-composition report.");
 }
@@ -90,6 +94,11 @@ export default function CreateBodyCompositionPage() {
     const match = data.clients.find((item) => item.normalizedPhone === phone);
     if (match) selectClient(match.id);
   }, [data?.clients, selectedClientId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("mode") === "upload") setMode("photo");
+  }, []);
 
   function selectClient(id: string) {
     setSelectedClientId(id);
@@ -133,8 +142,8 @@ export default function CreateBodyCompositionPage() {
     return { ...result, fileName: file.name } as StoredFile;
   }
 
-  async function analyzePhoto() {
-    const file = fileRef.current?.files?.[0] ?? null;
+  async function analyzePhoto(selectedFile?: File) {
+    const file = selectedFile ?? fileRef.current?.files?.[0] ?? null;
     if (!file || !token) {
       setError("Select a body-composition photo or PDF first.");
       return;
@@ -143,7 +152,10 @@ export default function CreateBodyCompositionPage() {
     setError("");
     setMessage("");
     try {
-      const [dataUrls, stored] = await Promise.all([prepareForAi(file), storedFile ? Promise.resolve(storedFile) : storeFile(file)]);
+      const [dataUrls, stored] = await Promise.all([
+        prepareForAi(file),
+        selectedFile ? storeFile(file) : storedFile ? Promise.resolve(storedFile) : storeFile(file),
+      ]);
       setStoredFile(stored);
       const response = await fetch("/api/analyze-report", {
         method: "POST",
@@ -186,12 +198,21 @@ export default function CreateBodyCompositionPage() {
       setAiConfidence(Number(result.aiConfidence) || 0);
       setSummary(result.summary ?? "");
       setTitle(result.title || title);
-      setMessage(`${markers.length} values extracted. Review highlighted fields before saving.`);
+      setMessage(`${markers.length} values automatically extracted from ${file.name}. Review highlighted fields before saving.`);
     } catch (analysisError) {
       setError(analysisError instanceof Error ? analysisError.message : "Body scan analysis failed.");
     } finally {
       setIsAnalyzing(false);
     }
+  }
+
+  function handleFileSelection(file: File | null) {
+    setFileName(file?.name ?? "");
+    setStoredFile(null);
+    setAiConfidence(0);
+    setError("");
+    setMessage("");
+    if (file) void analyzePhoto(file);
   }
 
   async function saveScan(event: FormEvent) {
@@ -264,7 +285,7 @@ export default function CreateBodyCompositionPage() {
 
             <section className="rounded-md border border-[#dbe6e3] bg-white p-3">
               <div className="grid grid-cols-2 rounded-md bg-[#eef4f2] p-1">{(["manual", "photo"] as const).map((item) => <button key={item} type="button" onClick={() => setMode(item)} className={`h-8 rounded text-[10px] font-black ${mode === item ? "bg-white text-[#075b4e] shadow-sm" : "text-[#74837f]"}`}>{item === "manual" ? "Manual" : "Photo / PDF"}</button>)}</div>
-              {mode === "photo" ? <div className="mt-3"><input ref={fileRef} type="file" accept=".pdf,image/*" onChange={(event) => { setFileName(event.target.files?.[0]?.name ?? ""); setStoredFile(null); }} className="w-full rounded-md border border-dashed border-[#9fc9bd] bg-[#f4fbf8] p-2 text-[10px] font-bold" /><p className="mt-2 truncate text-[9px] font-semibold text-[#74837f]">{fileName || "Clear InBody, Tanita, Omron, smart-scale image or PDF"}</p><button type="button" disabled={isAnalyzing || !fileName} onClick={() => void analyzePhoto()} className="mt-3 h-9 w-full rounded-md bg-[#102f35] text-[10px] font-black text-white disabled:opacity-50">{isAnalyzing ? "Reading values..." : "Scan & fill values"}</button>{aiConfidence ? <p className="mt-2 text-[9px] font-black text-[#0b806b]">AI confidence {aiConfidence}% · manual review required</p> : null}</div> : <p className="mt-3 text-[10px] font-semibold leading-4 text-[#74837f]">Use the standard InBody fields. Empty parameters are ignored when saving.</p>}
+              {mode === "photo" ? <div className="mt-3"><input ref={fileRef} type="file" accept=".pdf,image/*" onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)} className="w-full rounded-md border border-dashed border-[#9fc9bd] bg-[#f4fbf8] p-2 text-[10px] font-bold" /><p className="mt-2 truncate text-[9px] font-semibold text-[#74837f]">{isAnalyzing ? `Scanning ${fileName}...` : fileName || "Select an InBody, Tanita, Omron, smart-scale image or PDF"}</p><button type="button" disabled={isAnalyzing || !fileName} onClick={() => void analyzePhoto()} className="mt-3 h-9 w-full rounded-md bg-[#102f35] text-[10px] font-black text-white disabled:opacity-50">{isAnalyzing ? "Reading PDF values..." : aiConfidence ? "Scan again" : "Scan & fill values"}</button><p className="mt-2 text-[9px] font-semibold leading-4 text-[#74837f]">PDF/photo selection starts automatic extraction. Up to 3 PDF pages are scanned.</p>{aiConfidence ? <p className="mt-2 text-[9px] font-black text-[#0b806b]">AI confidence {aiConfidence}% · values filled below for review</p> : null}</div> : <p className="mt-3 text-[10px] font-semibold leading-4 text-[#74837f]">Use the standard InBody fields. Empty parameters are ignored when saving.</p>}
             </section>
 
             <section className="rounded-md bg-[#102f35] p-4 text-white"><div className="flex justify-between"><div><p className="text-[9px] font-black uppercase text-[#74e7c8]">Entered</p><p className="mt-1 text-[24px] font-black">{entered}</p></div><div className="text-right"><p className="text-[9px] font-black uppercase text-[#74e7c8]">Review</p><p className="mt-1 text-[24px] font-black">{flagged}</p></div></div><p className="mt-3 text-[9px] font-semibold text-white/55">Only verified scans sync to the matching patient mobile app.</p></section>
