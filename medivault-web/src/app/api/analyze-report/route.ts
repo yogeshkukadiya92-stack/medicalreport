@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createWorker, OEM } from "tesseract.js";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
 import type { ReportMarker, ReportStatus } from "@/lib/vault-types";
 
-export const maxDuration = 45;
+export const maxDuration = 60;
 
 type AnalysisResponse = {
   abnormal: number;
@@ -104,6 +105,19 @@ const bodyCompositionAliases: Array<[RegExp, string]> = [
 
 function getAiProvider() {
   const provider = (process.env.AI_PROVIDER || "openai").toLowerCase();
+  if (provider === "ollama") {
+    const baseUrl = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
+    return {
+      apiKey: process.env.OLLAMA_API_KEY || "ollama",
+      baseUrl: baseUrl.replace(/\/v1\/?$/, "").replace(/\/$/, ""),
+      imageLimit: 2,
+      keyName: "OLLAMA_BASE_URL",
+      model: process.env.OLLAMA_MODEL || "qwen3-vl:8b",
+      providerName: "Ollama",
+      supportsJsonMode: true,
+    };
+  }
+
   if (provider === "nvidia") {
     return {
       apiKey: process.env.NVIDIA_API_KEY,
@@ -138,6 +152,126 @@ function fallbackAnalysis(title: string, reason: string): AnalysisResponse {
     summary: reason,
     title: title || "Medical Report",
   };
+}
+
+type OcrMetric = {
+  joinTrailingDecimal?: boolean;
+  name: string;
+  nextLineIndex?: number;
+  nextLineWhenEmpty?: boolean;
+  pattern: RegExp;
+  pick?: "first" | "last";
+  range: string;
+  transform?: (value: number) => number;
+  unit: string;
+};
+
+const bodyOcrMetrics: OcrMetric[] = [
+  { name: "Height", nextLineIndex: 1, nextLineWhenEmpty: true, pattern: /\bheight\b/i, range: "> 0", unit: "cm" },
+  { name: "Total Body Water", pattern: /total body water|\btbw\b/i, range: "> 0", unit: "L" },
+  { name: "Protein", pattern: /\bprotein\b/i, range: "> 0", unit: "kg" },
+  { name: "Minerals", pattern: /\bminerals?\b/i, range: "> 0", unit: "kg" },
+  { name: "Body Fat Mass", pattern: /body fat mass/i, range: "7.5-14.9", unit: "kg" },
+  { name: "Weight", pattern: /sum of the above.*?\bweight\b/i, range: "> 0", unit: "kg" },
+  { name: "Skeletal Muscle Mass", pattern: /skeletal muscle mass|\bsmm\b/i, pick: "last", range: "> 0", unit: "kg" },
+  { name: "BMI", pattern: /body mass index/i, range: "18.5-24.9", unit: "kg/m2" },
+  { name: "PBF", pattern: /percent body fat/i, joinTrailingDecimal: true, pick: "last", range: "10-25", unit: "%" },
+  { name: "InBody Score", pattern: /inbody score|body score/i, range: "70-100", unit: "score" },
+  { name: "Target Weight", pattern: /target weight/i, range: "> 0", unit: "kg" },
+  { name: "Weight Control", pattern: /weight control/i, range: "", unit: "kg" },
+  { name: "Fat Control", pattern: /fat control/i, range: "", unit: "kg" },
+  { name: "Muscle Control", pattern: /muscle control/i, range: "", unit: "kg" },
+  { name: "Basal Metabolic Rate", pattern: /basal\s+\S*(?:rate|rete)|\bbmr\b/i, range: "> 0", transform: (value) => value > 0 && value < 100 ? value * 100 : value, unit: "kcal" },
+  { name: "Waist-Hip Ratio", pattern: /waist\s*-?\s*hip\s*ratio|\bwhr\b/i, range: "0.80-0.90", unit: "ratio" },
+  { name: "Visceral Fat Level", pattern: /visceral fat level|visceral fat/i, range: "1-9", unit: "level" },
+  { name: "Obesity Degree", pattern: /obesity degree/i, range: "90-110", unit: "%" },
+];
+
+function markerStatus(value: string, range: string): ReportMarker["status"] {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || !range) return "Watch";
+  const numbers = range.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+  if (range.trim().startsWith(">")) return numericValue > (numbers[0] ?? 0) ? "Normal" : "Low";
+  if (numbers.length < 2) return "Watch";
+  if (numericValue < numbers[0]) return "Low";
+  if (numericValue > numbers[1]) return "High";
+  return "Normal";
+}
+
+function numberAfterLabel(lines: string[], metric: OcrMetric) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const match = line.match(metric.pattern);
+    if (!match || match.index === undefined) continue;
+    const afterLabel = line.slice(match.index + match[0].length);
+    let values = afterLabel.match(/[+-]?\s*\d+(?:[.,]\d+)?/g) ?? [];
+    if (metric.name === "Weight" && /target weight/i.test(afterLabel) && lines[index + 1]) {
+      values = lines[index + 1].match(/[+-]?\s*\d+(?:[.,]\d+)?/g) ?? [];
+    } else if (!values.length && metric.nextLineWhenEmpty && lines[index + 1]) {
+      values = lines[index + 1].match(/[+-]?\s*\d+(?:[.,]\d+)?/g) ?? [];
+    }
+    let selected = metric.nextLineWhenEmpty && afterLabel.match(/\d/) === null && metric.nextLineIndex !== undefined
+      ? values[metric.nextLineIndex]
+      : metric.pick === "last" ? values.at(-1) : values[0];
+    if (metric.joinTrailingDecimal && values.length >= 2) {
+      const integer = values.at(-2)?.replace(/\s/g, "");
+      const decimal = values.at(-1)?.replace(/\s/g, "");
+      if (integer && decimal && /^\d{1,2}$/.test(integer) && /^\d$/.test(decimal)) selected = `${integer}.${decimal}`;
+    }
+    if (!selected) continue;
+    const cleanValue = selected.replace(/\s/g, "").replace(",", ".");
+    const numericValue = Number(cleanValue);
+    if (!Number.isFinite(numericValue)) continue;
+    const transformed = metric.transform ? metric.transform(numericValue) : numericValue;
+    return Number.isInteger(transformed) ? String(transformed) : String(Number(transformed.toFixed(2)));
+  }
+  return "";
+}
+
+async function bodyCompositionOcrAnalysis(title: string, imageUrls: string[], failureReason: string): Promise<AnalysisResponse> {
+  if (!imageUrls.length) return fallbackAnalysis(title, failureReason);
+
+  const worker = await createWorker("eng", OEM.LSTM_ONLY, { cachePath: "/tmp/tesseract" });
+  try {
+    const pages: string[] = [];
+    for (const dataUrl of imageUrls.slice(0, 2)) {
+      const encoded = dataUrl.split(",", 2)[1];
+      if (!encoded) continue;
+      const result = await worker.recognize(Buffer.from(encoded, "base64"));
+      pages.push(result.data.text);
+    }
+    const lines = pages.join("\n").split(/\r?\n/).map((line) => line.replace(/[|_]/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+    const markers = bodyOcrMetrics.flatMap((metric) => {
+      const value = numberAfterLabel(lines, metric);
+      if (!value) return [];
+      return [{
+        name: metric.name,
+        range: metric.range || "Manual review",
+        status: markerStatus(value, metric.range),
+        value: `${value} ${metric.unit}`.trim(),
+      } satisfies ReportMarker];
+    });
+
+    if (markers.length < 3) {
+      return fallbackAnalysis(title, `${failureReason} OCR could not confidently detect enough structured values. Upload a clear, straight scan.`);
+    }
+    const normalized = normalizeBodyCompositionMarkers(markers);
+    const abnormal = normalized.filter((marker) => marker.status !== "Normal").length;
+    return {
+      abnormal,
+      aiConfidence: 68,
+      category: "Body Composition",
+      markers: normalized,
+      parameters: normalized.length,
+      status: abnormal ? "Needs review" : "Reviewed",
+      summary: `${normalized.length} body-composition values extracted with OCR. Review every value before verification.`,
+      title: title || "BMI & Body Composition",
+    };
+  } catch {
+    return fallbackAnalysis(title, `${failureReason} OCR processing also failed. Try a clearer JPG/PNG or configure the vision API.`);
+  } finally {
+    await worker.terminate();
+  }
 }
 
 function cleanMarker(marker: Partial<ReportMarker>): ReportMarker {
@@ -217,13 +351,6 @@ export async function POST(request: NextRequest) {
   }
 
   const title = body.title || body.fileName?.replace(/\.[^.]+$/, "") || "Medical Report";
-  if (!aiProvider.apiKey) {
-    return NextResponse.json(
-      fallbackAnalysis(title, `${aiProvider.providerName} API key is not configured yet. Add ${aiProvider.keyName} in Railway Variables to enable live AI analysis.`),
-      { status: 200 },
-    );
-  }
-
   const imageUrls = (Array.isArray(body.fileDataUrls) && body.fileDataUrls.length ? body.fileDataUrls : body.fileDataUrl ? [body.fileDataUrl] : [])
     .filter((url) => typeof url === "string" && url.startsWith("data:image/"))
     .slice(0, aiProvider.imageLimit);
@@ -243,6 +370,16 @@ export async function POST(request: NextRequest) {
   }
 
   const isBodyComposition = body.reportKind === "body_composition" || /body composition|bmi|body scan|inbody|smart scale/i.test(`${title} ${body.lab || ""}`);
+  if (!aiProvider.apiKey) {
+    const reason = `${aiProvider.providerName} API key is not configured.`;
+    return NextResponse.json(
+      isBodyComposition
+        ? await bodyCompositionOcrAnalysis(title, imageUrls, reason)
+        : fallbackAnalysis(title, `${reason} Add ${aiProvider.keyName} in Railway Variables to enable live AI analysis.`),
+      { status: 200 },
+    );
+  }
+
   const prompt = [
     imageUrls.length > 1
       ? "Analyze these medical report page images for a personal health vault."
@@ -266,7 +403,7 @@ export async function POST(request: NextRequest) {
   let openAiResponse: Response;
   const imageContent = imageUrls.map((url) => ({
     type: "image_url",
-    image_url: aiProvider.providerName === "NVIDIA" ? { url } : { url, detail: "high" },
+    image_url: aiProvider.providerName === "OpenAI" ? { url, detail: "high" } : { url },
   }));
   const requestPayload = {
     model: aiProvider.model,
@@ -294,20 +431,26 @@ export async function POST(request: NextRequest) {
     });
   } catch {
     return NextResponse.json(
-      fallbackAnalysis(title, `${aiProvider.providerName} service connection failed. Confirm ${aiProvider.keyName} is set on Railway and redeploy the app.`),
+      isBodyComposition
+        ? await bodyCompositionOcrAnalysis(title, imageUrls, `${aiProvider.providerName} service connection failed.`)
+        : fallbackAnalysis(title, `${aiProvider.providerName} service connection failed. Confirm ${aiProvider.keyName} is set on Railway and redeploy the app.`),
       { status: 200 },
     );
   }
 
   if (!openAiResponse.ok) {
     const errorText = await openAiResponse.text();
-    const friendlyError = errorText.includes("model")
-      ? `AI model is not available for this key. Check ${aiProvider.providerName} model setting in Railway Variables.`
+    const friendlyError = aiProvider.providerName === "Ollama" && /model|not found/i.test(errorText)
+      ? `Ollama model is not installed. Run "ollama pull ${aiProvider.model}" on the Ollama host.`
+      : errorText.includes("model")
+        ? `AI model is not available for this key. Check ${aiProvider.providerName} model setting in Railway Variables.`
       : errorText.includes("Incorrect API key") || errorText.includes("invalid_api_key")
         ? `${aiProvider.providerName} API key is invalid. Update ${aiProvider.keyName} in Railway Variables and redeploy.`
         : `AI analysis could not finish (${openAiResponse.status}): ${errorText.slice(0, 180)}`;
     return NextResponse.json(
-      fallbackAnalysis(title, friendlyError),
+      isBodyComposition
+        ? await bodyCompositionOcrAnalysis(title, imageUrls, friendlyError)
+        : fallbackAnalysis(title, friendlyError),
       { status: 200 },
     );
   }

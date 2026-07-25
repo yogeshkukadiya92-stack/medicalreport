@@ -50,6 +50,22 @@ NVIDIA_MODEL=meta/llama-3.2-11b-vision-instruct
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com
 ```
 
+For private/local Ollama vision analysis:
+
+```bash
+ollama pull qwen3-vl:8b
+
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen3-vl:8b
+```
+
+Use `qwen3-vl:4b` on a lower-memory machine. `127.0.0.1` works only when Ollama and the Next.js server run on the same host. A Next.js app running in local Docker can usually use `http://host.docker.internal:11434`.
+
+Railway cannot access Ollama running on a developer Mac through `localhost`. For production, run Ollama on the same private server/network as MediVault or provide a secured HTTPS reverse proxy/VPN endpoint through `OLLAMA_BASE_URL`. Do not expose port `11434` directly to the public internet without authentication and firewall rules. Set `OLLAMA_API_KEY` when the reverse proxy requires a bearer token.
+
+Body composition uploads use the configured vision provider first and retain local OCR as a fallback. Extracted medical values still enter the verification workflow before patient-app publishing.
+
 MediVault reads Supabase public config at runtime from `/api/public-config`. After changing Railway variables, let Railway redeploy or restart the service so the runtime process sees the new values.
 
 ## Production Checks
