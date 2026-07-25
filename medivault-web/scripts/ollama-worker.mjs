@@ -17,6 +17,28 @@ const requiredNames = [
   "Waist-Hip Ratio", "Visceral Fat Level", "Obesity Degree", "Target Weight",
   "Weight Control", "Fat Control", "Muscle Control",
 ];
+const responseSchema = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    category: { type: "string" },
+    summary: { type: "string" },
+    markers: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          value: { type: "string" },
+          range: { type: "string" },
+          status: { type: "string", enum: ["Normal", "High", "Low", "Watch"] },
+        },
+        required: ["name", "value", "range", "status"],
+      },
+    },
+  },
+  required: ["title", "category", "summary", "markers"],
+};
 
 function sleep(duration) {
   return new Promise((resolve) => setTimeout(resolve, duration));
@@ -61,10 +83,10 @@ async function analyze(job) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      format: "json",
+      format: responseSchema,
       messages: [{ role: "user", content: prompt, images }],
       model: ollamaModel,
-      options: { num_predict: 2048, temperature: 0.1 },
+      options: { num_predict: 4096, temperature: 0 },
       stream: false,
       think: false,
     }),
