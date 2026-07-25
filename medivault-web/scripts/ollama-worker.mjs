@@ -17,12 +17,18 @@ const requiredNames = [
   "Waist-Hip Ratio", "Visceral Fat Level", "Obesity Degree", "Target Weight",
   "Weight Control", "Fat Control", "Muscle Control",
 ];
+const segmentalNames = [
+  "Right Arm Lean", "Left Arm Lean", "Trunk Lean", "Right Leg Lean", "Left Leg Lean",
+  "Right Arm Fat", "Left Arm Fat", "Trunk Fat", "Right Leg Fat", "Left Leg Fat",
+];
+const allMetricNames = [...requiredNames, ...segmentalNames];
+const metricGroups = Array.from(
+  { length: Math.ceil(allMetricNames.length / 4) },
+  (_, index) => allMetricNames.slice(index * 4, index * 4 + 4),
+);
 const responseSchema = {
   type: "object",
   properties: {
-    title: { type: "string" },
-    category: { type: "string" },
-    summary: { type: "string" },
     markers: {
       type: "array",
       items: {
@@ -37,7 +43,7 @@ const responseSchema = {
       },
     },
   },
-  required: ["title", "category", "summary", "markers"],
+  required: ["markers"],
 };
 
 function sleep(duration) {
@@ -63,20 +69,16 @@ async function workerRequest(payload) {
   });
 }
 
-async function analyze(job) {
+async function analyzeGroup(job, images, names) {
   const prompt = [
     "Read these pages from a BMI/body composition machine report.",
-    "Return only JSON with title, category, summary, markers.",
+    "Return only JSON with a markers array.",
     "markers must be an array of {name,value,range,status}.",
     "status must be Normal, High, Low, or Watch.",
     "Extract current main results exactly, including units. Ignore old history rows when a current result is visible.",
-    `Use these consistent names when visible: ${requiredNames.join(", ")}.`,
-    "Also extract segmental lean and fat values for right arm, left arm, trunk, right leg and left leg when visible.",
-    "Never invent a value. Omit unreadable fields. Keep the summary short and require professional verification.",
-    `Client: ${job.memberName || "Client"}`,
-    `Title: ${job.title || "BMI & Body Composition"}`,
+    `Extract only these fields when visible: ${names.join(", ")}.`,
+    "Never invent a value. Omit unreadable fields.",
   ].join("\n");
-  const images = (job.imageDataUrls || []).map((url) => url.slice(url.indexOf(",") + 1));
   const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
     method: "POST",
     headers: {
@@ -86,7 +88,7 @@ async function analyze(job) {
       format: responseSchema,
       messages: [{ role: "user", content: prompt, images }],
       model: ollamaModel,
-      options: { num_predict: 4096, temperature: 0 },
+      options: { num_predict: 2048, temperature: 0 },
       stream: false,
       think: false,
     }),
@@ -95,8 +97,24 @@ async function analyze(job) {
     throw new Error(`Ollama ${response.status}: ${(await response.text()).slice(0, 240)}`);
   }
   const completion = await response.json();
-  const parsed = extractJson(completion?.message?.content || completion?.message?.thinking);
-  return { ...parsed, aiConfidence: Number(parsed.aiConfidence) || 86 };
+  return extractJson(completion?.message?.content || completion?.message?.thinking);
+}
+
+async function analyze(job) {
+  const images = (job.imageDataUrls || []).map((url) => url.slice(url.indexOf(",") + 1));
+  const parts = [];
+  for (const names of metricGroups) {
+    parts.push(await analyzeGroup(job, images, names));
+  }
+  const markers = parts.flatMap((part) => Array.isArray(part.markers) ? part.markers : []);
+  const uniqueMarkers = [...new Map(markers.map((marker) => [marker.name, marker])).values()];
+  return {
+    title: job.title || "BMI & Body Composition",
+    category: "Body Composition",
+    summary: "Values extracted locally from the uploaded body composition report. Professional verification required.",
+    markers: uniqueMarkers,
+    aiConfidence: 86,
+  };
 }
 
 async function runJob(job) {
