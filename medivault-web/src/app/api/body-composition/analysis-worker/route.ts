@@ -8,6 +8,7 @@ import {
   type BodyAnalysisResult,
 } from "@/lib/body-analysis-jobs";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
+import { saveAutomatedBodyCompositionReport } from "@/lib/body-composition-automation";
 import type { ReportMarker } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
@@ -90,7 +91,8 @@ export async function POST(request: NextRequest) {
     }
     const completed = await completeBodyAnalysisJob(db, { id, leaseToken, result });
     if (!completed) return NextResponse.json({ error: "Job lease is no longer valid." }, { status: 409 });
-    return NextResponse.json({ completed: true });
+    const report = await saveAutomatedBodyCompositionReport(db, completed);
+    return NextResponse.json({ completed: true, reportId: report?.id });
   }
 
   if (action === "fail") {

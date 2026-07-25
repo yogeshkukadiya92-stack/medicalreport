@@ -96,6 +96,29 @@ async function findBestLabForUser(db: Db, userId: string): Promise<LabCandidate 
   })[0] ?? null;
 }
 
+export async function getAutomationLabContext(db: Db, userId: string) {
+  await ensureLabIndexes(db);
+  const candidate = await findBestLabForUser(db, userId);
+  if (!candidate) return null;
+  const now = isoNow();
+  const labUser = candidate.labUser ?? {
+    createdAt: now,
+    id: `${candidate.lab.id}:${userId}`,
+    labId: candidate.lab.id,
+    role: candidate.lab.ownerUserId === userId ? "lab_admin" as const : "lab_staff" as const,
+    updatedAt: now,
+    userId,
+  };
+  if (!candidate.labUser) {
+    await db.collection<LabUser>("labUsers").updateOne(
+      { labId: candidate.lab.id, userId },
+      { $setOnInsert: labUser },
+      { upsert: true },
+    );
+  }
+  return { lab: await ensureBookingSlug(db, candidate.lab), labUser, userId };
+}
+
 async function ensureBookingSlug(db: Db, lab: LabProfile) {
   if (lab.bookingSlug) return lab;
   const bookingSlug = `${slugFromText(lab.name)}-${lab.id.replace(/^lab-/, "").slice(-20)}`;

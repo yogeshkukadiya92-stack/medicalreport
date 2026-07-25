@@ -29,6 +29,14 @@ export type BodyAnalysisJob = {
   leaseUntil?: string;
   error?: string;
   result?: BodyAnalysisResult;
+  automation?: {
+    clientName: string;
+    clientPhone: string;
+    reportDate: string;
+    source: "telegram";
+    sourceId: string;
+  };
+  savedReportId?: string;
 };
 
 const collectionName = "bodyAnalysisJobs";
