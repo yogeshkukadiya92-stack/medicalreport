@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addLabAuditLog, getLabContext, requireLabPermission } from "@/lib/lab-server";
 import { syncNormalizedLabReport } from "@/lib/normalized-health";
+import { emitIntegrationEvent } from "@/lib/integration-server";
 import type { LabReport } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
@@ -95,6 +96,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       } catch (syncError) {
         syncWarning = syncError instanceof Error ? syncError.message : "FHIR sync could not finish.";
       }
+      void emitIntegrationEvent(context.db, context.lab.id, "lab.report.published", report).catch(() => undefined);
     }
 
     return NextResponse.json({ report, syncWarning });

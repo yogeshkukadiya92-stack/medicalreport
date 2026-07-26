@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addLabAuditLog, getLabContext, userOwnsReportFile } from "@/lib/lab-server";
 import { getLabDashboardData, todayDate } from "@/lib/lab-dashboard";
+import { emitIntegrationEvent } from "@/lib/integration-server";
 import { buildLabSummary, normalizePhone, statusFromValue } from "@/lib/lab-utils";
 import { syncNormalizedLabReport } from "@/lib/normalized-health";
 import type { LabClient, LabReport, LabReportValue, ReportMarker } from "@/lib/vault-types";
@@ -326,6 +327,7 @@ export async function POST(request: NextRequest) {
     labReportId: report.id,
     note: "Structured lab report created.",
   });
+  void emitIntegrationEvent(context.db, context.lab.id, "lab.report.created", report).catch(() => undefined);
   if (!usesVerificationWorkflow) {
     await addLabAuditLog(context.db, {
       action: "publish",
@@ -335,6 +337,7 @@ export async function POST(request: NextRequest) {
       note: "Report auto-published to matching client vaults.",
     });
     await syncNormalizedLabReport(context.db, report, context.userId);
+    void emitIntegrationEvent(context.db, context.lab.id, "lab.report.published", report).catch(() => undefined);
   }
 
   return NextResponse.json({

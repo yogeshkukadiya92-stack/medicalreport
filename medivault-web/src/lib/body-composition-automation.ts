@@ -1,6 +1,7 @@
 import type { Db } from "mongodb";
 import { addLabAuditLog } from "@/lib/lab-server";
 import { buildLabSummary, normalizePhone } from "@/lib/lab-utils";
+import { emitIntegrationEvent } from "@/lib/integration-server";
 import type { BodyAnalysisJob } from "@/lib/body-analysis-jobs";
 import type { LabClient, LabReport, LabReportValue } from "@/lib/vault-types";
 
@@ -96,5 +97,6 @@ export async function saveAutomatedBodyCompositionReport(db: Db, job: BodyAnalys
     labReportId: reportId,
     note: "Telegram body-composition report imported and saved for verification.",
   });
+  void emitIntegrationEvent(db, job.labId, "body_composition.scan.created", report).catch(() => undefined);
   return report;
 }

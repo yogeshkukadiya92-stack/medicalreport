@@ -13,6 +13,7 @@ const adminNav = [
   { href: "/admin/clients", icon: "family" as const, label: "Clients" },
   { href: "/admin/reports", icon: "reports" as const, label: "Reports" },
   { href: "/admin/tasks", icon: "calendar" as const, label: "Tasks" },
+  { href: "/admin/integrations", icon: "shield" as const, label: "API & Webhooks" },
 ];
 
 const workspaceLinks = [
