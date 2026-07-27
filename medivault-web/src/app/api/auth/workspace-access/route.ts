@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUserId, isBootstrapAdminUserId } from "@/lib/auth-server";
+import { getAuthenticatedUser, isBootstrapAdminUser } from "@/lib/auth-server";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
 import type { LabUser, WorkspaceAccess } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const userId = await getAuthenticatedUserId(request);
-  if (!userId) {
+  const user = await getAuthenticatedUser(request);
+  if (!user) {
     return NextResponse.json({ error: "Sign in is required." }, { status: 401 });
   }
+  const userId = user.id;
   if (!isMongoConfigured()) {
     return NextResponse.json({ error: "MongoDB is not configured." }, { status: 503 });
   }
 
-  if (isBootstrapAdminUserId(userId)) {
+  if (isBootstrapAdminUser(user)) {
     return NextResponse.json({ workspaceAccess: ["lab", "nutrition", "body_composition"] satisfies WorkspaceAccess[] });
   }
 

@@ -1,7 +1,7 @@
 import type { Db } from "mongodb";
 import type { NextRequest } from "next/server";
 import type { AdminClientSummary, AdminReportRow, AdminTask } from "@/lib/admin-types";
-import { isBootstrapAdminUserId } from "@/lib/auth-server";
+import { isBootstrapAdminUser } from "@/lib/auth-server";
 import { getLabContext } from "@/lib/lab-server";
 import type { LabClient, LabReport } from "@/lib/vault-types";
 
@@ -30,7 +30,11 @@ export async function getAdminContext(request: NextRequest) {
   const context = await getLabContext(request);
   if ("error" in context) return context;
 
-  if (!isBootstrapAdminUserId(context.userId)) {
+  const authUser = await context.db.collection<{ email: string; id: string }>("authUsers").findOne(
+    { id: context.userId },
+    { projection: { _id: 0, email: 1, id: 1 } },
+  );
+  if (!isBootstrapAdminUser(authUser)) {
     return { error: "Only the owner admin can open this panel.", status: 403 as const };
   }
 
