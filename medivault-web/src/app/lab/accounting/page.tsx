@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { LabShell } from "@/components/lab-shell";
 import { useAuth } from "@/components/auth-provider";
+import { formatRegionalCurrency, formatRegionalDateTime } from "@/lib/region-config";
+import type { LabProfile } from "@/lib/vault-types";
 
 type Invoice = {
   amount?: number;
@@ -19,18 +21,17 @@ type Invoice = {
 
 type Payload = {
   invoices: Invoice[];
+  lab: LabProfile;
   metrics: { invoiceCount: number; outstandingAmount: number; paidAmount: number; totalAmount: number };
 };
 
-function money(value?: number) {
-  return `₹${Math.round(value ?? 0).toLocaleString("en-IN")}`;
+function money(value?: number, lab?: LabProfile | null) {
+  return formatRegionalCurrency(value ?? 0, lab);
 }
 
-function dateLabel(value?: string) {
+function dateLabel(value?: string, lab?: LabProfile | null) {
   if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
+  return formatRegionalDateTime(value, lab);
 }
 
 export default function LabAccountingPage() {
@@ -67,9 +68,9 @@ export default function LabAccountingPage() {
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <section className="rounded-md border border-[#dbe6e3] bg-white p-4"><p className="text-[10px] font-black uppercase text-[#74837f]">Total invoices</p><p className="mt-2 text-[28px] font-black">{data?.metrics.invoiceCount ?? "--"}</p><p className="mt-1 text-[10px] font-bold text-[#087766]">Online + lab billing</p></section>
-        <section className="rounded-md border border-[#dbe6e3] bg-white p-4"><p className="text-[10px] font-black uppercase text-[#74837f]">Paid</p><p className="mt-2 text-[28px] font-black">{money(data?.metrics.paidAmount)}</p><p className="mt-1 text-[10px] font-bold text-[#087766]">Confirmed collection</p></section>
-        <section className="rounded-md border border-[#dbe6e3] bg-white p-4"><p className="text-[10px] font-black uppercase text-[#74837f]">Outstanding</p><p className="mt-2 text-[28px] font-black">{money(data?.metrics.outstandingAmount)}</p><p className="mt-1 text-[10px] font-bold text-[#ba563d]">Pending payment</p></section>
-        <section className="rounded-md border border-[#dbe6e3] bg-[#0d5c46] p-4 text-white"><p className="text-[10px] font-black uppercase text-[#99f6e4]">Total value</p><p className="mt-2 text-[28px] font-black">{money(data?.metrics.totalAmount)}</p><p className="mt-1 text-[10px] font-bold text-white/65">All invoice value</p></section>
+        <section className="rounded-md border border-[#dbe6e3] bg-white p-4"><p className="text-[10px] font-black uppercase text-[#74837f]">Paid</p><p className="mt-2 text-[28px] font-black">{money(data?.metrics.paidAmount, data?.lab)}</p><p className="mt-1 text-[10px] font-bold text-[#087766]">Confirmed collection</p></section>
+        <section className="rounded-md border border-[#dbe6e3] bg-white p-4"><p className="text-[10px] font-black uppercase text-[#74837f]">Outstanding</p><p className="mt-2 text-[28px] font-black">{money(data?.metrics.outstandingAmount, data?.lab)}</p><p className="mt-1 text-[10px] font-bold text-[#ba563d]">Pending payment</p></section>
+        <section className="rounded-md border border-[#dbe6e3] bg-[#0d5c46] p-4 text-white"><p className="text-[10px] font-black uppercase text-[#99f6e4]">Total value</p><p className="mt-2 text-[28px] font-black">{money(data?.metrics.totalAmount, data?.lab)}</p><p className="mt-1 text-[10px] font-bold text-white/65">All invoice value</p></section>
       </div>
 
       <section className="mt-4 overflow-hidden rounded-md border border-[#dbe6e3] bg-white">
@@ -80,9 +81,9 @@ export default function LabAccountingPage() {
           {data?.invoices?.length ? data.invoices.map((invoice) => (
             <div key={invoice.id} className="grid gap-3 px-4 py-3 sm:grid-cols-[1fr_120px_110px_110px] sm:items-center">
               <div><p className="text-[12px] font-black text-[#17222b]">{invoice.patientName || "Patient"}</p><p className="mt-1 text-[10px] font-semibold text-[#74837f]">{invoice.patientPhone} · {invoice.testName} · {invoice.paymentReference || invoice.paymentMode || "payment"}</p></div>
-              <p className="text-[13px] font-black">{money(invoice.amount)}</p>
+              <p className="text-[13px] font-black">{money(invoice.amount, { ...data.lab, currency: invoice.currency || data.lab.currency })}</p>
               <span className={`w-fit rounded px-2 py-1 text-[9px] font-black ${invoice.status === "paid" ? "bg-[#eaf9f2] text-[#087766]" : "bg-[#fff7d8] text-[#8a6500]"}`}>{invoice.status || "issued"}</span>
-              <p className="text-[10px] font-bold text-[#74837f]">{dateLabel(invoice.createdAt)}</p>
+              <p className="text-[10px] font-bold text-[#74837f]">{dateLabel(invoice.createdAt, data.lab)}</p>
             </div>
           )) : <div className="p-5 text-[12px] font-bold text-[#74837f]">No invoices yet. Online bookings will appear here automatically.</div>}
         </div>

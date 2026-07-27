@@ -33,7 +33,8 @@ const sessionMaxAgeSeconds = 60 * 60 * 24 * 30;
 const passwordIterations = 210_000;
 const passwordKeyLength = 32;
 const passwordDigest = "sha256";
-const testingAuthOtp = process.env.AUTH_TEST_OTP || "1111";
+const testingAuthOtp = process.env.AUTH_TEST_OTP?.trim() || "";
+const testOtpEnabled = process.env.NODE_ENV !== "production" || process.env.ALLOW_TEST_OTP === "true";
 const bootstrapAdminEmail = normalizeEmail(process.env.ADMIN_BOOTSTRAP_EMAIL || "yogeshkukadiya92@gmail.com");
 const bootstrapAdminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
 const bootstrapAdminUserId = bootstrapAdminEmail ? `user-admin-${hashToken(bootstrapAdminEmail).slice(0, 18)}` : "";
@@ -48,19 +49,25 @@ function isValidEmail(email: string) {
 }
 
 function normalizePhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length > 10 && digits.startsWith("91")) return digits.slice(-10);
+  const digits = phone.replace(/\D/g, "").replace(/^00/, "");
+  if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
   return digits;
 }
 
 function isValidPhone(phone: string) {
-  return normalizePhone(phone).length >= 10;
+  const digits = normalizePhone(phone);
+  return digits.length >= 8 && digits.length <= 15;
 }
 
 export function verifyTestingAuthOtp(otp: string) {
+  if (!testingAuthOtp || !testOtpEnabled) return false;
   const expected = Buffer.from(hashToken(testingAuthOtp), "hex");
   const received = Buffer.from(hashToken(otp.trim()), "hex");
   return expected.length === received.length && crypto.timingSafeEqual(expected, received);
+}
+
+export function isTestingAuthOtpEnabled() {
+  return Boolean(testingAuthOtp && testOtpEnabled);
 }
 
 function cleanName(email: string, name?: string) {

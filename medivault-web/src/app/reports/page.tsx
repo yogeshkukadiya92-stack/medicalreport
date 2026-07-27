@@ -127,6 +127,10 @@ export default function Reports() {
   const [fileError, setFileError] = useState("");
   const [isOpeningFileId, setIsOpeningFileId] = useState("");
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const [shareForm, setShareForm] = useState({ expiresInHours: 24, recipientLabel: "" });
+  const [shareResult, setShareResult] = useState<{ id: string; url: string } | null>(null);
+  const [shareMessage, setShareMessage] = useState("");
+  const [isSharing, setIsSharing] = useState(false);
   const [manualError, setManualError] = useState("");
   const [manualForm, setManualForm] = useState({
     category: "Manual",
@@ -183,7 +187,56 @@ export default function Reports() {
   function openReport(report: AppReport) {
     setSelectedReport(report);
     setFileError("");
+    setShareMessage("");
+    setShareResult(null);
     updateReportHistory({ reportId: report.id });
+  }
+
+  async function createSecureShare() {
+    if (!selectedReport || !session?.access_token) return;
+    setIsSharing(true);
+    setShareMessage("");
+    try {
+      const response = await fetch("/api/shares", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expiresInHours: shareForm.expiresInHours,
+          recipientLabel: shareForm.recipientLabel,
+          reportId: selectedReport.id,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error || "Secure link could not be created.");
+      setShareResult({ id: result.share.id, url: result.url });
+      await navigator.clipboard?.writeText(result.url).catch(() => null);
+      setShareMessage("Secure link created and copied. You can revoke it anytime.");
+    } catch (shareError) {
+      setShareMessage(shareError instanceof Error ? shareError.message : "Secure link could not be created.");
+    } finally {
+      setIsSharing(false);
+    }
+  }
+
+  async function copySecureShare() {
+    if (!shareResult) return;
+    await navigator.clipboard.writeText(shareResult.url);
+    setShareMessage("Secure link copied.");
+  }
+
+  async function revokeSecureShare() {
+    if (!shareResult || !session?.access_token) return;
+    const response = await fetch(`/api/shares?shareId=${encodeURIComponent(shareResult.id)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok) {
+      setShareMessage(result?.error || "Share link could not be revoked.");
+      return;
+    }
+    setShareResult(null);
+    setShareMessage("Share link revoked. It can no longer be opened.");
   }
 
   function closeReport() {
@@ -538,6 +591,35 @@ export default function Reports() {
                 </button>
               ) : null}
               {fileError ? <p className="mt-3 rounded-lg bg-[#fff0ec] p-3 text-[12px] font-bold text-[#ba563d]">{fileError}</p> : null}
+              <section className="mt-4 rounded-lg border border-[#dce9e5] bg-[#f7fbfa] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div><p className="text-[12px] font-black text-[#087766]">Secure doctor share</p><p className="mt-1 text-[10px] font-semibold leading-4 text-[#71817d]">Creates an expiring, revocable link. Original file stays private.</p></div>
+                  <Icon name="shield" className="h-5 w-5 text-[#087766]" />
+                </div>
+                {!shareResult ? (
+                  <>
+                    <input value={shareForm.recipientLabel} onChange={(event) => setShareForm((current) => ({ ...current, recipientLabel: event.target.value }))} className="mt-3 h-10 w-full rounded-md border border-[#dce9e5] bg-white px-3 text-[12px] font-bold" placeholder="Doctor / recipient (optional)" />
+                    <div className="mt-2 grid grid-cols-[1fr_140px] gap-2">
+                      <select value={shareForm.expiresInHours} onChange={(event) => setShareForm((current) => ({ ...current, expiresInHours: Number(event.target.value) }))} className="h-10 rounded-md border border-[#dce9e5] bg-white px-3 text-[11px] font-bold">
+                        <option value={1}>1 hour</option>
+                        <option value={24}>24 hours</option>
+                        <option value={168}>7 days</option>
+                        <option value={720}>30 days</option>
+                      </select>
+                      <button type="button" onClick={createSecureShare} disabled={isSharing} className="h-10 rounded-md bg-[#102f35] text-[11px] font-black text-white disabled:opacity-50">{isSharing ? "Creating..." : "Create link"}</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <input readOnly value={shareResult.url} className="mt-3 h-10 w-full rounded-md border border-[#dce9e5] bg-white px-3 text-[10px] font-bold text-[#52605d]" />
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <button type="button" onClick={copySecureShare} className="h-10 rounded-md bg-[#0a7d6e] text-[11px] font-black text-white">Copy link</button>
+                      <button type="button" onClick={revokeSecureShare} className="h-10 rounded-md border border-[#f2c6bb] bg-white text-[11px] font-black text-[#ba563d]">Revoke</button>
+                    </div>
+                  </>
+                )}
+                {shareMessage ? <p className="mt-2 text-[10px] font-bold leading-4 text-[#52605d]">{shareMessage}</p> : null}
+              </section>
               <div className="mt-4 rounded-lg bg-[#f7fbfa] p-4">
                 <p className="text-[12px] font-bold text-[#087766]">{selectedReport.source === "lab" ? "Rule summary" : "AI summary"}</p>
                 <p className="mt-2 text-[13px] leading-5 text-[#52605d]">{selectedReport.summary}</p>

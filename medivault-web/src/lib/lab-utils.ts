@@ -1,9 +1,8 @@
 import type { AppReport, LabReport, LabReportValue, ReportMarker } from "@/lib/vault-types";
 
 export function normalizePhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
+  const digits = phone.replace(/\D/g, "").replace(/^00/, "");
   if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
-  if (digits.length > 10) return digits.slice(-10);
   return digits;
 }
 

@@ -236,13 +236,13 @@ export default function LoginPage() {
               <div className="flex items-end gap-2">
                 <label className="min-w-0 flex-1">
                   <span className="text-[12px] font-bold text-[#52605d]">Mobile OTP</span>
-                  <input type="text" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1111" inputMode="numeric" autoComplete="one-time-code" disabled={!isOtpSent} maxLength={4} pattern="[0-9]{4}" required={isOtpSent} className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-center text-[16px] font-black tracking-[0.28em] outline-none focus:border-[#0a7d6e] disabled:bg-[#edf3f1] disabled:text-[#8a9794]" />
+                  <input type="text" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="Enter OTP" inputMode="numeric" autoComplete="one-time-code" disabled={!isOtpSent} maxLength={6} pattern="[0-9]{4,6}" required={isOtpSent} className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-center text-[16px] font-black tracking-[0.28em] outline-none focus:border-[#0a7d6e] disabled:bg-[#edf3f1] disabled:text-[#8a9794]" />
                 </label>
                 <button type="button" onClick={handleSendOtp} disabled={isSendingOtp} className="h-12 shrink-0 rounded-lg bg-[#102323] px-4 text-[12px] font-black text-white disabled:opacity-60">
                   {isSendingOtp ? "Sending" : isOtpSent ? "Resend" : "Send OTP"}
                 </button>
               </div>
-              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#65716f]">Testing mode: use OTP 1111. A live SMS provider can replace this later.</p>
+              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#65716f]">OTP access is available only when a delivery provider is configured.</p>
             </div>
           ) : null}
 
@@ -265,7 +265,7 @@ export default function LoginPage() {
 
         <div className="mt-6 rounded-lg bg-[#f7fbfa] p-4">
           <p className="text-[12px] font-bold text-[#087766]">Protected by secure MongoDB sessions</p>
-          <p className="mt-2 text-[12px] leading-5 text-[#65716f]">OTP login and password reset work only for a registered mobile number. Testing OTP is 1111.</p>
+          <p className="mt-2 text-[12px] leading-5 text-[#65716f]">OTP login and password reset work only for a registered mobile number.</p>
         </div>
       </section>
     </main>

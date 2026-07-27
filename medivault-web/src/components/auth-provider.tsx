@@ -31,6 +31,7 @@ const cookieBackedToken = "mongo-cookie-session";
 type SessionResponse = {
   error?: string;
   isConfigured?: boolean;
+  message?: string;
   user?: AuthUser | null;
 };
 
@@ -125,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         const result = await readJsonResponse(response);
         if (!response.ok) throw new Error(result?.error ?? "OTP could not be sent.");
-        return "OTP sent. Use 1111 for testing.";
+        return typeof result?.message === "string" ? result.message : "OTP sent.";
       },
       resetPassword: async (phone, otp, password) => submitAuth("/api/auth/reset-password", { otp, password, phone }),
       signup: async (input) => submitAuth("/api/auth/signup", input),

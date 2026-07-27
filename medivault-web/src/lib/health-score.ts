@@ -36,6 +36,8 @@ export function calculateHealthScore(reports: AppReport[]) {
   return Math.max(32, Math.round(100 - volumeAdjustedRisk));
 }
 
+export const attentionScoreLabel = "Report attention score";
+
 export function healthScoreLabel(score: number, hasReports: boolean) {
   if (!hasReports) return "Waiting";
   if (score >= 90) return "Great";

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAuthUserSession, setAuthCookie } from "@/lib/auth-server";
+import { createAuthUserSession, setAuthCookie, verifyTestingAuthOtp } from "@/lib/auth-server";
 import { checkRateLimit, clientKey, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -12,8 +12,6 @@ type SignupInput = {
   phone?: string;
 };
 
-const testingSignupOtp = "1111";
-
 export async function POST(request: NextRequest) {
   const rateLimit = checkRateLimit(clientKey(request, "auth-signup"), { limit: 5, windowMs: 30 * 60 * 1000 });
   if (!rateLimit.allowed) {
@@ -22,8 +20,8 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as SignupInput | null;
   try {
-    if ((body?.otp ?? "").trim() !== testingSignupOtp) {
-      return NextResponse.json({ error: "Invalid OTP. Use 1111 for testing." }, { status: 400 });
+    if (!verifyTestingAuthOtp(body?.otp ?? "")) {
+      return NextResponse.json({ error: "Invalid or unavailable OTP." }, { status: 400 });
     }
 
     const { token, user } = await createAuthUserSession({

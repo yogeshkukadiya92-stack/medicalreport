@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isTestingAuthOtpEnabled } from "@/lib/auth-server";
 import { checkRateLimit, clientKey, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -23,9 +24,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Enter a valid mobile number." }, { status: 400 });
   }
 
-  // Replace this testing response with an SMS provider call when production OTP delivery is connected.
+  if (!isTestingAuthOtpEnabled()) {
+    return NextResponse.json(
+      { error: "OTP delivery is not configured. Sign in with your password or contact the administrator." },
+      { status: 503 },
+    );
+  }
+
   return NextResponse.json({
-    message: "OTP sent. Use 1111 for testing.",
+    message: "Development OTP is ready.",
     purpose: body?.purpose ?? "login",
   });
 }

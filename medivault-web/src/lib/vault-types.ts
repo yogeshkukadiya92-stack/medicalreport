@@ -66,7 +66,13 @@ export type LabProfile = {
   bookingSlug?: string;
   phone?: string;
   address?: string;
+  countryCode?: string;
+  currency?: string;
+  dataRegion?: "india" | "us" | "eu" | "asia-pacific";
+  locale?: string;
+  measurementSystem?: "metric" | "imperial";
   ownerUserId: string;
+  timeZone?: string;
   createdAt: string;
   updatedAt: string;
 };

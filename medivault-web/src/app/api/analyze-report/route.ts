@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createWorker, OEM } from "tesseract.js";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
+import {
+  canonicalBodyMetricName,
+  isPlausibleBodyMetric,
+  normalizeBodyMarkers,
+} from "@/lib/body-metric-registry";
 import type { ReportMarker, ReportStatus } from "@/lib/vault-types";
 
 export const maxDuration = 60;
@@ -71,37 +76,6 @@ const requiredBodyCompositionNames = [
   "Fat Control",
   "Muscle Control",
 ].join(", ");
-
-const bodyCompositionAliases: Array<[RegExp, string]> = [
-  [/^height|stature/i, "Height"],
-  [/^weight$|body weight|total weight/i, "Weight"],
-  [/^bmi|body mass index/i, "BMI"],
-  [/^pbf|percent body fat|body fat percentage|fat %|body fat %/i, "PBF"],
-  [/^smm\b|skeletal muscle|skeletal muscle mass|muscle mass/i, "Skeletal Muscle Mass"],
-  [/body fat mass|fat mass$/i, "Body Fat Mass"],
-  [/total body water|^tbw\b/i, "Total Body Water"],
-  [/protein/i, "Protein"],
-  [/minerals?/i, "Minerals"],
-  [/inbody score|body score|fitness score/i, "InBody Score"],
-  [/basal metabolic rate|^bmr\b/i, "Basal Metabolic Rate"],
-  [/waist[-\s]?hip|^whr\b/i, "Waist-Hip Ratio"],
-  [/visceral fat level|visceral fat/i, "Visceral Fat Level"],
-  [/obesity degree/i, "Obesity Degree"],
-  [/target weight/i, "Target Weight"],
-  [/weight control/i, "Weight Control"],
-  [/fat control/i, "Fat Control"],
-  [/muscle control/i, "Muscle Control"],
-  [/right arm.*lean|ra.*lean/i, "Right Arm Lean"],
-  [/left arm.*lean|la.*lean/i, "Left Arm Lean"],
-  [/trunk.*lean|torso.*lean/i, "Trunk Lean"],
-  [/right leg.*lean|rl.*lean/i, "Right Leg Lean"],
-  [/left leg.*lean|ll.*lean/i, "Left Leg Lean"],
-  [/right arm.*fat|ra.*fat/i, "Right Arm Fat"],
-  [/left arm.*fat|la.*fat/i, "Left Arm Fat"],
-  [/trunk.*fat|torso.*fat/i, "Trunk Fat"],
-  [/right leg.*fat|rl.*fat/i, "Right Leg Fat"],
-  [/left leg.*fat|ll.*fat/i, "Left Leg Fat"],
-];
 
 function getAiProvider() {
   const provider = (process.env.AI_PROVIDER || "openai").toLowerCase();
@@ -285,24 +259,12 @@ function cleanMarker(marker: Partial<ReportMarker>): ReportMarker {
 }
 
 function canonicalBodyCompositionName(name: string) {
-  const cleanName = name.trim();
-  const alias = bodyCompositionAliases.find(([pattern]) => pattern.test(cleanName));
-  return alias?.[1] ?? cleanName;
+  return canonicalBodyMetricName(name);
 }
 
 function normalizeBodyCompositionMarkers(markers: ReportMarker[]) {
-  const seen = new Set<string>();
-  const normalized = markers
-    .map((marker) => ({
-      ...marker,
-      name: canonicalBodyCompositionName(marker.name),
-    }))
-    .filter((marker) => {
-      const key = marker.name.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+  const canonical = normalizeBodyMarkers(markers.map((marker) => ({ ...marker, name: canonicalBodyCompositionName(marker.name) })));
+  const normalized = canonical.filter((marker) => isPlausibleBodyMetric(marker, canonical));
 
   return normalized.sort((left, right) => {
     const leftIndex = bodyCompositionOrder.indexOf(left.name);

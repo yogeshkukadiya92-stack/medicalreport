@@ -6,6 +6,16 @@ const COUNTRY_CODES = [
   { code: "+44", label: "UK", maxDigits: 11 },
   { code: "+971", label: "UAE", maxDigits: 9 },
   { code: "+61", label: "AU", maxDigits: 9 },
+  { code: "+65", label: "SG", maxDigits: 8 },
+  { code: "+49", label: "DE", maxDigits: 11 },
+  { code: "+33", label: "FR", maxDigits: 9 },
+  { code: "+39", label: "IT", maxDigits: 11 },
+  { code: "+34", label: "ES", maxDigits: 9 },
+  { code: "+81", label: "JP", maxDigits: 10 },
+  { code: "+82", label: "KR", maxDigits: 10 },
+  { code: "+966", label: "SA", maxDigits: 9 },
+  { code: "+974", label: "QA", maxDigits: 8 },
+  { code: "+27", label: "ZA", maxDigits: 9 },
 ];
 
 function hasEmailText(value: string) {

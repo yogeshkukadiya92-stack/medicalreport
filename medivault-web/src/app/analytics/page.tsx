@@ -5,7 +5,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReportMarker } from "@/components/app-data-provider";
 import { useAppData } from "@/components/app-data-provider";
 import { Icon, MobileShell } from "@/components/mobile-shell";
-import { buildScoreTrend, calculateHealthScore, filterReportsByRange } from "@/lib/health-score";
+import {
+  bodyMetricKey,
+  canonicalBodyMetricName,
+  isPlausibleBodyMetric,
+  normalizeBodyMarker,
+  splitBodyMetricValue,
+} from "@/lib/body-metric-registry";
+import { attentionScoreLabel, buildScoreTrend, calculateHealthScore, filterReportsByRange } from "@/lib/health-score";
 
 function statusStyles(tone: string) {
   if (tone === "coral") return "bg-[#fff0ec] text-[#ba563d]";
@@ -73,12 +80,11 @@ function reportTimestamp(report: { createdAt?: number; date: string }) {
 }
 
 function numericMarkerValue(value: string) {
-  const match = value.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
-  return match ? Number(match[0]) : null;
+  return splitBodyMetricValue(value).number;
 }
 
 function normalizedMarkerName(name: string) {
-  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return bodyMetricKey(canonicalBodyMetricName(name));
 }
 
 const bodyCompositionCards = [
@@ -120,19 +126,22 @@ export default function Analytics() {
   const scoreBars = useMemo(() => buildScoreTrend(reportsForActiveMember, range), [range, reportsForActiveMember]);
   const flaggedCount = rangedReports.filter((report) => report.abnormal > 0 || report.status === "Needs review").length;
   const verifiedPercent = rangedReports.length
-    ? Math.round((rangedReports.filter((report) => report.status === "Reviewed" || report.status === "Normal").length / rangedReports.length) * 100)
+    ? Math.round((rangedReports.filter((report) => report.source === "lab" && Boolean(report.publishedAt)).length / rangedReports.length) * 100)
     : 0;
   const parameters = useMemo(() => {
     return rangedReports.flatMap((report) =>
-      report.markers.map((marker, index) => ({
-        name: marker.name,
-        value: marker.value,
-        range: marker.range,
-        status: marker.status,
-        trend: marker.status === "Normal" ? "Stable" : report.status === "Needs review" ? "Needs care" : "Watch",
-        width: markerWidth(marker, index),
-        tone: markerTone(marker),
-      })),
+      report.markers
+        .map(normalizeBodyMarker)
+        .filter((marker) => isPlausibleBodyMetric(marker, report.markers))
+        .map((marker, index) => ({
+          name: marker.name,
+          value: marker.value,
+          range: marker.range,
+          status: marker.status,
+          trend: marker.status === "Normal" ? "Stable" : report.status === "Needs review" ? "Needs care" : "Watch",
+          width: markerWidth(marker, index),
+          tone: markerTone(marker),
+        })),
     );
   }, [rangedReports]);
   const visibleParameters = useMemo(() => {
@@ -153,10 +162,11 @@ export default function Analytics() {
     >();
 
     rangedReports.forEach((report) => {
-      report.markers.forEach((marker) => {
+      const normalizedMarkers = report.markers.map(normalizeBodyMarker);
+      normalizedMarkers.filter((marker) => isPlausibleBodyMetric(marker, normalizedMarkers)).forEach((marker) => {
         const value = numericMarkerValue(marker.value);
         if (value === null || !Number.isFinite(value)) return;
-        const unit = marker.value.replace(/[-\d.,\s]/g, "").trim();
+        const unit = splitBodyMetricValue(marker.value).unit;
         const nextPoint = {
           date: report.date,
           reportTitle: report.title,
@@ -165,7 +175,8 @@ export default function Analytics() {
           unit,
           value,
         };
-        grouped.set(marker.name, [...(grouped.get(marker.name) ?? []), nextPoint]);
+        const canonicalName = canonicalBodyMetricName(marker.name);
+        grouped.set(canonicalName, [...(grouped.get(canonicalName) ?? []), nextPoint]);
       });
     });
 
@@ -262,7 +273,7 @@ export default function Analytics() {
         <div className="mt-5 overflow-hidden rounded-lg bg-[#102323] p-5 text-white shadow-[0_24px_54px_rgba(16,35,35,0.28)]">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[13px] font-semibold text-[#a9bfba]">Overall score</p>
+              <p className="text-[13px] font-semibold text-[#a9bfba]">{attentionScoreLabel}</p>
               <div className="mt-2 flex items-end gap-2">
                 <span className="text-[56px] font-black leading-none">{hasMember && rangedReports.length ? score : "--"}</span>
                 <span className="mb-2 rounded-md bg-[#173938] px-2 py-1 text-[11px] font-bold text-[#99f0db]">{hasMember && rangedReports.length ? "live" : "--"}</span>

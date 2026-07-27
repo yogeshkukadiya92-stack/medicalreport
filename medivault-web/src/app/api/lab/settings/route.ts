@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLabContext } from "@/lib/lab-server";
+import {
+  supportedCountries,
+  supportedCurrencies,
+  supportedLocales,
+  supportedTimeZones,
+  type DataRegion,
+  type MeasurementSystem,
+} from "@/lib/region-config";
 import type { LabProfile, LabReport } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
 
 type SettingsInput = {
   address?: string;
+  countryCode?: string;
+  currency?: string;
+  dataRegion?: DataRegion;
+  locale?: string;
+  measurementSystem?: MeasurementSystem;
   name?: string;
   phone?: string;
+  timeZone?: string;
 };
 
 function cleanText(value: unknown) {
@@ -43,10 +57,36 @@ export async function PATCH(request: NextRequest) {
   }
 
   const now = new Date().toISOString();
+  const countryCode = cleanText(body?.countryCode).toUpperCase();
+  const currency = cleanText(body?.currency).toUpperCase();
+  const locale = cleanText(body?.locale);
+  const timeZone = cleanText(body?.timeZone);
+  const measurementSystem = body?.measurementSystem === "imperial" ? "imperial" : "metric";
+  const dataRegion = ["india", "us", "eu", "asia-pacific"].includes(body?.dataRegion || "")
+    ? body?.dataRegion
+    : "india";
+  if (!supportedCountries.some((country) => country.code === countryCode)) {
+    return NextResponse.json({ error: "Select a supported country." }, { status: 400 });
+  }
+  if (!supportedCurrencies.includes(currency as (typeof supportedCurrencies)[number])) {
+    return NextResponse.json({ error: "Select a supported currency." }, { status: 400 });
+  }
+  if (!supportedLocales.includes(locale as (typeof supportedLocales)[number])) {
+    return NextResponse.json({ error: "Select a supported locale." }, { status: 400 });
+  }
+  if (!supportedTimeZones.includes(timeZone as (typeof supportedTimeZones)[number])) {
+    return NextResponse.json({ error: "Select a supported timezone." }, { status: 400 });
+  }
   const patch: Partial<LabProfile> = {
     address: cleanText(body?.address) || undefined,
+    countryCode,
+    currency,
+    dataRegion,
+    locale,
+    measurementSystem,
     name,
     phone: cleanText(body?.phone) || undefined,
+    timeZone,
     updatedAt: now,
   };
 
@@ -74,7 +114,7 @@ export async function PATCH(request: NextRequest) {
     entityType: "lab",
     id: `audit-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     labId: context.lab.id,
-    metadata: { name },
+    metadata: { countryCode, currency, dataRegion, locale, measurementSystem, name, timeZone },
   });
 
   return NextResponse.json({ lab });

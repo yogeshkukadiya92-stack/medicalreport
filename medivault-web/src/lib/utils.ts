@@ -1,3 +1,5 @@
+import { defaultRegionPreferences, formatRegionalDate } from "@/lib/region-config";
+
 // Utility functions for the app
 
 export function cn(...classes: (string | undefined | null | boolean)[]): string {
@@ -5,12 +7,7 @@ export function cn(...classes: (string | undefined | null | boolean)[]): string 
 }
 
 export function formatDate(date: string | Date): string {
-  const d = new Date(date);
-  return d.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return formatRegionalDate(date, defaultRegionPreferences);
 }
 
 export function formatFileSize(bytes: number): string {
@@ -26,7 +23,7 @@ export function formatPhone(phone: string): string {
   if (cleaned.length === 10) {
     return `+91 ${cleaned.slice(0, 5)} ${cleaned.slice(5)}`;
   }
-  return phone;
+  return phone.startsWith("+") ? phone : `+${cleaned}`;
 }
 
 export function getInitials(name: string): string {
