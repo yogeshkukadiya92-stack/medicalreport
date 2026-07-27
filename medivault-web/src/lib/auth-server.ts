@@ -32,6 +32,7 @@ const sessionMaxAgeSeconds = 60 * 60 * 24 * 30;
 const passwordIterations = 210_000;
 const passwordKeyLength = 32;
 const passwordDigest = "sha256";
+const testingAuthOtp = process.env.AUTH_TEST_OTP || "1111";
 const bootstrapAdminEmail = normalizeEmail(process.env.ADMIN_BOOTSTRAP_EMAIL || "yogeshkukadiya92@gmail.com");
 const bootstrapAdminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
 const bootstrapAdminUserId = bootstrapAdminEmail ? `user-admin-${hashToken(bootstrapAdminEmail).slice(0, 18)}` : "";
@@ -53,6 +54,12 @@ function normalizePhone(phone: string) {
 
 function isValidPhone(phone: string) {
   return normalizePhone(phone).length >= 10;
+}
+
+export function verifyTestingAuthOtp(otp: string) {
+  const expected = Buffer.from(hashToken(testingAuthOtp), "hex");
+  const received = Buffer.from(hashToken(otp.trim()), "hex");
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 }
 
 function cleanName(email: string, name?: string) {
@@ -376,6 +383,68 @@ export async function loginAuthUserSession(input: { password: string; phone: str
 
   const token = await createSession(db, user.id);
   return { token, user: publicUser(user) };
+}
+
+async function findUserByPhone(phoneInput: string) {
+  if (!isMongoConfigured()) {
+    throw new Error("MongoDB is not configured.");
+  }
+
+  const phone = normalizePhone(phoneInput);
+  if (!isValidPhone(phone)) {
+    throw new Error("Enter a valid mobile number.");
+  }
+
+  const db = await getMongoDb();
+  await ensureAuthIndexes(db);
+  const user = await db.collection<AuthUserDocument>("authUsers").findOne({ phone }, { projection: { _id: 0 } });
+  return { db, user };
+}
+
+export async function loginAuthUserSessionWithOtp(input: { otp: string; phone: string }) {
+  if (!verifyTestingAuthOtp(input.otp)) {
+    throw new Error("Invalid OTP.");
+  }
+
+  const { db, user } = await findUserByPhone(input.phone);
+  if (!user) {
+    throw new Error("No account found for this mobile number.");
+  }
+
+  const token = await createSession(db, user.id);
+  return { token, user: publicUser(user) };
+}
+
+export async function resetAuthUserPasswordWithOtp(input: { otp: string; password: string; phone: string }) {
+  if (!verifyTestingAuthOtp(input.otp)) {
+    throw new Error("Invalid OTP.");
+  }
+  if (input.password.length < 6) {
+    throw new Error("Password must be at least 6 characters.");
+  }
+
+  const { db, user } = await findUserByPhone(input.phone);
+  if (!user) {
+    throw new Error("No account found for this mobile number.");
+  }
+
+  const password = hashPassword(input.password);
+  const updatedAt = new Date().toISOString();
+  await db.collection<AuthUserDocument>("authUsers").updateOne(
+    { id: user.id },
+    {
+      $set: {
+        passwordHash: password.hash,
+        passwordIterations: password.iterations,
+        passwordSalt: password.salt,
+        updatedAt,
+      },
+    },
+  );
+  await db.collection<AuthSessionDocument>("authSessions").deleteMany({ userId: user.id });
+
+  const token = await createSession(db, user.id);
+  return { token, user: publicUser({ ...user, updatedAt }) };
 }
 
 export async function destroyAuthSession(request: NextRequest) {

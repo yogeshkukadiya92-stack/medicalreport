@@ -18,6 +18,9 @@ type AuthContextValue = {
   status: AuthStatus;
   user: AuthUser | null;
   login: (phone: string, password: string) => Promise<void>;
+  loginWithOtp: (phone: string, otp: string) => Promise<void>;
+  requestOtp: (phone: string, purpose: "login" | "reset" | "signup") => Promise<string>;
+  resetPassword: (phone: string, otp: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   signup: (input: { email: string; otp: string; password: string; phone: string }) => Promise<void>;
 };
@@ -78,7 +81,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function submitAuth(endpoint: "/api/auth/login" | "/api/auth/signup", input: { email?: string; otp?: string; password: string; phone?: string }) {
+  async function submitAuth(
+    endpoint: "/api/auth/login" | "/api/auth/otp-login" | "/api/auth/reset-password" | "/api/auth/signup",
+    input: { email?: string; otp?: string; password?: string; phone?: string },
+  ) {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -110,6 +116,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       status,
       user: session?.user ?? null,
       login: async (phone, password) => submitAuth("/api/auth/login", { password, phone }),
+      loginWithOtp: async (phone, otp) => submitAuth("/api/auth/otp-login", { otp, phone }),
+      requestOtp: async (phone, purpose) => {
+        const response = await fetch("/api/auth/request-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, purpose }),
+        });
+        const result = await readJsonResponse(response);
+        if (!response.ok) throw new Error(result?.error ?? "OTP could not be sent.");
+        return "OTP sent. Use 1111 for testing.";
+      },
+      resetPassword: async (phone, otp, password) => submitAuth("/api/auth/reset-password", { otp, password, phone }),
       signup: async (input) => submitAuth("/api/auth/signup", input),
       signOut: async () => {
         await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);

@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { CountryPhoneInput, localPhoneDigits } from "@/components/country-phone-input";
 
-type Mode = "signin" | "signup";
+type Mode = "forgot" | "otp" | "signin" | "signup";
 
 function safeRedirectPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/dashboard";
@@ -18,9 +18,15 @@ function safeRedirectPath(value: string | null) {
   }
 }
 
+function modeTitle(mode: Mode) {
+  if (mode === "forgot") return "Reset password";
+  if (mode === "otp") return "Login with OTP";
+  return "Secure health login";
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const { isConfigLoading, isConfigured, login, signup, status } = useAuth();
+  const { isConfigLoading, isConfigured, login, loginWithOtp, requestOtp, resetPassword, signup, status } = useAuth();
   const [redirectPath] = useState(() => {
     if (typeof window === "undefined") return "/dashboard";
     return safeRedirectPath(new URLSearchParams(window.location.search).get("next"));
@@ -31,16 +37,56 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
 
   useEffect(() => {
-    if (status === "authenticated") {
-      router.replace(redirectPath);
-    }
+    if (status === "authenticated") router.replace(redirectPath);
   }, [redirectPath, router, status]);
+
+  function switchMode(nextMode: Mode) {
+    setMode(nextMode);
+    setError("");
+    setMessage("");
+    setOtp("");
+    setPassword("");
+    setConfirmPassword("");
+    setIsOtpSent(false);
+    setPhone((current) => (nextMode !== "signin" && current.includes("@") ? "" : current));
+  }
+
+  async function handleSendOtp() {
+    setError("");
+    setMessage("");
+
+    if (!phone || localPhoneDigits(phone).length < 10) {
+      setError("Enter a valid mobile number before sending OTP.");
+      return;
+    }
+    if (mode === "signup" && !email) {
+      setError("Enter email address before sending OTP.");
+      return;
+    }
+    if (mode === "signup" && password.length < 6) {
+      setError("Enter a password with at least 6 characters before sending OTP.");
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const purpose = mode === "forgot" ? "reset" : mode === "signup" ? "signup" : "login";
+      setMessage(await requestOtp(phone, purpose));
+      setIsOtpSent(true);
+    } catch (otpError) {
+      setError(otpError instanceof Error ? otpError.message : "OTP could not be sent.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,68 +97,43 @@ export default function LoginPage() {
       setError("MongoDB is not configured yet.");
       return;
     }
-
-    if (!phone || !password) {
-      setError(mode === "signin" ? "Enter mobile/email and password." : "Enter mobile number and password.");
+    if (!phone) {
+      setError("Enter your mobile number.");
       return;
     }
 
     setIsSubmitting(true);
     try {
       if (mode === "signin") {
+        if (!password) throw new Error("Enter your password.");
         await login(phone, password);
+      } else if (mode === "otp") {
+        if (!isOtpSent) throw new Error("Tap Send OTP first.");
+        if (otp.length !== 4) throw new Error("Enter the 4-digit OTP.");
+        await loginWithOtp(phone, otp);
+      } else if (mode === "forgot") {
+        if (!isOtpSent) throw new Error("Tap Send OTP first.");
+        if (otp.length !== 4) throw new Error("Enter the 4-digit OTP.");
+        if (password.length < 6) throw new Error("New password must be at least 6 characters.");
+        if (password !== confirmPassword) throw new Error("Passwords do not match.");
+        await resetPassword(phone, otp, password);
       } else {
-        if (!email) {
-          setError("Enter email address for signup.");
-          return;
-        }
-        if (!isOtpSent) {
-          setError("Tap Send OTP first.");
-          return;
-        }
-        if (otp.trim() !== "1111") {
-          setError("Invalid OTP. Use 1111 for testing.");
-          return;
-        }
+        if (!email) throw new Error("Enter email address for signup.");
+        if (password.length < 6) throw new Error("Password must be at least 6 characters.");
+        if (!isOtpSent) throw new Error("Tap Send OTP first.");
+        if (otp.length !== 4) throw new Error("Enter the 4-digit OTP.");
         await signup({ email, otp, password, phone });
       }
       router.replace(redirectPath);
     } catch (authError) {
-      setError(authError instanceof Error ? authError.message : "We couldn't reach the authentication service. Check your connection and try again.");
+      setError(authError instanceof Error ? authError.message : "Authentication failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  function handleSendOtp() {
-    setError("");
-    setMessage("");
-
-    if (!phone || localPhoneDigits(phone).length < 10) {
-      setError("Enter a valid mobile number before sending OTP.");
-      return;
-    }
-    if (!email) {
-      setError("Enter email address before sending OTP.");
-      return;
-    }
-    if (!password || password.length < 6) {
-      setError("Enter a password with at least 6 characters before sending OTP.");
-      return;
-    }
-
-    setIsOtpSent(true);
-    setMessage("Testing OTP sent. Use 1111 to verify this mobile number.");
-  }
-
-  function switchMode(nextMode: Mode) {
-    setMode(nextMode);
-    setError("");
-    setMessage("");
-    setOtp("");
-    setIsOtpSent(false);
-    setPhone((current) => (nextMode === "signup" && current.includes("@") ? "" : current));
-  }
+  const needsOtp = mode === "otp" || mode === "forgot" || mode === "signup";
+  const needsPassword = mode === "signin" || mode === "forgot" || mode === "signup";
 
   return (
     <main className="min-h-screen bg-[#eef3f1] px-5 py-8 text-[#101c1c] md:flex md:items-center md:justify-center">
@@ -120,7 +141,7 @@ export default function LoginPage() {
         <div className="mt-2 flex items-center justify-between">
           <div>
             <p className="text-[13px] font-bold text-[#087766]">MediVault</p>
-            <h1 className="mt-2 text-[30px] font-black leading-tight">Secure health login</h1>
+            <h1 className="mt-2 text-[30px] font-black leading-tight">{modeTitle(mode)}</h1>
           </div>
           <div className="grid h-14 w-14 place-items-center rounded-lg bg-[#102323] text-white shadow-[0_18px_38px_rgba(16,35,35,0.2)]">
             <svg className="h-7 w-7" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" viewBox="0 0 24 24">
@@ -131,32 +152,33 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-4 text-[14px] leading-6 text-[#65716f]">
-          Sign in with your mobile number to keep family reports, health trends, and upload history private.
+          {mode === "forgot"
+            ? "Verify your registered mobile number, then create a new secure password."
+            : mode === "otp"
+              ? "Use a one-time code to access your reports without entering a password."
+              : "Sign in with your mobile number to keep family reports, health trends, and upload history private."}
         </p>
 
-        <div className="mt-6 grid grid-cols-2 gap-2 rounded-lg border border-[#dce9e5] bg-white p-1">
-          <button
-            type="button"
-            onClick={() => switchMode("signin")}
-            className={`h-10 rounded-md text-[13px] font-bold ${mode === "signin" ? "bg-[#102323] text-white" : "text-[#65716f]"}`}
-          >
-            Sign in
+        {mode === "signin" || mode === "signup" ? (
+          <div className="mt-6 grid grid-cols-2 gap-2 rounded-lg border border-[#dce9e5] bg-white p-1">
+            <button type="button" onClick={() => switchMode("signin")} className={`h-10 rounded-md text-[13px] font-bold ${mode === "signin" ? "bg-[#102323] text-white" : "text-[#65716f]"}`}>
+              Sign in
+            </button>
+            <button type="button" onClick={() => switchMode("signup")} className={`h-10 rounded-md text-[13px] font-bold ${mode === "signup" ? "bg-[#102323] text-white" : "text-[#65716f]"}`}>
+              Create account
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => switchMode("signin")} className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg border border-[#dce9e5] bg-white px-4 text-[13px] font-bold text-[#30413e]">
+            <span aria-hidden="true">←</span>
+            Back to sign in
           </button>
-          <button
-            type="button"
-            onClick={() => switchMode("signup")}
-            className={`h-10 rounded-md text-[13px] font-bold ${mode === "signup" ? "bg-[#102323] text-white" : "text-[#65716f]"}`}
-          >
-            Create account
-          </button>
-        </div>
+        )}
 
         {!isConfigLoading && !isConfigured ? (
           <div className="mt-5 rounded-lg border border-[#f0d4ca] bg-[#fff7f4] p-4">
             <p className="text-[13px] font-black text-[#ba563d]">MongoDB env missing</p>
-            <p className="mt-2 text-[13px] leading-5 text-[#65716f]">
-              Add MONGODB_URI and MONGODB_DB locally and on Railway.
-            </p>
+            <p className="mt-2 text-[13px] leading-5 text-[#65716f]">Add MONGODB_URI and MONGODB_DB locally and on Railway.</p>
           </div>
         ) : null}
 
@@ -164,7 +186,7 @@ export default function LoginPage() {
           <CountryPhoneInput
             allowEmail={mode === "signin"}
             autoComplete={mode === "signin" ? "username" : "tel"}
-            label={mode === "signin" ? "Mobile number or admin email" : "Mobile number"}
+            label={mode === "signin" ? "Mobile number or admin email" : "Registered mobile number"}
             value={phone}
             onChange={setPhone}
             placeholder="9876543210"
@@ -175,84 +197,59 @@ export default function LoginPage() {
           {mode === "signup" ? (
             <label className="block">
               <span className="text-[12px] font-bold text-[#52605d]">Email address</span>
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-                required
-                className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
-              />
+              <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" required className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold outline-none focus:border-[#0a7d6e]" />
             </label>
           ) : null}
 
-          <label className="block">
-            <span className="text-[12px] font-bold text-[#52605d]">Password</span>
-            <div className="relative mt-2">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Minimum 6 characters"
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                minLength={6}
-                required
-                className="h-12 w-full rounded-lg border border-[#dce9e5] bg-white py-0 pl-4 pr-12 text-[14px] font-semibold text-[#162523] outline-none focus:border-[#0a7d6e]"
-              />
-              <button
-                type="button"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                aria-pressed={showPassword}
-                onClick={() => setShowPassword((current) => !current)}
-                className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-md text-[#52605d] hover:bg-[#f1f6f4] hover:text-[#102323]"
-              >
-                {showPassword ? (
+          {needsPassword ? (
+            <label className="block">
+              <span className="text-[12px] font-bold text-[#52605d]">{mode === "forgot" ? "New password" : "Password"}</span>
+              <div className="relative mt-2">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Minimum 6 characters"
+                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                  minLength={6}
+                  required
+                  className="h-12 w-full rounded-lg border border-[#dce9e5] bg-white py-0 pl-4 pr-12 text-[14px] font-semibold outline-none focus:border-[#0a7d6e]"
+                />
+                <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword((current) => !current)} className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-md text-[#52605d] hover:bg-[#f1f6f4]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" viewBox="0 0 24 24">
-                    <path d="M3.8 12.1s3-5.8 8.2-5.8 8.2 5.8 8.2 5.8-3 5.8-8.2 5.8-8.2-5.8-8.2-5.8Z" />
-                    <path d="M14.1 10a3 3 0 0 1-4.1 4.1" />
-                    <path d="m4.5 4.5 15 15" />
+                    {showPassword ? <><path d="M3.8 12.1s3-5.8 8.2-5.8 8.2 5.8 8.2 5.8-3 5.8-8.2 5.8-8.2-5.8-8.2-5.8Z" /><path d="M14.1 10a3 3 0 0 1-4.1 4.1" /><path d="m4.5 4.5 15 15" /></> : <><path d="M3.8 12.1s3-5.8 8.2-5.8 8.2 5.8 8.2 5.8-3 5.8-8.2 5.8-8.2-5.8-8.2-5.8Z" /><path d="M12 14.8a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6Z" /></>}
                   </svg>
-                ) : (
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" viewBox="0 0 24 24">
-                    <path d="M3.8 12.1s3-5.8 8.2-5.8 8.2 5.8 8.2 5.8-3 5.8-8.2 5.8-8.2-5.8-8.2-5.8Z" />
-                    <path d="M12 14.8a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6Z" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          </label>
+                </button>
+              </div>
+            </label>
+          ) : null}
 
-          {mode === "signup" ? (
+          {mode === "forgot" ? (
+            <label className="block">
+              <span className="text-[12px] font-bold text-[#52605d]">Confirm new password</span>
+              <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Enter new password again" autoComplete="new-password" minLength={6} required className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[14px] font-semibold outline-none focus:border-[#0a7d6e]" />
+            </label>
+          ) : null}
+
+          {needsOtp ? (
             <div className="rounded-lg border border-[#dce9e5] bg-[#f7fbfa] p-3">
               <div className="flex items-end gap-2">
                 <label className="min-w-0 flex-1">
                   <span className="text-[12px] font-bold text-[#52605d]">Mobile OTP</span>
-                  <input
-                    type="text"
-                    value={otp}
-                    onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 4))}
-                    placeholder="1111"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    disabled={!isOtpSent}
-                    maxLength={4}
-                    pattern="[0-9]{4}"
-                    required={isOtpSent}
-                    className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-[16px] font-black tracking-[0.28em] text-[#162523] outline-none focus:border-[#0a7d6e] disabled:bg-[#edf3f1] disabled:text-[#8a9794]"
-                  />
+                  <input type="text" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1111" inputMode="numeric" autoComplete="one-time-code" disabled={!isOtpSent} maxLength={4} pattern="[0-9]{4}" required={isOtpSent} className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-center text-[16px] font-black tracking-[0.28em] outline-none focus:border-[#0a7d6e] disabled:bg-[#edf3f1] disabled:text-[#8a9794]" />
                 </label>
-                <button
-                  type="button"
-                  onClick={handleSendOtp}
-                  className="h-12 shrink-0 rounded-lg bg-[#102323] px-4 text-[12px] font-black text-white"
-                >
-                  {isOtpSent ? "Resend" : "Send OTP"}
+                <button type="button" onClick={handleSendOtp} disabled={isSendingOtp} className="h-12 shrink-0 rounded-lg bg-[#102323] px-4 text-[12px] font-black text-white disabled:opacity-60">
+                  {isSendingOtp ? "Sending" : isOtpSent ? "Resend" : "Send OTP"}
                 </button>
               </div>
-              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#65716f]">
-                SMS provider is not connected yet. For testing, every mobile number uses OTP 1111.
-              </p>
+              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#65716f]">Testing mode: use OTP 1111. A live SMS provider can replace this later.</p>
+            </div>
+          ) : null}
+
+          {mode === "signin" ? (
+            <div className="flex items-center justify-between gap-3">
+              <button type="button" onClick={() => switchMode("otp")} className="text-[13px] font-black text-[#087766] hover:underline">Login with OTP</button>
+              <button type="button" onClick={() => switchMode("forgot")} className="text-[13px] font-bold text-[#52605d] hover:text-[#087766] hover:underline">Forgot password?</button>
             </div>
           ) : null}
 
@@ -261,20 +258,14 @@ export default function LoginPage() {
             {message ? <p role="status" className="rounded-lg bg-[#eaf9f2] p-3 text-[13px] font-bold text-[#087766]">{message}</p> : null}
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting || isConfigLoading || !isConfigured}
-            className="h-12 w-full rounded-lg bg-[#0a7d6e] text-[14px] font-black text-white shadow-[0_14px_30px_rgba(10,125,110,0.22)] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isConfigLoading ? "Checking setup" : isSubmitting ? "Please wait" : mode === "signin" ? "Sign in with mobile" : "Verify OTP & create account"}
+          <button type="submit" disabled={isSubmitting || isConfigLoading || !isConfigured} className="h-12 w-full rounded-lg bg-[#0a7d6e] text-[14px] font-black text-white shadow-[0_14px_30px_rgba(10,125,110,0.22)] disabled:cursor-not-allowed disabled:opacity-60">
+            {isConfigLoading ? "Checking setup" : isSubmitting ? "Please wait" : mode === "signin" ? "Sign in" : mode === "otp" ? "Verify OTP & sign in" : mode === "forgot" ? "Reset password & sign in" : "Verify OTP & create account"}
           </button>
         </form>
 
         <div className="mt-6 rounded-lg bg-[#f7fbfa] p-4">
-          <p className="text-[12px] font-bold text-[#087766]">Protected by MongoDB sessions</p>
-          <p className="mt-2 text-[12px] leading-5 text-[#65716f]">
-            Signup verifies mobile with test OTP 1111. Login uses mobile number and password.
-          </p>
+          <p className="text-[12px] font-bold text-[#087766]">Protected by secure MongoDB sessions</p>
+          <p className="mt-2 text-[12px] leading-5 text-[#65716f]">OTP login and password reset work only for a registered mobile number. Testing OTP is 1111.</p>
         </div>
       </section>
     </main>
