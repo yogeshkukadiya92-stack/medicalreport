@@ -103,7 +103,7 @@ function publicUser(user: AuthUserDocument): AuthUser {
 }
 
 export function isBootstrapAdminUser(user: Pick<AuthUser, "email" | "id"> | null | undefined) {
-  return Boolean(user && user.email === bootstrapAdminEmail && user.id === bootstrapAdminUserId);
+  return Boolean(user && user.email === bootstrapAdminEmail);
 }
 
 export function isBootstrapAdminUserId(userId: string) {
