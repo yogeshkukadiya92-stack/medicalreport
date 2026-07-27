@@ -259,7 +259,7 @@ export default function AdminPage() {
         <section className="rounded-md border border-[#dbe6e3] bg-white p-4"><p className="text-[10px] font-black uppercase text-[#087766]">Audit coverage</p><p className="mt-2 text-[24px] font-black">{data?.operations.auditEvents ?? "--"}</p><p className="mt-1 text-[10px] font-semibold text-[#71817d]">Traceable lab and platform actions</p></section>
       </div>
 
-      <section className="mt-4 rounded-md border border-[#dbe6e3] bg-white">
+      <section id="dashboard-users" className="mt-4 scroll-mt-20 rounded-md border border-[#dbe6e3] bg-white">
         <div className="flex flex-col gap-1 border-b border-[#e8efed] p-4">
           <p className="text-[10px] font-black uppercase text-[#087766]">Owner controlled access</p>
           <h2 className="text-[15px] font-black text-[#17302b]">Dashboard users</h2>

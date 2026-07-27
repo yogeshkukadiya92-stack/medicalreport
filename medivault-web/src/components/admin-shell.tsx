@@ -13,12 +13,15 @@ const adminNav = [
   { href: "/admin/clients", icon: "family" as const, label: "Clients" },
   { href: "/admin/reports", icon: "reports" as const, label: "Reports" },
   { href: "/admin/tasks", icon: "calendar" as const, label: "Tasks" },
+  { href: "/admin/users", icon: "family" as const, label: "Users & Access" },
+  { href: "/admin/security", icon: "shield" as const, label: "Security" },
   { href: "/admin/integrations", icon: "shield" as const, label: "API & Webhooks" },
 ];
 
 const workspaceLinks = [
   { href: "/lab", icon: "shield" as const, label: "Lab operations" },
   { href: "/nutrition", icon: "trend" as const, label: "Nutrition CRM" },
+  { href: "/body-composition", icon: "analytics" as const, label: "Body composition" },
   { href: "/dashboard", icon: "home" as const, label: "Patient app" },
 ];
 

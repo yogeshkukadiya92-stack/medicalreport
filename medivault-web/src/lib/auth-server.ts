@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
 
 export type AuthUser = {
+  accountStatus?: "active" | "suspended";
   createdAt: string;
   email: string;
   id: string;
@@ -93,6 +94,7 @@ function verifyBootstrapAdminPassword(password: string) {
 
 function publicUser(user: AuthUserDocument): AuthUser {
   return {
+    accountStatus: user.accountStatus ?? "active",
     createdAt: user.createdAt,
     email: user.email,
     id: user.id,
@@ -137,6 +139,7 @@ async function ensureBootstrapAdmin(db: Db, password: string) {
     {
       $set: {
         email: bootstrapAdminEmail,
+        accountStatus: "active",
         name: "Yogesh Admin",
         passwordHash: passwordFields.hash,
         passwordIterations: passwordFields.iterations,
@@ -251,7 +254,7 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<AuthUs
   if (!session) return null;
 
   const user = await db.collection<AuthUserDocument>("authUsers").findOne({ id: session.userId }, { projection: { _id: 0 } });
-  if (!user) return null;
+  if (!user || user.accountStatus === "suspended") return null;
 
   await db.collection<AuthSessionDocument>("authSessions").updateOne(
     { id: session.id },
@@ -300,6 +303,7 @@ export async function createAuthUserSession(input: { email: string; name?: strin
   const now = new Date().toISOString();
   const password = hashPassword(input.password);
   const user: AuthUserDocument = {
+    accountStatus: "active",
     id: `user-${Date.now()}-${crypto.randomBytes(8).toString("hex")}`,
     createdAt: now,
     email,
@@ -346,6 +350,7 @@ export async function createManagedAuthUser(input: { email: string; name?: strin
   const now = new Date().toISOString();
   const password = hashPassword(input.password);
   const user: AuthUserDocument = {
+    accountStatus: "active",
     id: `user-${Date.now()}-${crypto.randomBytes(8).toString("hex")}`,
     createdAt: now,
     email,
@@ -377,7 +382,7 @@ export async function loginAuthUserSession(input: { password: string; phone: str
     isValidEmail(emailFallback) ? { $or: [{ phone }, { email: emailFallback }] } : { phone },
     { projection: { _id: 0 } },
   );
-  if (!user || !verifyPassword(input.password, user)) {
+  if (!user || user.accountStatus === "suspended" || !verifyPassword(input.password, user)) {
     throw new Error("Invalid mobile/email or password.");
   }
 
@@ -445,6 +450,48 @@ export async function resetAuthUserPasswordWithOtp(input: { otp: string; passwor
 
   const token = await createSession(db, user.id);
   return { token, user: publicUser({ ...user, updatedAt }) };
+}
+
+export async function updateManagedAuthUser(input: {
+  accountStatus?: "active" | "suspended";
+  password?: string;
+  userId: string;
+}) {
+  if (!isMongoConfigured()) throw new Error("MongoDB is not configured.");
+  if (input.password !== undefined && input.password.length < 6) {
+    throw new Error("Password must be at least 6 characters.");
+  }
+
+  const db = await getMongoDb();
+  await ensureAuthIndexes(db);
+  const user = await db.collection<AuthUserDocument>("authUsers").findOne({ id: input.userId }, { projection: { _id: 0 } });
+  if (!user) throw new Error("User account was not found.");
+  if (isBootstrapAdminUser(user)) throw new Error("Owner admin account cannot be changed from user management.");
+
+  const updates: Partial<AuthUserDocument> = { updatedAt: new Date().toISOString() };
+  if (input.accountStatus) updates.accountStatus = input.accountStatus;
+  if (input.password !== undefined) {
+    const password = hashPassword(input.password);
+    updates.passwordHash = password.hash;
+    updates.passwordIterations = password.iterations;
+    updates.passwordSalt = password.salt;
+  }
+  await db.collection<AuthUserDocument>("authUsers").updateOne({ id: input.userId }, { $set: updates });
+  if (input.accountStatus === "suspended" || input.password !== undefined) {
+    await db.collection<AuthSessionDocument>("authSessions").deleteMany({ userId: input.userId });
+  }
+  return publicUser({ ...user, ...updates });
+}
+
+export async function revokeManagedAuthUserSessions(userId: string) {
+  if (!isMongoConfigured()) throw new Error("MongoDB is not configured.");
+  const db = await getMongoDb();
+  await ensureAuthIndexes(db);
+  const user = await db.collection<AuthUserDocument>("authUsers").findOne({ id: userId }, { projection: { _id: 0 } });
+  if (!user) throw new Error("User account was not found.");
+  if (isBootstrapAdminUser(user)) throw new Error("Owner admin sessions cannot be revoked from user management.");
+  const result = await db.collection<AuthSessionDocument>("authSessions").deleteMany({ userId });
+  return result.deletedCount;
 }
 
 export async function destroyAuthSession(request: NextRequest) {
