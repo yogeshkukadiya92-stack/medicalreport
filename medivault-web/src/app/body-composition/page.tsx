@@ -1,15 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { BodyCompositionShell } from "@/components/body-composition-shell";
+import { useAuth } from "@/components/auth-provider";
 import { bodyReportTitle, reportMetric } from "@/lib/body-composition";
 import { useBodyData } from "./_components/use-body-data";
 
 export default function BodyCompositionDashboardPage() {
+  const router = useRouter();
+  const { signOut } = useAuth();
   const { data, error, isLoading, reload } = useBodyData();
   const metrics = data?.metrics;
   const recent = data?.reports.slice(0, 8) ?? [];
   const riskReports = data?.reports.filter((report) => report.values.some((value) => (value.name === "Visceral Fat Level" || value.name === "PBF") && value.status !== "Normal")).slice(0, 5) ?? [];
+
+  async function openLogin() {
+    await signOut();
+    router.replace("/login?next=%2Fbody-composition");
+  }
 
   return (
     <BodyCompositionShell>
@@ -17,7 +26,17 @@ export default function BodyCompositionDashboardPage() {
         <div><p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#0b806b]">Live body intelligence</p><h1 className="mt-1 text-[26px] font-black">Command dashboard</h1><p className="mt-1 text-[12px] font-semibold text-[#697875]">Scans, composition risk, verification and patient-app delivery from one workspace.</p></div>
         <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void reload()} className="h-10 rounded-md border border-[#bdd4ce] bg-white px-4 text-[11px] font-black text-[#075b4e]">Refresh</button><Link href="/body-composition/create?mode=upload" className="inline-flex h-10 items-center rounded-md border border-[#75b9a7] bg-white px-4 text-[11px] font-black text-[#075b4e]">Upload PDF / Photo</Link><Link href="/body-composition/create" className="inline-flex h-10 items-center rounded-md bg-[#075b4e] px-4 text-[11px] font-black text-white">+ Manual scan</Link></div>
       </header>
-      {error ? <p className="mt-4 rounded-md bg-[#fff0ec] p-3 text-[11px] font-bold text-[#ba563d]">{error}</p> : null}
+      {error ? (
+        <div className="mt-4 flex flex-col gap-3 rounded-md border border-[#f3cfc5] bg-[#fff0ec] p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-black text-[#ba563d]">{error}</p>
+            <p className="mt-1 text-[9px] font-semibold text-[#8b665d]">Use your admin or lab portal credentials to continue.</p>
+          </div>
+          <button type="button" onClick={openLogin} className="h-9 shrink-0 rounded-md bg-[#ba563d] px-4 text-[10px] font-black text-white">
+            Sign in / switch account
+          </button>
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {[

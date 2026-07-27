@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AuthSetupRequired, SessionLoading } from "@/components/auth-gate";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/mobile-shell";
-import { SignOutButton } from "@/components/sign-out-button";
 
 const navigation = [
   { href: "/body-composition", icon: "analytics", label: "Dashboard" },
@@ -20,7 +19,8 @@ const navigation = [
 export function BodyCompositionShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isConfigLoading, isConfigured, status } = useAuth();
+  const { isConfigLoading, isConfigured, signOut, status, user } = useAuth();
+  const [isOpeningLogin, setIsOpeningLogin] = useState(false);
 
   useEffect(() => {
     if (isConfigured && status === "unauthenticated") {
@@ -35,6 +35,12 @@ export function BodyCompositionShell({ children }: { children: ReactNode }) {
     return <AuthSetupRequired surface="body composition center" />;
   }
 
+  async function openLogin() {
+    setIsOpeningLogin(true);
+    if (status === "authenticated") await signOut();
+    router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+  }
+
   return (
     <main className="min-h-screen bg-[#f3f7f6] text-[#17222b]">
       <div className="flex min-h-screen flex-col lg:flex-row">
@@ -46,7 +52,14 @@ export function BodyCompositionShell({ children }: { children: ReactNode }) {
               </span>
               <span><span className="block text-[14px] font-black">MediVault Body</span><span className="block text-[10px] font-bold text-white/55">Composition center</span></span>
             </Link>
-            <div className="lg:hidden"><SignOutButton /></div>
+            <button
+              type="button"
+              onClick={openLogin}
+              disabled={isOpeningLogin}
+              className="h-9 rounded-md border border-white/20 px-3 text-[10px] font-black text-white lg:hidden"
+            >
+              {isOpeningLogin ? "Opening..." : status === "authenticated" ? "Switch login" : "Sign in"}
+            </button>
           </div>
 
           <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:mt-6 lg:block lg:space-y-1 lg:overflow-visible">
@@ -66,7 +79,18 @@ export function BodyCompositionShell({ children }: { children: ReactNode }) {
             <p className="mt-0.5 text-[10px] font-semibold text-white/55">Verified scans only</p>
             <Link href="/lab" className="mt-3 flex h-9 items-center justify-center rounded-md border border-white/15 text-[10px] font-black text-white/70 hover:bg-white/10">Lab dashboard</Link>
             <Link href="/dashboard" className="mt-2 flex h-9 items-center justify-center rounded-md border border-white/15 text-[10px] font-black text-white/70 hover:bg-white/10">Patient app</Link>
-            <div className="mt-2"><SignOutButton /></div>
+            <div className="mt-3 rounded-md border border-white/12 bg-white/5 p-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#74e7c8]">Account</p>
+              <p className="mt-1.5 truncate text-[10px] font-bold text-white/70">{user?.email || user?.phone || "Not signed in"}</p>
+              <button
+                type="button"
+                onClick={openLogin}
+                disabled={isOpeningLogin}
+                className="mt-2 flex h-9 w-full items-center justify-center rounded-md bg-[#55d6b3] px-3 text-[10px] font-black text-[#102f35] disabled:opacity-60"
+              >
+                {isOpeningLogin ? "Opening login..." : status === "authenticated" ? "Switch account" : "Sign in"}
+              </button>
+            </div>
           </div>
         </aside>
         <section className="min-w-0 flex-1 px-3 py-4 sm:px-5 lg:px-6 lg:py-5">{children}</section>
