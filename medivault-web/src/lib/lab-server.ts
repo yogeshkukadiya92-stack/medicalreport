@@ -158,6 +158,17 @@ export async function getLabContext(request: NextRequest): Promise<LabContext> {
         { upsert: true },
       );
     }
+    const requestedWorkspace = request.nextUrl.pathname.startsWith("/api/body-composition")
+      ? "body_composition"
+      : "lab";
+    const isOwner = candidate.lab.ownerUserId === userId;
+    const access = candidate.labUser?.workspaceAccess ?? ["lab"];
+    if (!isOwner && !access.includes(requestedWorkspace)) {
+      return {
+        error: `${requestedWorkspace === "body_composition" ? "Body Composition" : "Lab"} access must be enabled by the Super Admin.`,
+        status: 403,
+      };
+    }
     const lab = await ensureBookingSlug(db, candidate.lab);
     return { db, lab, labUser, userId };
   }

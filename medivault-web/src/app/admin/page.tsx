@@ -6,7 +6,7 @@ import { AdminShell } from "@/components/admin-shell";
 import { useAuth } from "@/components/auth-provider";
 import { CountryPhoneInput } from "@/components/country-phone-input";
 import type { AdminDashboardPayload, AdminTask } from "@/lib/admin-types";
-import type { LabRole } from "@/lib/vault-types";
+import type { LabRole, WorkspaceAccess } from "@/lib/vault-types";
 import { readNutritionAdminClients } from "@/lib/nutrition-admin";
 import { AdminEmpty, AdminError, AdminPageHeader, AdminSkeleton, AdminStatCard, StatusPill } from "@/app/admin/_components/admin-ui";
 
@@ -36,10 +36,23 @@ type LabCredentialRow = {
   phone?: string;
   role: LabRole;
   updatedAt: string;
+  workspaceAccess?: WorkspaceAccess[];
 };
 
 const labRoles: LabRole[] = ["lab_admin", "pathologist", "technician", "collector", "cashier", "lab_staff"];
-const emptyLabCredentialForm = { email: "", name: "", password: "", phone: "", role: "lab_staff" as LabRole };
+const workspaceOptions: { label: string; value: WorkspaceAccess }[] = [
+  { label: "Lab", value: "lab" },
+  { label: "Nutrition", value: "nutrition" },
+  { label: "Body composition", value: "body_composition" },
+];
+const emptyLabCredentialForm = {
+  email: "",
+  name: "",
+  password: "",
+  phone: "",
+  role: "lab_staff" as LabRole,
+  workspaceAccess: ["lab"] as WorkspaceAccess[],
+};
 
 export default function AdminPage() {
   const { session, status } = useAuth();
@@ -123,7 +136,7 @@ export default function AdminPage() {
       if (!response.ok) throw new Error(result?.error ?? "Lab credential could not be created.");
       setLabCredentials(result?.labUsers ?? []);
       setLabCredentialForm(emptyLabCredentialForm);
-      setLabCredentialMessage("Lab login created. Share the email/mobile and password with that staff member.");
+      setLabCredentialMessage("User login created with the selected dashboard access.");
     } catch (createError) {
       setLabCredentialError(createError instanceof Error ? createError.message : "Lab credential could not be created.");
     } finally {
@@ -249,8 +262,8 @@ export default function AdminPage() {
       <section className="mt-4 rounded-md border border-[#dbe6e3] bg-white">
         <div className="flex flex-col gap-1 border-b border-[#e8efed] p-4">
           <p className="text-[10px] font-black uppercase text-[#087766]">Owner controlled access</p>
-          <h2 className="text-[15px] font-black text-[#17302b]">Lab credentials</h2>
-          <p className="text-[10px] font-semibold text-[#71817d]">Only the owner admin can create lab portal logins. Public users will not get lab/admin access automatically.</p>
+          <h2 className="text-[15px] font-black text-[#17302b]">Dashboard users</h2>
+          <p className="text-[10px] font-semibold text-[#71817d]">Only the Super Admin can create users and enable Lab, Nutrition, or Body Composition access.</p>
         </div>
         <div className="grid gap-4 p-4 xl:grid-cols-[420px_1fr]">
           <form onSubmit={createLabCredential} className="space-y-3 rounded-md border border-[#e2ebe8] bg-[#f8fbfa] p-3">
@@ -270,6 +283,30 @@ export default function AdminPage() {
               <span className="text-[10px] font-black uppercase text-[#71817d]">Email</span>
               <input type="email" required value={labCredentialForm.email} onChange={(event) => setLabCredentialForm((current) => ({ ...current, email: event.target.value }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold" placeholder="staff@example.com" />
             </label>
+            <fieldset>
+              <legend className="text-[10px] font-black uppercase text-[#71817d]">Dashboard access</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {workspaceOptions.map((option) => {
+                  const checked = labCredentialForm.workspaceAccess.includes(option.value);
+                  return (
+                    <label key={option.value} className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-[10px] font-black ${checked ? "border-[#0b8c78] bg-[#e8f8f3] text-[#075b4e]" : "border-[#d5e2de] bg-white text-[#64736f]"}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) => setLabCredentialForm((current) => ({
+                          ...current,
+                          workspaceAccess: event.target.checked
+                            ? [...current.workspaceAccess, option.value]
+                            : current.workspaceAccess.filter((workspace) => workspace !== option.value),
+                        }))}
+                        className="h-4 w-4 accent-[#0b8c78]"
+                      />
+                      {option.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
             <CountryPhoneInput
               label="Mobile"
               required
@@ -287,21 +324,28 @@ export default function AdminPage() {
             {labCredentialError ? <p className="rounded-md bg-[#fff0ec] p-2 text-[11px] font-bold text-[#ba563d]">{labCredentialError}</p> : null}
             {labCredentialMessage ? <p className="rounded-md bg-[#eaf9f2] p-2 text-[11px] font-bold text-[#087766]">{labCredentialMessage}</p> : null}
             <button disabled={isSavingLabCredential} className="h-10 w-full rounded-md bg-[#0b6f61] text-[11px] font-black text-white disabled:opacity-60">
-              {isSavingLabCredential ? "Creating..." : "Create lab login"}
+              {isSavingLabCredential ? "Creating..." : "Create dashboard user"}
             </button>
           </form>
-          <div className="overflow-hidden rounded-md border border-[#e2ebe8]">
-            <div className="grid grid-cols-[1fr_130px_120px] gap-3 border-b border-[#edf2f1] bg-[#f8fbfa] px-3 py-2 text-[9px] font-black uppercase text-[#71817d]">
-              <span>User</span><span>Role</span><span>Mobile</span>
+          <div className="overflow-x-auto rounded-md border border-[#e2ebe8]">
+            <div className="grid min-w-[720px] grid-cols-[1fr_120px_minmax(180px,1fr)_110px] gap-3 border-b border-[#edf2f1] bg-[#f8fbfa] px-3 py-2 text-[9px] font-black uppercase text-[#71817d]">
+              <span>User</span><span>Role</span><span>Dashboard access</span><span>Mobile</span>
             </div>
             <div className="divide-y divide-[#edf2f1]">
               {labCredentials.length ? labCredentials.map((credential) => (
-                <div key={credential.id} className="grid grid-cols-[1fr_130px_120px] gap-3 px-3 py-3 text-[11px]">
+                <div key={credential.id} className="grid min-w-[720px] grid-cols-[1fr_120px_minmax(180px,1fr)_110px] gap-3 px-3 py-3 text-[11px]">
                   <div className="min-w-0"><p className="truncate font-black text-[#17302b]">{credential.name || credential.email || "Lab user"}</p><p className="mt-1 truncate text-[10px] font-semibold text-[#71817d]">{credential.email}</p></div>
                   <StatusPill tone={credential.role === "lab_admin" ? "green" : "neutral"}>{credential.role.replace("_", " ")}</StatusPill>
+                  <div className="flex flex-wrap gap-1">
+                    {(credential.workspaceAccess ?? ["lab"]).map((workspace) => (
+                      <span key={workspace} className="rounded bg-[#e8f8f3] px-2 py-1 text-[9px] font-black text-[#075b4e]">
+                        {workspace === "body_composition" ? "Body" : workspace[0].toUpperCase() + workspace.slice(1)}
+                      </span>
+                    ))}
+                  </div>
                   <p className="truncate font-bold text-[#53645f]">{credential.phone || "--"}</p>
                 </div>
-              )) : <AdminEmpty title="No lab credentials yet" description="Create the first staff login from this panel." />}
+              )) : <AdminEmpty title="No dashboard users yet" description="Create the first controlled user login from this panel." />}
             </div>
           </div>
         </div>

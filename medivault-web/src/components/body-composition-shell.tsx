@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { AuthSetupRequired, SessionLoading } from "@/components/auth-gate";
+import { AuthSetupRequired, SessionLoading, WorkspaceAccessDenied } from "@/components/auth-gate";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/mobile-shell";
+import { useWorkspaceAccess } from "@/components/use-workspace-access";
 
 const navigation = [
   { href: "/body-composition", icon: "analytics", label: "Dashboard" },
@@ -20,6 +21,7 @@ export function BodyCompositionShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { isConfigLoading, isConfigured, signOut, status, user } = useAuth();
+  const workspaceAccess = useWorkspaceAccess("body_composition");
   const [isOpeningLogin, setIsOpeningLogin] = useState(false);
 
   useEffect(() => {
@@ -28,11 +30,14 @@ export function BodyCompositionShell({ children }: { children: ReactNode }) {
     }
   }, [isConfigured, pathname, router, status]);
 
-  if (isConfigLoading || (isConfigured && (status === "loading" || status === "unauthenticated"))) {
+  if (isConfigLoading || (isConfigured && (status === "loading" || status === "unauthenticated")) || (status === "authenticated" && workspaceAccess.loading)) {
     return <SessionLoading />;
   }
   if (!isConfigured && process.env.NODE_ENV === "production") {
     return <AuthSetupRequired surface="body composition center" />;
+  }
+  if (isConfigured && status === "authenticated" && !workspaceAccess.allowed) {
+    return <WorkspaceAccessDenied workspace="Body Composition dashboard" />;
   }
 
   async function openLogin() {

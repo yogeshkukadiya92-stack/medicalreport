@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { AuthSetupRequired, SessionLoading } from "@/components/auth-gate";
+import { AuthSetupRequired, SessionLoading, WorkspaceAccessDenied } from "@/components/auth-gate";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/mobile-shell";
 import { SignOutButton } from "@/components/sign-out-button";
+import { useWorkspaceAccess } from "@/components/use-workspace-access";
 
 const labNav = [
   { href: "/lab", icon: "analytics", label: "Dashboard" },
@@ -29,6 +30,7 @@ export function LabShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { isConfigLoading, isConfigured, status } = useAuth();
+  const workspaceAccess = useWorkspaceAccess("lab");
   const requiresProductionAuth = process.env.NODE_ENV === "production";
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export function LabShell({ children }: { children: ReactNode }) {
     }
   }, [isConfigured, pathname, router, status]);
 
-  if (isConfigLoading) {
+  if (isConfigLoading || (status === "authenticated" && workspaceAccess.loading)) {
     return <SessionLoading />;
   }
 
@@ -49,6 +51,9 @@ export function LabShell({ children }: { children: ReactNode }) {
 
   if (isConfigured && (status === "loading" || status === "unauthenticated")) {
     return <SessionLoading />;
+  }
+  if (isConfigured && status === "authenticated" && !workspaceAccess.allowed) {
+    return <WorkspaceAccessDenied workspace="Lab dashboard" />;
   }
 
   return (

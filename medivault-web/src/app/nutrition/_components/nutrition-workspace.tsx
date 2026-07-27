@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AuthSetupRequired, SessionLoading } from "@/components/auth-gate";
+import { AuthSetupRequired, SessionLoading, WorkspaceAccessDenied } from "@/components/auth-gate";
 import { useAppData } from "@/components/app-data-provider";
 import { useAuth } from "@/components/auth-provider";
+import { useWorkspaceAccess } from "@/components/use-workspace-access";
 import { CountryPhoneInput } from "@/components/country-phone-input";
 import { Icon } from "@/components/mobile-shell";
 
@@ -529,6 +530,7 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
   const router = useRouter();
   const { familyMembers, reports } = useAppData();
   const { isConfigLoading, isConfigured, status } = useAuth();
+  const workspaceAccess = useWorkspaceAccess("nutrition");
   const [store, setStore] = useState<NutritionStore>({ clients: starterClients, customTemplates: emptyCustomTemplates, selectedClientId: starterClients[0]?.id ?? "" });
   const [isLoaded, setIsLoaded] = useState(false);
   const [query, setQuery] = useState("");
@@ -576,9 +578,10 @@ export function NutritionWorkspace({ section = "dashboard" }: { section?: Nutrit
     window.localStorage.setItem(storageKey, JSON.stringify(store));
   }, [isLoaded, store]);
 
-  if (isConfigLoading) return <SessionLoading />;
+  if (isConfigLoading || (status === "authenticated" && workspaceAccess.loading)) return <SessionLoading />;
   if (!isConfigured && process.env.NODE_ENV === "production") return <AuthSetupRequired surface="nutrition dashboard" />;
   if (isConfigured && (status === "loading" || status === "unauthenticated")) return <SessionLoading />;
+  if (isConfigured && status === "authenticated" && !workspaceAccess.allowed) return <WorkspaceAccessDenied workspace="Nutrition dashboard" />;
 
   const selectedClient = store.clients.find((client) => client.id === store.selectedClientId) ?? store.clients[0] ?? null;
   const selectedPhone = normalizePhone(selectedClient?.phone ?? "");

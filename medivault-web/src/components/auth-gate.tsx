@@ -27,3 +27,25 @@ export function SessionLoading() {
     </main>
   );
 }
+
+export function WorkspaceAccessDenied({ workspace }: { workspace: string }) {
+  return (
+    <main className="grid min-h-screen place-items-center bg-[#eef3f1] px-5 text-[#101c1c]">
+      <section className="w-full max-w-[520px] rounded-lg border border-[#dce9e5] bg-white p-6 shadow-[0_24px_70px_rgba(10,31,31,0.12)]">
+        <p className="text-[12px] font-black uppercase text-[#ba563d]">Access restricted</p>
+        <h1 className="mt-2 text-[25px] font-black leading-tight">Super Admin approval required</h1>
+        <p className="mt-3 text-[14px] leading-6 text-[#65716f]">
+          Your account does not have access to the {workspace}. Ask the Super Admin to enable this dashboard for your login.
+        </p>
+        <div className="mt-5 flex gap-3">
+          <Link href="/dashboard" className="inline-flex h-11 items-center justify-center rounded-lg bg-[#0a7d6e] px-4 text-[13px] font-bold text-white">
+            Open patient app
+          </Link>
+          <Link href="/login" className="inline-flex h-11 items-center justify-center rounded-lg border border-[#dce9e5] px-4 text-[13px] font-bold text-[#30413e]">
+            Switch account
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
+}

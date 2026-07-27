@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createManagedAuthUser } from "@/lib/auth-server";
 import { getAdminContext } from "@/lib/admin-server";
 import type { AuthUser } from "@/lib/auth-server";
-import type { LabRole, LabUser } from "@/lib/vault-types";
+import type { LabRole, LabUser, WorkspaceAccess } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
 
@@ -12,6 +12,7 @@ type LabUserInput = {
   password?: string;
   phone?: string;
   role?: LabRole;
+  workspaceAccess?: WorkspaceAccess[];
 };
 
 type LabCredentialRow = LabUser & {
@@ -20,6 +21,7 @@ type LabCredentialRow = LabUser & {
 };
 
 const allowedRoles: LabRole[] = ["lab_admin", "lab_staff", "pathologist", "technician", "collector", "cashier"];
+const allowedWorkspaces: WorkspaceAccess[] = ["lab", "nutrition", "body_composition"];
 
 function isoNow() {
   return new Date().toISOString();
@@ -45,6 +47,9 @@ async function listLabCredentials(context: Exclude<Awaited<ReturnType<typeof get
       email: user?.email,
       name: labUser.name || user?.name,
       phone: user?.phone,
+      workspaceAccess: labUser.userId === context.userId
+        ? ["lab", "nutrition", "body_composition"]
+        : labUser.workspaceAccess ?? ["lab"],
     };
   });
 }
@@ -63,6 +68,10 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as LabUserInput | null;
   const role = allowedRoles.includes(body?.role as LabRole) ? body?.role as LabRole : "lab_staff";
+  const workspaceAccess = allowedWorkspaces.filter((workspace) => body?.workspaceAccess?.includes(workspace));
+  if (!workspaceAccess.length) {
+    return NextResponse.json({ error: "Select at least one dashboard for this user." }, { status: 400 });
+  }
   const name = body?.name?.trim() || "";
 
   try {
@@ -78,6 +87,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       labId: context.lab.id,
       role,
+      workspaceAccess,
       name: name || user.name,
       createdAt: now,
       updatedAt: now,
@@ -89,6 +99,7 @@ export async function POST(request: NextRequest) {
         $set: {
           name: labUser.name,
           role,
+          workspaceAccess,
           updatedAt: now,
         },
         $setOnInsert: {
@@ -108,7 +119,7 @@ export async function POST(request: NextRequest) {
       entityType: "lab_user",
       id: `audit-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       labId: context.lab.id,
-      metadata: { email: user.email, role },
+      metadata: { email: user.email, role, workspaceAccess },
     });
 
     const labUsers = await listLabCredentials(context);
