@@ -157,7 +157,7 @@ export default function Dashboard() {
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#0d5c46] text-[11px] font-black text-white">{initials(activeMember?.name || "MediVault")}</span>
             <div className="min-w-0"><h1 className="truncate text-[20px] font-black text-[#17222b]">Unified Timeline</h1><p className="text-[10px] font-bold text-[#71817d]">All connected lab results</p></div>
           </div>
-          <SignOutButton />
+          <div className="flex items-center gap-2"><Link href="/privacy" aria-label="Privacy and access history" className="grid h-9 w-9 place-items-center rounded-md border border-[#d7e4e0] text-[#0d5c46]"><Icon name="shield" className="h-4 w-4" /></Link><SignOutButton /></div>
         </div>
       </header>
 

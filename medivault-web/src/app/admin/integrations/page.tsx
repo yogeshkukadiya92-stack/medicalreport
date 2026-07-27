@@ -64,6 +64,18 @@ const domainDetails = [
     endpoint: "GET /api/integrations/v1/body-composition/scans",
     scopes: ["body_composition.read", "body_composition.write"],
   },
+  {
+    title: "FHIR R4",
+    description: "DiagnosticReport, Observation and Specimen search Bundle.",
+    endpoint: "GET /api/integrations/v1/fhir",
+    scopes: ["lab.read"],
+  },
+  {
+    title: "HL7 v2 ORU",
+    description: "Analyzer or hospital result ingestion with MSH-10 deduplication.",
+    endpoint: "POST /api/integrations/v1/hl7",
+    scopes: ["lab.write"],
+  },
 ];
 
 function formatDate(value?: string) {

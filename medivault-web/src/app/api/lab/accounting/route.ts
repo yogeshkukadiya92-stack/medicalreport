@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLabContext } from "@/lib/lab-server";
+import { billingMetrics } from "@/lib/billing-rules";
 
 export const runtime = "nodejs";
 
@@ -24,18 +25,9 @@ export async function GET(request: NextRequest) {
     { projection: { _id: 0 } },
   ).sort({ createdAt: -1 }).limit(250).toArray();
 
-  const paid = invoices.filter((invoice) => invoice.status === "paid");
-  const outstanding = invoices.filter((invoice) => invoice.status !== "paid" && invoice.status !== "void");
-  const sum = (items: Invoice[]) => items.reduce((total, invoice) => total + (typeof invoice.amount === "number" ? invoice.amount : 0), 0);
-
   return NextResponse.json({
     invoices,
     lab: context.lab,
-    metrics: {
-      invoiceCount: invoices.length,
-      outstandingAmount: sum(outstanding),
-      paidAmount: sum(paid),
-      totalAmount: sum(invoices),
-    },
+    metrics: billingMetrics(invoices),
   });
 }

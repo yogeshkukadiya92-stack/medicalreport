@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { Db } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
+import { validatePasswordStrength } from "@/lib/auth-policy";
 
 export type AuthUser = {
   accountStatus?: "active" | "suspended";
@@ -296,9 +297,8 @@ export async function createAuthUserSession(input: { email: string; name?: strin
   if (!isValidPhone(phone)) {
     throw new Error("Enter a valid mobile number.");
   }
-  if (input.password.length < 6) {
-    throw new Error("Password must be at least 6 characters.");
-  }
+  const passwordError = validatePasswordStrength(input.password);
+  if (passwordError) throw new Error(passwordError);
 
   const db = await getMongoDb();
   await ensureAuthIndexes(db);
@@ -340,9 +340,8 @@ export async function createManagedAuthUser(input: { email: string; name?: strin
   if (!isValidPhone(phone)) {
     throw new Error("Enter a valid mobile number.");
   }
-  if (input.password.length < 6) {
-    throw new Error("Password must be at least 6 characters.");
-  }
+  const passwordError = validatePasswordStrength(input.password);
+  if (passwordError) throw new Error(passwordError);
   if (email === bootstrapAdminEmail) {
     throw new Error("Owner admin credentials are reserved.");
   }
@@ -431,9 +430,8 @@ export async function resetAuthUserPasswordWithOtp(input: { otp: string; passwor
   if (!verifyTestingAuthOtp(input.otp)) {
     throw new Error("Invalid OTP.");
   }
-  if (input.password.length < 6) {
-    throw new Error("Password must be at least 6 characters.");
-  }
+  const passwordError = validatePasswordStrength(input.password);
+  if (passwordError) throw new Error(passwordError);
 
   const { db, user } = await findUserByPhone(input.phone);
   if (!user) {
@@ -465,9 +463,8 @@ export async function updateManagedAuthUser(input: {
   userId: string;
 }) {
   if (!isMongoConfigured()) throw new Error("MongoDB is not configured.");
-  if (input.password !== undefined && input.password.length < 6) {
-    throw new Error("Password must be at least 6 characters.");
-  }
+  const passwordError = input.password === undefined ? "" : validatePasswordStrength(input.password);
+  if (passwordError) throw new Error(passwordError);
 
   const db = await getMongoDb();
   await ensureAuthIndexes(db);

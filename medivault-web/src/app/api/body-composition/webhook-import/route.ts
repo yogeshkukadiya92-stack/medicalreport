@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { handleBodyCompositionImport } from "@/app/api/body-composition/telegram-import/route";
+import { POST as handleBodyCompositionImport } from "@/app/api/body-composition/telegram-import/route";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -18,5 +18,5 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  return handleBodyCompositionImport(request, "webhook");
+  return handleBodyCompositionImport(request);
 }

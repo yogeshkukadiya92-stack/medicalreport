@@ -82,6 +82,10 @@ export type LabUser = {
   userId: string;
   labId: string;
   role: LabRole;
+  permissionOverrides?: {
+    allow?: string[];
+    deny?: string[];
+  };
   workspaceAccess?: WorkspaceAccess[];
   name?: string;
   createdAt: string;

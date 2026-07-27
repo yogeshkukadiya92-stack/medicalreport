@@ -217,7 +217,13 @@ export const labRolePermissions: Record<LabRole, LabPermission[]> = {
   collector: ["samples:collect", "analytics:view"],
 };
 
-export function hasLabPermission(role: LabRole, permission: LabPermission) {
+export function hasLabPermission(
+  role: LabRole,
+  permission: LabPermission,
+  overrides?: { allow?: string[]; deny?: string[] },
+) {
+  if (overrides?.deny?.includes(permission)) return false;
+  if (overrides?.allow?.includes(permission)) return true;
   return labRolePermissions[role]?.includes(permission) ?? false;
 }
 

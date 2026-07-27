@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
 import { GridFSBucket, ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "node:crypto";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
 import { normalizePhone } from "@/lib/lab-utils";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
@@ -84,6 +85,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (!file) {
     return NextResponse.json({ error: "File not found." }, { status: 404 });
   }
+  await db.collection("dataAccessLogs").insertOne({
+    action: "file_viewed",
+    createdAt: new Date().toISOString(),
+    id: `access-${crypto.randomUUID()}`,
+    resourceId: fileIdParam,
+    resourceName: file.filename || "Medical report",
+    userAgent: request.headers.get("user-agent")?.slice(0, 180),
+    userId,
+  });
 
   const stream = bucket.openDownloadStream(fileId);
   const webStream = Readable.toWeb(stream) as ReadableStream;

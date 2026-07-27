@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { AppDataProvider } from "@/components/app-data-provider";
 import { AuthProvider } from "@/components/auth-provider";
+import { LanguageProvider } from "@/components/language-provider";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +43,9 @@ export default function RootLayout({
     <html lang="en" data-scroll-behavior="smooth">
       <body>
         <AuthProvider>
-          <AppDataProvider>{children}</AppDataProvider>
+          <LanguageProvider>
+            <AppDataProvider>{children}</AppDataProvider>
+          </LanguageProvider>
         </AuthProvider>
       </body>
     </html>

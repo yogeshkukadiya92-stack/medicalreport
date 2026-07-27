@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
+import crypto from "node:crypto";
 
 export const runtime = "nodejs";
 
@@ -66,6 +67,14 @@ export async function POST(request: NextRequest) {
     },
     { upsert: true },
   );
+  await db.collection("consentAuditLogs").insertOne({
+    action: isGranted ? "granted" : "revoked",
+    consentType,
+    consentVersion,
+    createdAt: now,
+    id: `consent-audit-${crypto.randomUUID()}`,
+    userId,
+  });
 
   const consent = await db.collection("consents").findOne({ userId, consent_type: consentType }, { projection: { _id: 0 } });
   return NextResponse.json({ consent });

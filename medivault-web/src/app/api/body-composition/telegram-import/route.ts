@@ -49,7 +49,7 @@ function uploadFile(
   });
 }
 
-export async function handleBodyCompositionImport(
+async function handleBodyCompositionImport(
   request: NextRequest,
   source: "telegram" | "webhook" = "telegram",
 ) {
@@ -126,5 +126,6 @@ export async function handleBodyCompositionImport(
 }
 
 export async function POST(request: NextRequest) {
-  return handleBodyCompositionImport(request, "telegram");
+  const source = request.nextUrl.pathname.includes("webhook-import") ? "webhook" : "telegram";
+  return handleBodyCompositionImport(request, source);
 }

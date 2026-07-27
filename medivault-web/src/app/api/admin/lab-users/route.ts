@@ -3,6 +3,7 @@ import { createManagedAuthUser, revokeManagedAuthUserSessions, updateManagedAuth
 import { getAdminContext } from "@/lib/admin-server";
 import type { AuthUser } from "@/lib/auth-server";
 import type { LabRole, LabUser, WorkspaceAccess } from "@/lib/vault-types";
+import { labRolePermissions, type LabPermission } from "@/lib/normalized-health";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,10 @@ type LabUserInput = {
   email?: string;
   name?: string;
   password?: string;
+  permissionOverrides?: {
+    allow?: LabPermission[];
+    deny?: LabPermission[];
+  };
   phone?: string;
   role?: LabRole;
   workspaceAccess?: WorkspaceAccess[];
@@ -28,6 +33,14 @@ type LabCredentialRow = LabUser & {
 
 const allowedRoles: LabRole[] = ["lab_admin", "lab_staff", "pathologist", "technician", "collector", "cashier"];
 const allowedWorkspaces: WorkspaceAccess[] = ["lab", "nutrition", "body_composition"];
+const allowedPermissions = [...new Set(Object.values(labRolePermissions).flat())];
+
+function normalizePermissionOverrides(value: LabUserInput["permissionOverrides"]) {
+  if (!value) return undefined;
+  const allow = allowedPermissions.filter((permission) => value.allow?.includes(permission));
+  const deny = allowedPermissions.filter((permission) => value.deny?.includes(permission));
+  return { allow, deny };
+}
 
 function isoNow() {
   return new Date().toISOString();
@@ -108,6 +121,9 @@ export async function PATCH(request: NextRequest) {
       if (!workspaceAccess.length) return NextResponse.json({ error: "Select at least one dashboard." }, { status: 400 });
       updates.workspaceAccess = workspaceAccess;
     }
+    if (body?.permissionOverrides !== undefined) {
+      updates.permissionOverrides = normalizePermissionOverrides(body.permissionOverrides);
+    }
     await context.db.collection<LabUser>("labUsers").updateOne({ labId: context.lab.id, userId }, { $set: updates });
 
     if (body?.accountStatus || body?.password !== undefined) {
@@ -130,6 +146,7 @@ export async function PATCH(request: NextRequest) {
       metadata: {
         accountStatus: body?.accountStatus,
         role: body?.role,
+        permissionOverrides: body?.permissionOverrides,
         workspaceAccess: body?.workspaceAccess,
       },
     });
@@ -174,6 +191,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       labId: context.lab.id,
       role,
+      permissionOverrides: normalizePermissionOverrides(body?.permissionOverrides),
       workspaceAccess,
       name: name || user.name,
       createdAt: now,
@@ -186,6 +204,7 @@ export async function POST(request: NextRequest) {
         $set: {
           name: labUser.name,
           role,
+          permissionOverrides: labUser.permissionOverrides,
           workspaceAccess,
           updatedAt: now,
         },
@@ -206,7 +225,7 @@ export async function POST(request: NextRequest) {
       entityType: "lab_user",
       id: `audit-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       labId: context.lab.id,
-      metadata: { email: user.email, role, workspaceAccess },
+      metadata: { email: user.email, role, workspaceAccess, permissionOverrides: labUser.permissionOverrides },
     });
 
     const labUsers = await listLabCredentials(context);

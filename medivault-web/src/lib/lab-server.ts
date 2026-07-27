@@ -54,7 +54,7 @@ type LabCandidate = {
   reportCount: number;
 };
 
-async function findBestLabForUser(db: Db, userId: string): Promise<LabCandidate | null> {
+async function findBestLabForUser(db: Db, userId: string, preferredLabId?: string): Promise<LabCandidate | null> {
   const [memberships, ownedLabs, reportLabIds] = await Promise.all([
     db.collection<LabUser>("labUsers").find({ userId }, { projection: { _id: 0 } }).toArray(),
     db.collection<LabProfile>("labs").find({ ownerUserId: userId }, { projection: { _id: 0 } }).toArray(),
@@ -87,6 +87,10 @@ async function findBestLabForUser(db: Db, userId: string): Promise<LabCandidate 
     };
   }));
 
+  const preferred = preferredLabId
+    ? candidates.find((candidate) => candidate.lab.id === preferredLabId)
+    : undefined;
+  if (preferred) return preferred;
   return candidates.sort((left, right) => {
     if (right.reportCount !== left.reportCount) return right.reportCount - left.reportCount;
     if (right.activityCount !== left.activityCount) return right.activityCount - left.activityCount;
@@ -140,7 +144,8 @@ export async function getLabContext(request: NextRequest): Promise<LabContext> {
   const db = await getMongoDb();
   await ensureLabIndexes(db);
 
-  const candidate = await findBestLabForUser(db, userId);
+  const preferredLabId = request.cookies.get("medivault_lab_id")?.value?.trim();
+  const candidate = await findBestLabForUser(db, userId, preferredLabId);
   if (candidate) {
     const now = isoNow();
     const labUser = candidate.labUser ?? {
@@ -191,7 +196,7 @@ export async function addLabAuditLog(
 }
 
 export function requireLabPermission(labUser: LabUser, permission: LabPermission) {
-  if (hasLabPermission(labUser.role, permission)) return null;
+  if (hasLabPermission(labUser.role, permission, labUser.permissionOverrides)) return null;
   return {
     error: `Your ${labUser.role.replace("_", " ")} role cannot ${permission.replace(":", " ")}.`,
     status: 403,

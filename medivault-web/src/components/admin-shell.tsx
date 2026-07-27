@@ -7,6 +7,8 @@ import { AuthSetupRequired, SessionLoading } from "@/components/auth-gate";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/mobile-shell";
 import { SignOutButton } from "@/components/sign-out-button";
+import { LanguageSelect } from "@/components/language-provider";
+import { ClinicSwitcher } from "@/components/clinic-switcher";
 
 const adminNav = [
   { href: "/admin", icon: "analytics" as const, label: "Overview", exact: true },
@@ -118,6 +120,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <Link href="/admin/tasks" className="relative grid h-10 w-10 shrink-0 place-items-center rounded-md border border-[#d7e4e0] bg-white text-[#31504a]" aria-label="Open tasks">
                 <Icon name="bell" className="h-4 w-4" />
               </Link>
+              <LanguageSelect compact />
+              <ClinicSwitcher />
               <Link href="/lab/create" className="hidden h-10 items-center gap-2 rounded-md bg-[#0b6f61] px-4 text-[11px] font-black text-white sm:inline-flex">
                 <Icon name="upload" className="h-4 w-4" />New report
               </Link>
