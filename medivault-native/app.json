@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "MediVault",
+    "slug": "medivault",
+    "scheme": "medivault",
+    "version": "1.0.0",
+    "icon": "./assets/icon.png",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "in.yogeshaihub.medivault",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "MediVault uses the camera to scan your medical reports.",
+        "NSPhotoLibraryUsageDescription": "MediVault uses your photo library only when you select a medical report."
+      }
+    },
+    "android": {
+      "package": "in.yogeshaihub.medivault",
+      "adaptiveIcon": {
+        "backgroundColor": "#E8F4F0",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
+      "permissions": [
+        "CAMERA"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Select a medical report to add it to your private MediVault."
+        }
+      ],
+      "expo-asset",
+      "expo-font"
+    ],
+    "splash": {
+      "backgroundColor": "#E8F4F0",
+      "image": "./assets/splash.png",
+      "resizeMode": "contain"
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiUrl": "https://mr.yogeshaihub.in/api"
+    }
+  }
+}

@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "build": "cd medivault-web && npm ci && npm run build",
-    "start": "cd medivault-web && npm run start"
+    "start": "cd medivault-web && npm run start",
+    "mobile:start": "cd medivault-native && npm start",
+    "mobile:typecheck": "cd medivault-native && npm run typecheck"
   },
   "engines": {
     "node": ">=20"
