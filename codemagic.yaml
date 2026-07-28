@@ -13,7 +13,7 @@ workflows:
         XCODE_SCHEME: MediVault
         XCODE_WORKSPACE: MediVault.xcworkspace
       node: 22.14.0
-      xcode: 16.4
+      xcode: 26.2
       cocoapods: default
 
     scripts:
