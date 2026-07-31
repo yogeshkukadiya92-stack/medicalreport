@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createManagedAuthUser, revokeManagedAuthUserSessions, updateManagedAuthUser } from "@/lib/auth-server";
 import { getAdminContext } from "@/lib/admin-server";
 import type { AuthUser } from "@/lib/auth-server";
-import type { LabRole, LabUser, WorkspaceAccess } from "@/lib/vault-types";
+import type { LabRole, LabUser, WorkspaceAccess, WorkspaceRoleAssignments } from "@/lib/vault-types";
 import { labRolePermissions, type LabPermission } from "@/lib/normalized-health";
+import { normalizeWorkspaceRoles } from "@/lib/workspace-roles";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,7 @@ type LabUserInput = {
   phone?: string;
   role?: LabRole;
   workspaceAccess?: WorkspaceAccess[];
+  workspaceRoles?: WorkspaceRoleAssignments;
   userId?: string;
   revokeSessions?: boolean;
 };
@@ -85,6 +87,13 @@ async function listLabCredentials(context: Exclude<Awaited<ReturnType<typeof get
       workspaceAccess: labUser.userId === context.userId
         ? ["lab", "nutrition", "body_composition", "patient_app"]
         : labUser.workspaceAccess ?? ["lab"],
+      workspaceRoles: normalizeWorkspaceRoles(
+        labUser.userId === context.userId
+          ? ["lab", "nutrition", "body_composition", "patient_app"]
+          : labUser.workspaceAccess ?? ["lab"],
+        labUser.workspaceRoles,
+        labUser.role,
+      ),
     };
   });
 }
@@ -120,6 +129,8 @@ export async function PATCH(request: NextRequest) {
       const workspaceAccess = allowedWorkspaces.filter((workspace) => body.workspaceAccess?.includes(workspace));
       if (!workspaceAccess.length) return NextResponse.json({ error: "Select at least one dashboard." }, { status: 400 });
       updates.workspaceAccess = workspaceAccess;
+      updates.workspaceRoles = normalizeWorkspaceRoles(workspaceAccess, body.workspaceRoles, body.role ?? membership.role);
+      updates.role = (updates.workspaceRoles.lab as LabRole | undefined) ?? body.role ?? membership.role;
     }
     if (body?.permissionOverrides !== undefined) {
       updates.permissionOverrides = normalizePermissionOverrides(body.permissionOverrides);
@@ -148,6 +159,7 @@ export async function PATCH(request: NextRequest) {
         role: body?.role,
         permissionOverrides: body?.permissionOverrides,
         workspaceAccess: body?.workspaceAccess,
+        workspaceRoles: body?.workspaceRoles,
       },
     });
 
@@ -177,6 +189,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Select at least one app or dashboard for this user." }, { status: 400 });
   }
   const name = body?.name?.trim() || "";
+  const workspaceRoles = normalizeWorkspaceRoles(workspaceAccess, body?.workspaceRoles, role);
+  const labRole = (workspaceRoles.lab as LabRole | undefined) ?? role;
 
   try {
     const user = await createManagedAuthUser({
@@ -190,9 +204,10 @@ export async function POST(request: NextRequest) {
       id: `${context.lab.id}:${user.id}`,
       userId: user.id,
       labId: context.lab.id,
-      role,
+      role: labRole,
       permissionOverrides: normalizePermissionOverrides(body?.permissionOverrides),
       workspaceAccess,
+      workspaceRoles,
       name: name || user.name,
       createdAt: now,
       updatedAt: now,
@@ -203,9 +218,10 @@ export async function POST(request: NextRequest) {
       {
         $set: {
           name: labUser.name,
-          role,
+          role: labRole,
           permissionOverrides: labUser.permissionOverrides,
           workspaceAccess,
+          workspaceRoles,
           updatedAt: now,
         },
         $setOnInsert: {
@@ -225,7 +241,7 @@ export async function POST(request: NextRequest) {
       entityType: "lab_user",
       id: `audit-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       labId: context.lab.id,
-      metadata: { email: user.email, role, workspaceAccess, permissionOverrides: labUser.permissionOverrides },
+      metadata: { email: user.email, role: labRole, workspaceAccess, workspaceRoles, permissionOverrides: labUser.permissionOverrides },
     });
 
     const labUsers = await listLabCredentials(context);

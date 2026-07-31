@@ -6,8 +6,9 @@ import { AdminShell } from "@/components/admin-shell";
 import { useAuth } from "@/components/auth-provider";
 import { CountryPhoneInput } from "@/components/country-phone-input";
 import type { AdminDashboardPayload, AdminTask } from "@/lib/admin-types";
-import type { LabRole, WorkspaceAccess } from "@/lib/vault-types";
+import type { LabRole, WorkspaceAccess, WorkspaceRole, WorkspaceRoleAssignments } from "@/lib/vault-types";
 import { readNutritionAdminClients } from "@/lib/nutrition-admin";
+import { defaultWorkspaceRoles, workspaceRoleLabel, workspaceRoleOptions } from "@/lib/workspace-roles";
 import { AdminEmpty, AdminError, AdminPageHeader, AdminSkeleton, AdminStatCard, StatusPill } from "@/app/admin/_components/admin-ui";
 
 function formatDate(value?: string) {
@@ -37,9 +38,9 @@ type LabCredentialRow = {
   role: LabRole;
   updatedAt: string;
   workspaceAccess?: WorkspaceAccess[];
+  workspaceRoles?: WorkspaceRoleAssignments;
 };
 
-const labRoles: LabRole[] = ["lab_admin", "pathologist", "technician", "collector", "cashier", "lab_staff"];
 const workspaceOptions: { label: string; value: WorkspaceAccess }[] = [
   { label: "Lab", value: "lab" },
   { label: "Nutrition", value: "nutrition" },
@@ -53,6 +54,7 @@ const emptyLabCredentialForm = {
   phone: "",
   role: "lab_staff" as LabRole,
   workspaceAccess: ["lab"] as WorkspaceAccess[],
+  workspaceRoles: { lab: "lab_staff" } as WorkspaceRoleAssignments,
 };
 
 export default function AdminPage() {
@@ -268,18 +270,10 @@ export default function AdminPage() {
         </div>
         <div className="grid gap-4 p-4 xl:grid-cols-[420px_1fr]">
           <form onSubmit={createLabCredential} className="space-y-3 rounded-md border border-[#e2ebe8] bg-[#f8fbfa] p-3">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-[10px] font-black uppercase text-[#71817d]">Name</span>
-                <input value={labCredentialForm.name} onChange={(event) => setLabCredentialForm((current) => ({ ...current, name: event.target.value }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold" placeholder="Staff name" />
-              </label>
-              <label className="block">
-                <span className="text-[10px] font-black uppercase text-[#71817d]">Role</span>
-                <select value={labCredentialForm.role} onChange={(event) => setLabCredentialForm((current) => ({ ...current, role: event.target.value as LabRole }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold">
-                  {labRoles.map((role) => <option key={role} value={role}>{role.replace("_", " ")}</option>)}
-                </select>
-              </label>
-            </div>
+            <label className="block">
+              <span className="text-[10px] font-black uppercase text-[#71817d]">Name</span>
+              <input value={labCredentialForm.name} onChange={(event) => setLabCredentialForm((current) => ({ ...current, name: event.target.value }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold" placeholder="User name" />
+            </label>
             <label className="block">
               <span className="text-[10px] font-black uppercase text-[#71817d]">Email</span>
               <input type="email" required value={labCredentialForm.email} onChange={(event) => setLabCredentialForm((current) => ({ ...current, email: event.target.value }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold" placeholder="staff@example.com" />
@@ -299,6 +293,9 @@ export default function AdminPage() {
                           workspaceAccess: event.target.checked
                             ? [...current.workspaceAccess, option.value]
                             : current.workspaceAccess.filter((workspace) => workspace !== option.value),
+                          workspaceRoles: event.target.checked
+                            ? { ...current.workspaceRoles, [option.value]: current.workspaceRoles[option.value] ?? defaultWorkspaceRoles[option.value] }
+                            : Object.fromEntries(Object.entries(current.workspaceRoles).filter(([workspace]) => workspace !== option.value)) as WorkspaceRoleAssignments,
                         }))}
                         className="h-4 w-4 accent-[#0b8c78]"
                       />
@@ -308,6 +305,29 @@ export default function AdminPage() {
                 })}
               </div>
             </fieldset>
+            {labCredentialForm.workspaceAccess.length ? (
+              <fieldset>
+                <legend className="text-[10px] font-black uppercase text-[#71817d]">Role for each selected access</legend>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {workspaceOptions.filter((option) => labCredentialForm.workspaceAccess.includes(option.value)).map((option) => (
+                    <label key={option.value} className="block">
+                      <span className="text-[9px] font-black text-[#64736f]">{option.label}</span>
+                      <select
+                        value={labCredentialForm.workspaceRoles[option.value] ?? defaultWorkspaceRoles[option.value]}
+                        onChange={(event) => setLabCredentialForm((current) => ({
+                          ...current,
+                          role: option.value === "lab" ? event.target.value as LabRole : current.role,
+                          workspaceRoles: { ...current.workspaceRoles, [option.value]: event.target.value as WorkspaceRole },
+                        }))}
+                        className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] bg-white px-3 text-[11px] font-bold"
+                      >
+                        {workspaceRoleOptions[option.value].map((role) => <option key={role} value={role}>{workspaceRoleLabel(role)}</option>)}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
             <CountryPhoneInput
               label="Mobile"
               required
@@ -336,7 +356,13 @@ export default function AdminPage() {
               {labCredentials.length ? labCredentials.map((credential) => (
                 <div key={credential.id} className="grid min-w-[720px] grid-cols-[1fr_120px_minmax(180px,1fr)_110px] gap-3 px-3 py-3 text-[11px]">
                   <div className="min-w-0"><p className="truncate font-black text-[#17302b]">{credential.name || credential.email || "Lab user"}</p><p className="mt-1 truncate text-[10px] font-semibold text-[#71817d]">{credential.email}</p></div>
-                  <StatusPill tone={credential.role === "lab_admin" ? "green" : "neutral"}>{credential.role.replace("_", " ")}</StatusPill>
+                  <div className="flex flex-col gap-1">
+                    {(credential.workspaceAccess ?? ["lab"]).map((workspace) => (
+                      <StatusPill key={workspace} tone={credential.workspaceRoles?.[workspace]?.endsWith("admin") ? "green" : "neutral"}>
+                        {workspaceRoleLabel(credential.workspaceRoles?.[workspace] ?? (workspace === "lab" ? credential.role : defaultWorkspaceRoles[workspace]))}
+                      </StatusPill>
+                    ))}
+                  </div>
                   <div className="flex flex-wrap gap-1">
                     {(credential.workspaceAccess ?? ["lab"]).map((workspace) => (
                       <span key={workspace} className="rounded bg-[#e8f8f3] px-2 py-1 text-[9px] font-black text-[#075b4e]">

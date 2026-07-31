@@ -6,6 +6,17 @@ import { validatePasswordStrength } from "../src/lib/auth-policy";
 import { parseHl7Oru } from "../src/lib/hl7";
 import { hasLabPermission } from "../src/lib/normalized-health";
 import { createShareToken, hashShareToken } from "../src/lib/secure-share";
+import { normalizeWorkspaceRoles } from "../src/lib/workspace-roles";
+
+test("workspace roles are limited to the selected app or dashboard", () => {
+  assert.deepEqual(normalizeWorkspaceRoles(
+    ["nutrition", "patient_app"],
+    { nutrition: "dietitian", patient_app: "technician" },
+  ), {
+    nutrition: "dietitian",
+    patient_app: "patient",
+  });
+});
 
 test("owner admin can recover a missing dashboard workspace", async () => {
   const updates: Array<{ collection: string; filter: unknown; update: unknown }> = [];
@@ -36,6 +47,15 @@ test("owner admin can recover a missing dashboard workspace", async () => {
   assert.deepEqual(
     (updates[1]?.update as { $set: { workspaceAccess: string[] } }).$set.workspaceAccess,
     ["lab", "nutrition", "body_composition", "patient_app"],
+  );
+  assert.deepEqual(
+    (updates[1]?.update as { $set: { workspaceRoles: Record<string, string> } }).$set.workspaceRoles,
+    {
+      body_composition: "body_composition_admin",
+      lab: "lab_admin",
+      nutrition: "nutrition_admin",
+      patient_app: "patient",
+    },
   );
 });
 

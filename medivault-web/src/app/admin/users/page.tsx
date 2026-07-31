@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminShell } from "@/components/admin-shell";
 import { useAuth } from "@/components/auth-provider";
 import { AdminEmpty, AdminError, AdminPageHeader, AdminSkeleton, AdminStatCard, StatusPill } from "@/app/admin/_components/admin-ui";
-import type { LabRole, WorkspaceAccess } from "@/lib/vault-types";
+import type { LabRole, WorkspaceAccess, WorkspaceRole, WorkspaceRoleAssignments } from "@/lib/vault-types";
+import { defaultWorkspaceRoles, workspaceRoleLabel, workspaceRoleOptions } from "@/lib/workspace-roles";
 
 type DashboardUser = {
   accountStatus?: "active" | "suspended";
@@ -20,9 +21,9 @@ type DashboardUser = {
   updatedAt: string;
   userId: string;
   workspaceAccess?: WorkspaceAccess[];
+  workspaceRoles?: WorkspaceRoleAssignments;
 };
 
-const roles: LabRole[] = ["lab_admin", "pathologist", "technician", "collector", "cashier", "lab_staff"];
 const workspaceOptions: { label: string; value: WorkspaceAccess }[] = [
   { label: "Lab", value: "lab" },
   { label: "Nutrition", value: "nutrition" },
@@ -154,15 +155,43 @@ export default function AdminUsersPage() {
             <div>
               <div className="border-b border-[#e8efed] p-4"><p className="text-[10px] font-black uppercase text-[#087766]">Edit access</p><h2 className="mt-1 truncate text-[16px] font-black">{selected.name || selected.email}</h2><p className="mt-1 text-[10px] font-semibold text-[#71817d]">Last active {formatDate(selected.lastSeenAt)}</p></div>
               <div className="space-y-4 p-4">
-                <label className="block"><span className="text-[10px] font-black uppercase text-[#71817d]">Role</span><select disabled={selectedIsOwner || isSaving} value={selected.role} onChange={(event) => setSelected((current) => current ? { ...current, role: event.target.value as LabRole } : current)} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[11px] font-bold disabled:bg-[#edf2f1]">{roles.map((role) => <option key={role} value={role}>{role.replace("_", " ")}</option>)}</select></label>
                 <fieldset disabled={selectedIsOwner || isSaving}>
-                  <legend className="text-[10px] font-black uppercase text-[#71817d]">Dashboard access</legend>
+                  <legend className="text-[10px] font-black uppercase text-[#71817d]">App & dashboard access</legend>
                   <div className="mt-2 space-y-2">{workspaceOptions.map((option) => {
                     const checked = (selected.workspaceAccess ?? ["lab"]).includes(option.value);
-                    return <label key={option.value} className="flex h-10 items-center gap-2 rounded-md border border-[#d5e2de] px-3 text-[10px] font-black"><input type="checkbox" checked={checked} onChange={(event) => setSelected((current) => current ? { ...current, workspaceAccess: event.target.checked ? [...(current.workspaceAccess ?? ["lab"]), option.value] : (current.workspaceAccess ?? ["lab"]).filter((workspace) => workspace !== option.value) } : current)} className="h-4 w-4 accent-[#0b8c78]" />{option.label}</label>;
+                    return <label key={option.value} className="flex h-10 items-center gap-2 rounded-md border border-[#d5e2de] px-3 text-[10px] font-black"><input type="checkbox" checked={checked} onChange={(event) => setSelected((current) => current ? {
+                      ...current,
+                      workspaceAccess: event.target.checked ? [...(current.workspaceAccess ?? ["lab"]), option.value] : (current.workspaceAccess ?? ["lab"]).filter((workspace) => workspace !== option.value),
+                      workspaceRoles: event.target.checked
+                        ? { ...current.workspaceRoles, [option.value]: current.workspaceRoles?.[option.value] ?? defaultWorkspaceRoles[option.value] }
+                        : Object.fromEntries(Object.entries(current.workspaceRoles ?? {}).filter(([workspace]) => workspace !== option.value)) as WorkspaceRoleAssignments,
+                    } : current)} className="h-4 w-4 accent-[#0b8c78]" />{option.label}</label>;
                   })}</div>
                 </fieldset>
-                <button type="button" disabled={selectedIsOwner || isSaving} onClick={() => patchUser({ role: selected.role, workspaceAccess: selected.workspaceAccess ?? ["lab"] }, "Role and dashboard access updated.")} className="h-10 w-full rounded-md bg-[#0b6f61] text-[10px] font-black text-white disabled:opacity-50">Save access</button>
+                {(selected.workspaceAccess ?? ["lab"]).length ? (
+                  <fieldset disabled={selectedIsOwner || isSaving}>
+                    <legend className="text-[10px] font-black uppercase text-[#71817d]">Roles by selected access</legend>
+                    <div className="mt-2 space-y-2">
+                      {workspaceOptions.filter((option) => (selected.workspaceAccess ?? ["lab"]).includes(option.value)).map((option) => (
+                        <label key={option.value} className="block">
+                          <span className="text-[9px] font-black text-[#64736f]">{option.label}</span>
+                          <select
+                            value={selected.workspaceRoles?.[option.value] ?? (option.value === "lab" ? selected.role : defaultWorkspaceRoles[option.value])}
+                            onChange={(event) => setSelected((current) => current ? {
+                              ...current,
+                              role: option.value === "lab" ? event.target.value as LabRole : current.role,
+                              workspaceRoles: { ...current.workspaceRoles, [option.value]: event.target.value as WorkspaceRole },
+                            } : current)}
+                            className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] bg-white px-3 text-[11px] font-bold disabled:bg-[#edf2f1]"
+                          >
+                            {workspaceRoleOptions[option.value].map((role) => <option key={role} value={role}>{workspaceRoleLabel(role)}</option>)}
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                ) : null}
+                <button type="button" disabled={selectedIsOwner || isSaving || !(selected.workspaceAccess ?? []).length} onClick={() => patchUser({ role: selected.role, workspaceAccess: selected.workspaceAccess ?? ["lab"], workspaceRoles: selected.workspaceRoles }, "Roles and access updated.")} className="h-10 w-full rounded-md bg-[#0b6f61] text-[10px] font-black text-white disabled:opacity-50">Save roles & access</button>
 
                 <div className="border-t border-[#e8efed] pt-4">
                   <label className="block"><span className="text-[10px] font-black uppercase text-[#71817d]">Temporary password</span><input type="password" minLength={6} disabled={selectedIsOwner || isSaving} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Minimum 6 characters" className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[11px] font-bold disabled:bg-[#edf2f1]" /></label>

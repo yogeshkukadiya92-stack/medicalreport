@@ -59,6 +59,19 @@ export type VaultSnapshot = {
 
 export type LabRole = "lab_admin" | "lab_staff" | "pathologist" | "technician" | "cashier" | "collector";
 export type WorkspaceAccess = "body_composition" | "lab" | "nutrition" | "patient_app";
+export type WorkspaceRole =
+  | LabRole
+  | "body_composition_admin"
+  | "body_composition_specialist"
+  | "caregiver"
+  | "dietitian"
+  | "family_member"
+  | "nutrition_admin"
+  | "nutrition_coach"
+  | "nutritionist"
+  | "patient"
+  | "trainer";
+export type WorkspaceRoleAssignments = Partial<Record<WorkspaceAccess, WorkspaceRole>>;
 
 export type LabProfile = {
   id: string;
@@ -87,6 +100,7 @@ export type LabUser = {
     deny?: string[];
   };
   workspaceAccess?: WorkspaceAccess[];
+  workspaceRoles?: WorkspaceRoleAssignments;
   name?: string;
   createdAt: string;
   updatedAt: string;
