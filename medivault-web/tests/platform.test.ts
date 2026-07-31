@@ -1,10 +1,43 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { ensureBootstrapAdminWorkspace } from "../src/lib/auth-server";
 import { billingMetrics } from "../src/lib/billing-rules";
 import { validatePasswordStrength } from "../src/lib/auth-policy";
 import { parseHl7Oru } from "../src/lib/hl7";
 import { hasLabPermission } from "../src/lib/normalized-health";
 import { createShareToken, hashShareToken } from "../src/lib/secure-share";
+
+test("owner admin can recover a missing dashboard workspace", async () => {
+  const updates: Array<{ collection: string; filter: unknown; update: unknown }> = [];
+  const db = {
+    collection(name: string) {
+      return {
+        async updateOne(filter: unknown, update: unknown) {
+          updates.push({ collection: name, filter, update });
+        },
+      };
+    },
+  };
+  const now = new Date().toISOString();
+  const ownerEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL || "yogeshkukadiya92@gmail.com").trim().toLowerCase();
+
+  await ensureBootstrapAdminWorkspace(db as never, {
+    createdAt: now,
+    email: ownerEmail,
+    id: "existing-owner-user",
+    updatedAt: now,
+  });
+
+  assert.deepEqual(updates.map((item) => item.collection), ["labs", "labUsers"]);
+  assert.deepEqual(updates[1]?.filter, {
+    labId: updates[0] && (updates[0].filter as { id: string }).id,
+    userId: "existing-owner-user",
+  });
+  assert.deepEqual(
+    (updates[1]?.update as { $set: { workspaceAccess: string[] } }).$set.workspaceAccess,
+    ["lab", "nutrition", "body_composition"],
+  );
+});
 
 test("secure share tokens are random and hashes are stable", () => {
   const first = createShareToken();

@@ -1,8 +1,9 @@
 import type { Db } from "mongodb";
 import type { NextRequest } from "next/server";
 import type { AdminClientSummary, AdminReportRow, AdminTask } from "@/lib/admin-types";
-import { isBootstrapAdminUser } from "@/lib/auth-server";
+import { ensureBootstrapAdminWorkspace, getAuthenticatedUser, isBootstrapAdminUser } from "@/lib/auth-server";
 import { getLabContext } from "@/lib/lab-server";
+import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
 import type { LabClient, LabReport } from "@/lib/vault-types";
 
 type AdminContext = Exclude<Awaited<ReturnType<typeof getLabContext>>, { error: string; status: number }>;
@@ -27,8 +28,17 @@ type ReportLink = { labReportId?: string; state?: string };
 type CriticalAcknowledgement = { markerName?: string; reportId?: string };
 
 export async function getAdminContext(request: NextRequest) {
-  const context = await getLabContext(request);
-  if ("error" in context) return context;
+  let context = await getLabContext(request);
+  if ("error" in context) {
+    if (context.status !== 403 || !isMongoConfigured()) return context;
+
+    const owner = await getAuthenticatedUser(request);
+    if (!owner || !isBootstrapAdminUser(owner)) return context;
+
+    await ensureBootstrapAdminWorkspace(await getMongoDb(), owner);
+    context = await getLabContext(request);
+    if ("error" in context) return context;
+  }
 
   const authUser = await context.db.collection<{ email: string; id: string }>("authUsers").findOne(
     { id: context.userId },

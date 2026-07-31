@@ -196,6 +196,46 @@ async function ensureBootstrapAdmin(db: Db, password: string) {
   );
 }
 
+export async function ensureBootstrapAdminWorkspace(db: Db, user: AuthUser) {
+  if (!isBootstrapAdminUser(user)) {
+    throw new Error("Only the owner admin can initialize the admin workspace.");
+  }
+
+  const now = new Date().toISOString();
+  await db.collection("labs").updateOne(
+    { id: bootstrapAdminLabId },
+    {
+      $set: {
+        ownerUserId: user.id,
+        updatedAt: now,
+      },
+      $setOnInsert: {
+        createdAt: now,
+        id: bootstrapAdminLabId,
+        name: "MediVault Lab",
+      },
+    },
+    { upsert: true },
+  );
+  await db.collection("labUsers").updateOne(
+    { labId: bootstrapAdminLabId, userId: user.id },
+    {
+      $set: {
+        role: "lab_admin",
+        workspaceAccess: ["lab", "nutrition", "body_composition"],
+        updatedAt: now,
+      },
+      $setOnInsert: {
+        createdAt: now,
+        id: `${bootstrapAdminLabId}:${user.id}`,
+        labId: bootstrapAdminLabId,
+        userId: user.id,
+      },
+    },
+    { upsert: true },
+  );
+}
+
 function createToken() {
   return crypto.randomBytes(32).toString("base64url");
 }

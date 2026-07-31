@@ -319,7 +319,7 @@ export default function AdminPage() {
             />
             <label className="block">
               <span className="text-[10px] font-black uppercase text-[#71817d]">Password</span>
-              <input type="password" required minLength={6} value={labCredentialForm.password} onChange={(event) => setLabCredentialForm((current) => ({ ...current, password: event.target.value }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold" placeholder="Minimum 6 characters" />
+              <input type="password" required minLength={8} pattern="(?=.*[A-Za-z])(?=.*\d).{8,}" title="Use at least 8 characters with one letter and one number." value={labCredentialForm.password} onChange={(event) => setLabCredentialForm((current) => ({ ...current, password: event.target.value }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold" placeholder="8+ characters, letter and number" />
             </label>
             {labCredentialError ? <p className="rounded-md bg-[#fff0ec] p-2 text-[11px] font-bold text-[#ba563d]">{labCredentialError}</p> : null}
             {labCredentialMessage ? <p className="rounded-md bg-[#eaf9f2] p-2 text-[11px] font-bold text-[#087766]">{labCredentialMessage}</p> : null}
