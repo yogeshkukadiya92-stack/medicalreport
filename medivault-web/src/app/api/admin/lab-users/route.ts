@@ -32,7 +32,7 @@ type LabCredentialRow = LabUser & {
 };
 
 const allowedRoles: LabRole[] = ["lab_admin", "lab_staff", "pathologist", "technician", "collector", "cashier"];
-const allowedWorkspaces: WorkspaceAccess[] = ["lab", "nutrition", "body_composition"];
+const allowedWorkspaces: WorkspaceAccess[] = ["lab", "nutrition", "body_composition", "patient_app"];
 const allowedPermissions = [...new Set(Object.values(labRolePermissions).flat())];
 
 function normalizePermissionOverrides(value: LabUserInput["permissionOverrides"]) {
@@ -83,7 +83,7 @@ async function listLabCredentials(context: Exclude<Awaited<ReturnType<typeof get
       phone: user?.phone,
       sessionCount: userSessions.length,
       workspaceAccess: labUser.userId === context.userId
-        ? ["lab", "nutrition", "body_composition"]
+        ? ["lab", "nutrition", "body_composition", "patient_app"]
         : labUser.workspaceAccess ?? ["lab"],
     };
   });
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
   const role = allowedRoles.includes(body?.role as LabRole) ? body?.role as LabRole : "lab_staff";
   const workspaceAccess = allowedWorkspaces.filter((workspace) => body?.workspaceAccess?.includes(workspace));
   if (!workspaceAccess.length) {
-    return NextResponse.json({ error: "Select at least one dashboard for this user." }, { status: 400 });
+    return NextResponse.json({ error: "Select at least one app or dashboard for this user." }, { status: 400 });
   }
   const name = body?.name?.trim() || "";
 

@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (isBootstrapAdminUser(user)) {
-    return NextResponse.json({ workspaceAccess: ["lab", "nutrition", "body_composition"] satisfies WorkspaceAccess[] });
+    return NextResponse.json({ workspaceAccess: ["lab", "nutrition", "body_composition", "patient_app"] satisfies WorkspaceAccess[] });
   }
 
   const db = await getMongoDb();

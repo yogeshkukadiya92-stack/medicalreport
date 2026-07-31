@@ -35,7 +35,7 @@ test("owner admin can recover a missing dashboard workspace", async () => {
   });
   assert.deepEqual(
     (updates[1]?.update as { $set: { workspaceAccess: string[] } }).$set.workspaceAccess,
-    ["lab", "nutrition", "body_composition"],
+    ["lab", "nutrition", "body_composition", "patient_app"],
   );
 });
 

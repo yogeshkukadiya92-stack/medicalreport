@@ -27,6 +27,7 @@ const workspaceOptions: { label: string; value: WorkspaceAccess }[] = [
   { label: "Lab", value: "lab" },
   { label: "Nutrition", value: "nutrition" },
   { label: "Body composition", value: "body_composition" },
+  { label: "Patient mobile app", value: "patient_app" },
 ];
 
 function formatDate(value?: string) {
@@ -140,7 +141,7 @@ export default function AdminUsersPage() {
                 <button key={item.id} type="button" onClick={() => { setSelected(item); setMessage(""); setNewPassword(""); }} className={`grid w-full gap-2 p-4 text-left hover:bg-[#f7fbfa] sm:grid-cols-[minmax(0,1fr)_110px_150px_90px] sm:items-center ${selected?.userId === item.userId ? "bg-[#f0faf7]" : ""}`}>
                   <div className="min-w-0"><p className="truncate text-[12px] font-black">{item.name || item.email || "Dashboard user"}</p><p className="mt-1 truncate text-[10px] font-semibold text-[#71817d]">{item.email} · {item.phone || "No mobile"}</p></div>
                   <StatusPill tone={(item.accountStatus ?? "active") === "active" ? "green" : "critical"}>{item.accountStatus ?? "active"}</StatusPill>
-                  <p className="text-[10px] font-bold text-[#53645f]">{(item.workspaceAccess ?? ["lab"]).map((workspace) => workspace === "body_composition" ? "Body" : workspace).join(", ")}</p>
+                  <p className="text-[10px] font-bold text-[#53645f]">{(item.workspaceAccess ?? ["lab"]).map((workspace) => workspace === "body_composition" ? "Body" : workspace === "patient_app" ? "Mobile App" : workspace).join(", ")}</p>
                   <p className="text-[10px] font-bold text-[#53645f]">{item.sessionCount ?? 0} sessions</p>
                 </button>
               ))}

@@ -44,6 +44,7 @@ const workspaceOptions: { label: string; value: WorkspaceAccess }[] = [
   { label: "Lab", value: "lab" },
   { label: "Nutrition", value: "nutrition" },
   { label: "Body composition", value: "body_composition" },
+  { label: "Patient mobile app", value: "patient_app" },
 ];
 const emptyLabCredentialForm = {
   email: "",
@@ -263,7 +264,7 @@ export default function AdminPage() {
         <div className="flex flex-col gap-1 border-b border-[#e8efed] p-4">
           <p className="text-[10px] font-black uppercase text-[#087766]">Owner controlled access</p>
           <h2 className="text-[15px] font-black text-[#17302b]">Dashboard users</h2>
-          <p className="text-[10px] font-semibold text-[#71817d]">Only the Super Admin can create users and enable Lab, Nutrition, or Body Composition access.</p>
+          <p className="text-[10px] font-semibold text-[#71817d]">Only the Super Admin can create users and enable Patient App, Lab, Nutrition, or Body Composition access.</p>
         </div>
         <div className="grid gap-4 p-4 xl:grid-cols-[420px_1fr]">
           <form onSubmit={createLabCredential} className="space-y-3 rounded-md border border-[#e2ebe8] bg-[#f8fbfa] p-3">
@@ -284,8 +285,8 @@ export default function AdminPage() {
               <input type="email" required value={labCredentialForm.email} onChange={(event) => setLabCredentialForm((current) => ({ ...current, email: event.target.value }))} className="mt-1 h-10 w-full rounded-md border border-[#d5e2de] px-3 text-[12px] font-bold" placeholder="staff@example.com" />
             </label>
             <fieldset>
-              <legend className="text-[10px] font-black uppercase text-[#71817d]">Dashboard access</legend>
-              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              <legend className="text-[10px] font-black uppercase text-[#71817d]">App & dashboard access</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {workspaceOptions.map((option) => {
                   const checked = labCredentialForm.workspaceAccess.includes(option.value);
                   return (
@@ -339,7 +340,7 @@ export default function AdminPage() {
                   <div className="flex flex-wrap gap-1">
                     {(credential.workspaceAccess ?? ["lab"]).map((workspace) => (
                       <span key={workspace} className="rounded bg-[#e8f8f3] px-2 py-1 text-[9px] font-black text-[#075b4e]">
-                        {workspace === "body_composition" ? "Body" : workspace[0].toUpperCase() + workspace.slice(1)}
+                        {workspace === "body_composition" ? "Body" : workspace === "patient_app" ? "Mobile App" : workspace[0].toUpperCase() + workspace.slice(1)}
                       </span>
                     ))}
                   </div>

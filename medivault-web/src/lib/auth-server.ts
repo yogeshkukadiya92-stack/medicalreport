@@ -222,7 +222,7 @@ export async function ensureBootstrapAdminWorkspace(db: Db, user: AuthUser) {
     {
       $set: {
         role: "lab_admin",
-        workspaceAccess: ["lab", "nutrition", "body_composition"],
+        workspaceAccess: ["lab", "nutrition", "body_composition", "patient_app"],
         updatedAt: now,
       },
       $setOnInsert: {

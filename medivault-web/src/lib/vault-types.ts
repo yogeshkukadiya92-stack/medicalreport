@@ -58,7 +58,7 @@ export type VaultSnapshot = {
 };
 
 export type LabRole = "lab_admin" | "lab_staff" | "pathologist" | "technician" | "cashier" | "collector";
-export type WorkspaceAccess = "body_composition" | "lab" | "nutrition";
+export type WorkspaceAccess = "body_composition" | "lab" | "nutrition" | "patient_app";
 
 export type LabProfile = {
   id: string;
