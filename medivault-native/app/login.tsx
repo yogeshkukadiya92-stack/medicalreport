@@ -6,19 +6,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiRequest } from "@/api";
 import { useAuth } from "@/auth-context";
 import { PrimaryButton } from "@/components";
+import { isValidLoginIdentifier, normalizeLoginIdentifier } from "@/login-identifier";
 import { colors, radius } from "@/theme";
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { error, isLoading, signIn, signInWithOtp } = useAuth();
   const [mode, setMode] = useState<"password" | "otp">("password");
-  const [phone, setPhone] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [secret, setSecret] = useState("");
   const [message, setMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   async function submit() {
-    const normalized = `+91${phone.replace(/\D/g, "").slice(-10)}`;
+    const normalized = normalizeLoginIdentifier(identifier);
     if (mode === "otp") await signInWithOtp(normalized, secret);
     else await signIn(normalized, secret);
     router.replace("/(tabs)");
@@ -28,7 +29,7 @@ export default function LoginScreen() {
     setMessage("");
     try {
       const result = await apiRequest<{ message?: string }>("/auth/request-otp", {
-        body: JSON.stringify({ phone: `+91${phone.replace(/\D/g, "").slice(-10)}`, purpose: "login" }),
+        body: JSON.stringify({ phone: normalizeLoginIdentifier(identifier), purpose: "login" }),
         method: "POST",
       });
       setMessage(result.message || "OTP sent.");
@@ -42,17 +43,21 @@ export default function LoginScreen() {
       <View style={styles.brand}><View style={styles.logo}><Ionicons name="shield-checkmark-outline" size={28} color="#fff" /></View><Text style={styles.brandName}>MediVault</Text><Text style={styles.brandCopy}>Your private medical history, connected across reports, clinics and family.</Text></View>
       <View style={styles.panel}>
         <View style={styles.segment}>
-          <Pressable onPress={() => { setMode("password"); setSecret(""); }} style={[styles.segmentButton, mode === "password" && styles.segmentActive]}><Text style={[styles.segmentText, mode === "password" && styles.segmentTextActive]}>Password</Text></Pressable>
-          <Pressable onPress={() => { setMode("otp"); setSecret(""); }} style={[styles.segmentButton, mode === "otp" && styles.segmentActive]}><Text style={[styles.segmentText, mode === "otp" && styles.segmentTextActive]}>Mobile OTP</Text></Pressable>
+          <Pressable onPress={() => { setMode("password"); setIdentifier(""); setSecret(""); }} style={[styles.segmentButton, mode === "password" && styles.segmentActive]}><Text style={[styles.segmentText, mode === "password" && styles.segmentTextActive]}>Password</Text></Pressable>
+          <Pressable onPress={() => { setMode("otp"); setIdentifier(""); setSecret(""); }} style={[styles.segmentButton, mode === "otp" && styles.segmentActive]}><Text style={[styles.segmentText, mode === "otp" && styles.segmentTextActive]}>Mobile OTP</Text></Pressable>
         </View>
-        <Text style={styles.label}>Mobile number</Text>
-        <View style={styles.phoneRow}><View style={styles.country}><Text style={styles.countryText}>India +91</Text></View><TextInput accessibilityLabel="Mobile number" keyboardType="phone-pad" maxLength={10} onChangeText={setPhone} placeholder="9876543210" placeholderTextColor="#93A29E" style={[styles.input, { flex: 1 }]} value={phone} /></View>
+        <Text style={styles.label}>{mode === "password" ? "Email or mobile number" : "Mobile number"}</Text>
+        {mode === "password" ? (
+          <TextInput accessibilityLabel="Email or mobile number" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" onChangeText={setIdentifier} placeholder="name@example.com or 9876543210" placeholderTextColor="#93A29E" style={styles.input} value={identifier} />
+        ) : (
+          <View style={styles.phoneRow}><View style={styles.country}><Text style={styles.countryText}>India +91</Text></View><TextInput accessibilityLabel="Mobile number" keyboardType="phone-pad" maxLength={10} onChangeText={setIdentifier} placeholder="9876543210" placeholderTextColor="#93A29E" style={[styles.input, { flex: 1 }]} value={identifier} /></View>
+        )}
         <Text style={styles.label}>{mode === "otp" ? "One-time password" : "Password"}</Text>
         <View style={styles.secretRow}><TextInput accessibilityLabel={mode === "otp" ? "One-time password" : "Password"} keyboardType={mode === "otp" ? "number-pad" : "default"} onChangeText={setSecret} placeholder={mode === "otp" ? "Enter OTP" : "Enter password"} placeholderTextColor="#93A29E" secureTextEntry={mode === "password" && !showPassword} style={[styles.input, { flex: 1, borderWidth: 0 }]} value={secret} /><Pressable accessibilityLabel="Show password" onPress={() => setShowPassword((value) => !value)} style={styles.eye}>{mode === "password" ? <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={19} color={colors.muted} /> : null}</Pressable></View>
         {mode === "otp" ? <Pressable onPress={requestOtp} style={styles.otpButton}><Text style={styles.otpText}>Send OTP</Text></Pressable> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {message ? <Text style={styles.message}>{message}</Text> : null}
-        <PrimaryButton disabled={isLoading || phone.length < 10 || !secret} icon="lock-closed-outline" onPress={submit} title={isLoading ? "Signing in..." : "Secure sign in"} />
+        <PrimaryButton disabled={isLoading || !isValidLoginIdentifier(identifier) || !secret} icon="lock-closed-outline" onPress={submit} title={isLoading ? "Signing in..." : "Secure sign in"} />
         <Text style={styles.security}>Protected with encrypted device storage and 30-day revocable sessions.</Text>
       </View>
     </KeyboardAvoidingView>
