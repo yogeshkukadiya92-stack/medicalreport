@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useAppData } from "@/components/app-data-provider";
 import { CountryPhoneInput } from "@/components/country-phone-input";
 import { Icon, MobileShell } from "@/components/mobile-shell";
+import { SignOutButton } from "@/components/sign-out-button";
 import { calculateHealthScore } from "@/lib/health-score";
 
 const emptyForm = { name: "", relation: "", age: "", bloodGroup: "", phone: "" };
@@ -86,8 +87,11 @@ export default function FamilyPage() {
             <p className="text-[13px] font-medium text-[#6f7f7c]">Family vault</p>
             <h1 className="mt-1 text-[24px] font-bold leading-tight text-[#101c1c]">Members</h1>
           </div>
-          <div className="grid h-11 w-11 place-items-center rounded-lg border border-[#dce9e5] bg-white text-[#223230]">
-            <Icon name="family" className="h-5 w-5" />
+          <div className="flex items-center gap-2">
+            <div className="grid h-11 w-11 place-items-center rounded-lg border border-[#dce9e5] bg-white text-[#223230]">
+              <Icon name="family" className="h-5 w-5" />
+            </div>
+            <SignOutButton />
           </div>
         </div>
 
