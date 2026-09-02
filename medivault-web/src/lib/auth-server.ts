@@ -34,8 +34,11 @@ const sessionMaxAgeSeconds = 60 * 60 * 24 * 30;
 const passwordIterations = 210_000;
 const passwordKeyLength = 32;
 const passwordDigest = "sha256";
-const testingAuthOtp = process.env.AUTH_TEST_OTP?.trim() || "";
-const testOtpEnabled = process.env.NODE_ENV !== "production" || process.env.ALLOW_TEST_OTP === "true";
+// A local-only OTP keeps developer testing quick without exposing a production bypass.
+// This must remain unreachable from every deployed environment, regardless of env vars.
+const isDevelopmentEnvironment = process.env.NODE_ENV === "development";
+const testingAuthOtp = isDevelopmentEnvironment ? process.env.AUTH_TEST_OTP?.trim() || "1111" : "";
+const testOtpEnabled = isDevelopmentEnvironment;
 const bootstrapAdminEmail = normalizeEmail(process.env.ADMIN_BOOTSTRAP_EMAIL || "yogeshkukadiya92@gmail.com");
 const bootstrapAdminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
 const bootstrapAdminUserId = bootstrapAdminEmail ? `user-admin-${hashToken(bootstrapAdminEmail).slice(0, 18)}` : "";

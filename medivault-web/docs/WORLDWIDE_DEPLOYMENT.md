@@ -29,11 +29,10 @@ NEXT_PUBLIC_MEASUREMENT_SYSTEM=metric
 NEXT_PUBLIC_DATA_REGION=india
 ```
 
-Test OTP must remain disabled in production:
+Test OTP is development-only and cannot be enabled in production:
 
 ```text
 AUTH_TEST_OTP=
-ALLOW_TEST_OTP=false
 ```
 
 ## Tenant Boundary
