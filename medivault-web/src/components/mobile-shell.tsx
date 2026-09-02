@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { AuthSetupRequired, SessionLoading } from "@/components/auth-gate";
 import { useAuth } from "@/components/auth-provider";
 import { LanguageSelect, useLanguage } from "@/components/language-provider";
+import { SignOutButton } from "@/components/sign-out-button";
 
 type IconName = "home" | "reports" | "analytics" | "family" | "upload" | "bell" | "shield" | "trend" | "calendar";
 
@@ -142,7 +143,10 @@ export function MobileShell({ children }: { children: ReactNode }) {
         <div className="pointer-events-none sticky top-0 z-30 flex justify-center pt-[max(env(safe-area-inset-top),10px)] md:hidden">
           <div className="mt-1 h-1.5 w-12 rounded-full bg-[#c9d8d4]" />
         </div>
-        <div className="absolute right-3 top-[max(env(safe-area-inset-top),10px)] z-40"><LanguageSelect compact /></div>
+        <div className="absolute right-3 top-[max(env(safe-area-inset-top),10px)] z-40 flex items-center gap-2">
+          <LanguageSelect compact />
+          <SignOutButton />
+        </div>
         <div className="relative pb-[calc(104px+env(safe-area-inset-bottom))]">{children}</div>
         <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] border-t border-[#dbe7e3] bg-white/94 px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 shadow-[0_-18px_42px_rgba(16,35,35,0.10)] backdrop-blur-xl md:absolute">
           <div className="grid grid-cols-5 items-end gap-1">
