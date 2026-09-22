@@ -33,7 +33,7 @@ echo Server will start on: http://localhost:3000
 echo.
 echo Default Login:
 echo   - Phone: +919876543210 (or any number)
-echo   - OTP: 123456 (any 6 digits)
+echo   - OTP: 1111 (or 123456)
 echo.
 echo Available Pages:
 echo   - Dashboard: http://localhost:3000/dashboard

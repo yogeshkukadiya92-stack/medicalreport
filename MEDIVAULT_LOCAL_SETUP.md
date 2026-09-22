@@ -87,7 +87,7 @@ npm run dev
 ### Dummy Data
 - All screens use dummy data (no real backend needed)
 - Login with any phone number (no auth validation yet)
-- OTP: any 6-digit number
+- OTP: 1111 (or any number in mock)
 
 ### Using DevTools
 - Press F12 to open Developer Tools

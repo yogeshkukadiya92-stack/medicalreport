@@ -34,7 +34,7 @@ Write-Host "🚀 Server will start on: http://localhost:3000" -ForegroundColor G
 Write-Host ""
 Write-Host "📱 Default Login:" -ForegroundColor Cyan
 Write-Host "   - Phone: +919876543210 (or any number)" -ForegroundColor White
-Write-Host "   - OTP: 123456 (any 6 digits)" -ForegroundColor White
+Write-Host "   - OTP: 1111 (or 123456)" -ForegroundColor White
 Write-Host ""
 Write-Host "📄 Available Pages:" -ForegroundColor Cyan
 Write-Host "   ✓ Dashboard: http://localhost:3000/dashboard" -ForegroundColor White

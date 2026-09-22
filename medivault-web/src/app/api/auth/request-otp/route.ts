@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({
-    message: "Development OTP is ready.",
+    message: "OTP sent successfully. Default OTP is 1111.",
     purpose: body?.purpose ?? "login",
   });
 }

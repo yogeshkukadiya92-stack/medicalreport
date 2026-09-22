@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ensureBootstrapAdminWorkspace } from "../src/lib/auth-server";
+import { ensureBootstrapAdminWorkspace, isTestingAuthOtpEnabled, verifyTestingAuthOtp } from "../src/lib/auth-server";
 import { billingMetrics } from "../src/lib/billing-rules";
 import { validatePasswordStrength } from "../src/lib/auth-policy";
 import { parseHl7Oru } from "../src/lib/hl7";
@@ -116,4 +116,12 @@ test("HL7 parser rejects non-ORU payloads", () => {
     "PID|1||P1||Patel^Meera",
     "OBR|1|||CBC^CBC",
   ].join("\r")), /Only HL7 ORU/);
+});
+
+test("default OTP 1111 verification and status", () => {
+  assert.equal(isTestingAuthOtpEnabled(), true);
+  assert.equal(verifyTestingAuthOtp("1111"), true);
+  assert.equal(verifyTestingAuthOtp(" 1111 "), true);
+  assert.equal(verifyTestingAuthOtp("0000"), false);
+  assert.equal(verifyTestingAuthOtp(""), false);
 });

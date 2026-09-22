@@ -34,7 +34,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
-  const [otp, setOtp] = useState("");
+  const [otp, setOtp] = useState("1111");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -52,7 +52,7 @@ export default function LoginPage() {
     setMode(nextMode);
     setError("");
     setMessage("");
-    setOtp("");
+    setOtp("1111");
     setPassword("");
     setConfirmPassword("");
     setIsOtpSent(false);
@@ -81,6 +81,7 @@ export default function LoginPage() {
       const purpose = mode === "forgot" ? "reset" : mode === "signup" ? "signup" : "login";
       setMessage(await requestOtp(phone, purpose));
       setIsOtpSent(true);
+      setOtp((prev) => prev || "1111");
     } catch (otpError) {
       setError(otpError instanceof Error ? otpError.message : "OTP could not be sent.");
     } finally {
@@ -109,20 +110,23 @@ export default function LoginPage() {
         await login(phone, password);
       } else if (mode === "otp") {
         if (!isOtpSent) throw new Error("Tap Send OTP first.");
-        if (otp.length !== 4) throw new Error("Enter the 4-digit OTP.");
-        await loginWithOtp(phone, otp);
+        const activeOtp = otp.trim() || "1111";
+        if (activeOtp.length !== 4 && activeOtp.length !== 6) throw new Error("Enter valid OTP (Default: 1111).");
+        await loginWithOtp(phone, activeOtp);
       } else if (mode === "forgot") {
         if (!isOtpSent) throw new Error("Tap Send OTP first.");
-        if (otp.length !== 4) throw new Error("Enter the 4-digit OTP.");
+        const activeOtp = otp.trim() || "1111";
+        if (activeOtp.length !== 4 && activeOtp.length !== 6) throw new Error("Enter valid OTP (Default: 1111).");
         if (password.length < 6) throw new Error("New password must be at least 6 characters.");
         if (password !== confirmPassword) throw new Error("Passwords do not match.");
-        await resetPassword(phone, otp, password);
+        await resetPassword(phone, activeOtp, password);
       } else {
         if (!email) throw new Error("Enter email address for signup.");
         if (password.length < 6) throw new Error("Password must be at least 6 characters.");
         if (!isOtpSent) throw new Error("Tap Send OTP first.");
-        if (otp.length !== 4) throw new Error("Enter the 4-digit OTP.");
-        await signup({ email, otp, password, phone });
+        const activeOtp = otp.trim() || "1111";
+        if (activeOtp.length !== 4 && activeOtp.length !== 6) throw new Error("Enter valid OTP (Default: 1111).");
+        await signup({ email, otp: activeOtp, password, phone });
       }
       router.replace(redirectPath);
     } catch (authError) {
@@ -236,13 +240,13 @@ export default function LoginPage() {
               <div className="flex items-end gap-2">
                 <label className="min-w-0 flex-1">
                   <span className="text-[12px] font-bold text-[#52605d]">Mobile OTP</span>
-                  <input type="text" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="Enter OTP" inputMode="numeric" autoComplete="one-time-code" disabled={!isOtpSent} maxLength={6} pattern="[0-9]{4,6}" required={isOtpSent} className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-center text-[16px] font-black tracking-[0.28em] outline-none focus:border-[#0a7d6e] disabled:bg-[#edf3f1] disabled:text-[#8a9794]" />
+                  <input type="text" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="1111" inputMode="numeric" autoComplete="one-time-code" disabled={!isOtpSent} maxLength={6} pattern="[0-9]{4,6}" required={isOtpSent} className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-center text-[16px] font-black tracking-[0.28em] outline-none focus:border-[#0a7d6e] disabled:bg-[#edf3f1] disabled:text-[#8a9794]" />
                 </label>
                 <button type="button" onClick={handleSendOtp} disabled={isSendingOtp} className="h-12 shrink-0 rounded-lg bg-[#102323] px-4 text-[12px] font-black text-white disabled:opacity-60">
                   {isSendingOtp ? "Sending" : isOtpSent ? "Resend" : "Send OTP"}
                 </button>
               </div>
-              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#65716f]">OTP access is available only when a delivery provider is configured.</p>
+              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#65716f]">Default OTP is <strong>1111</strong> for fast testing and login access.</p>
             </div>
           ) : null}
 

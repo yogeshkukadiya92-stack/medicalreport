@@ -32,7 +32,8 @@ export default function LoginScreen() {
         body: JSON.stringify({ phone: normalizeLoginIdentifier(identifier), purpose: "login" }),
         method: "POST",
       });
-      setMessage(result.message || "OTP sent.");
+      setMessage(result.message || "OTP sent. Default OTP: 1111");
+      setSecret("1111");
     } catch (requestError) {
       setMessage(requestError instanceof Error ? requestError.message : "OTP could not be sent.");
     }
@@ -44,7 +45,7 @@ export default function LoginScreen() {
       <View style={styles.panel}>
         <View style={styles.segment}>
           <Pressable onPress={() => { setMode("password"); setIdentifier(""); setSecret(""); }} style={[styles.segmentButton, mode === "password" && styles.segmentActive]}><Text style={[styles.segmentText, mode === "password" && styles.segmentTextActive]}>Password</Text></Pressable>
-          <Pressable onPress={() => { setMode("otp"); setIdentifier(""); setSecret(""); }} style={[styles.segmentButton, mode === "otp" && styles.segmentActive]}><Text style={[styles.segmentText, mode === "otp" && styles.segmentTextActive]}>Mobile OTP</Text></Pressable>
+          <Pressable onPress={() => { setMode("otp"); setIdentifier(""); setSecret("1111"); }} style={[styles.segmentButton, mode === "otp" && styles.segmentActive]}><Text style={[styles.segmentText, mode === "otp" && styles.segmentTextActive]}>Mobile OTP</Text></Pressable>
         </View>
         <Text style={styles.label}>{mode === "password" ? "Email or mobile number" : "Mobile number"}</Text>
         {mode === "password" ? (
@@ -53,7 +54,7 @@ export default function LoginScreen() {
           <View style={styles.phoneRow}><View style={styles.country}><Text style={styles.countryText}>India +91</Text></View><TextInput accessibilityLabel="Mobile number" keyboardType="phone-pad" maxLength={10} onChangeText={setIdentifier} placeholder="9876543210" placeholderTextColor="#93A29E" style={[styles.input, { flex: 1 }]} value={identifier} /></View>
         )}
         <Text style={styles.label}>{mode === "otp" ? "One-time password" : "Password"}</Text>
-        <View style={styles.secretRow}><TextInput accessibilityLabel={mode === "otp" ? "One-time password" : "Password"} keyboardType={mode === "otp" ? "number-pad" : "default"} onChangeText={setSecret} placeholder={mode === "otp" ? "Enter OTP" : "Enter password"} placeholderTextColor="#93A29E" secureTextEntry={mode === "password" && !showPassword} style={[styles.input, { flex: 1, borderWidth: 0 }]} value={secret} /><Pressable accessibilityLabel="Show password" onPress={() => setShowPassword((value) => !value)} style={styles.eye}>{mode === "password" ? <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={19} color={colors.muted} /> : null}</Pressable></View>
+        <View style={styles.secretRow}><TextInput accessibilityLabel={mode === "otp" ? "One-time password" : "Password"} keyboardType={mode === "otp" ? "number-pad" : "default"} onChangeText={setSecret} placeholder={mode === "otp" ? "Enter OTP (Default: 1111)" : "Enter password"} placeholderTextColor="#93A29E" secureTextEntry={mode === "password" && !showPassword} style={[styles.input, { flex: 1, borderWidth: 0 }]} value={secret} /><Pressable accessibilityLabel="Show password" onPress={() => setShowPassword((value) => !value)} style={styles.eye}>{mode === "password" ? <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={19} color={colors.muted} /> : null}</Pressable></View>
         {mode === "otp" ? <Pressable onPress={requestOtp} style={styles.otpButton}><Text style={styles.otpText}>Send OTP</Text></Pressable> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {message ? <Text style={styles.message}>{message}</Text> : null}
