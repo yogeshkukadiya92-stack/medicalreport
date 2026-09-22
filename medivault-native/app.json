@@ -25,7 +25,8 @@
         "foregroundImage": "./assets/adaptive-icon.png"
       },
       "permissions": [
-        "CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -49,7 +50,12 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiUrl": "https://mr.yogeshaihub.in/api"
-    }
+      "apiUrl": "https://mr.yogeshaihub.in/api",
+      "router": {},
+      "eas": {
+        "projectId": "4ae9b881-cbd6-4d57-910a-53cb341af180"
+      }
+    },
+    "owner": "yogeshkv9200"
   }
 }
