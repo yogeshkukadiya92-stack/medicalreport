@@ -136,7 +136,7 @@ class _HolographicShield3DState extends State<HolographicShield3D> with TickerPr
                   alignment: FractionalOffset.center,
                   transform: Matrix4.identity()
                     ..setEntry(3, 2, 0.0025)
-                    ..translate(0.0, 0.0, 30.0) // Z depth
+                    ..setTranslationRaw(0.0, 0.0, 30.0) // Z depth
                     ..rotateX(_dragPitch * 1.2)
                     ..rotateY(_dragRoll * 1.2),
                   child: Container(

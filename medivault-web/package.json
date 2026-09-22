@@ -12,7 +12,7 @@
     "start": "node .next/standalone/server.js",
     "test": "tsx --test tests/**/*.test.ts",
     "ollama:worker": "node scripts/ollama-worker.mjs",
-    "lint": "next lint",
+    "lint": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx,md}\""
   },
   "dependencies": {

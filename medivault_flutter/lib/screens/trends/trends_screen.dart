@@ -65,10 +65,10 @@ class _TrendsScreenState extends State<TrendsScreen> {
 
           Expanded(
             child: trends.isEmpty
-                ? Center(
+                ? const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
+                      children: [
                         Icon(Icons.show_chart_rounded, size: 48, color: Color(0xFF879590)),
                         SizedBox(height: 12),
                         Text(
@@ -80,13 +80,9 @@ class _TrendsScreenState extends State<TrendsScreen> {
                           ),
                         ),
                         SizedBox(height: 4),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 32),
-                          child: Text(
-                            'Upload two or more lab reports to view longitudinal tracking.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: Color(0xFF74837F)),
-                          ),
+                        Text(
+                          'Upload multiple reports over time to see trends.',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF879590)),
                         ),
                       ],
                     ),
@@ -195,8 +191,8 @@ class _TrendsScreenState extends State<TrendsScreen> {
                       gridData: FlGridData(
                         show: true,
                         drawVerticalLine: false,
-                        getDrawingHorizontalLine: (value) => FlLine(
-                          color: const Color(0xFFE7EFED),
+                        getDrawingHorizontalLine: (value) => const FlLine(
+                          color: Color(0xFFE7EFED),
                           strokeWidth: 1,
                           dashArray: [4, 4],
                         ),

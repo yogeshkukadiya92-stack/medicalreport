@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/app_colors.dart';
 import '../../models/report_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../widgets/custom_app_bar.dart';
-import '../../widgets/status_badge.dart';
 import 'report_detail_screen.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -136,12 +134,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
           // Reports List
           Expanded(
             child: filteredReports.isEmpty
-                ? Center(
+                ? const Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(24.0),
+                      padding: EdgeInsets.all(24.0),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
+                        children: [
                           Icon(Icons.folder_open_rounded, size: 48, color: Color(0xFF879590)),
                           SizedBox(height: 12),
                           Text(

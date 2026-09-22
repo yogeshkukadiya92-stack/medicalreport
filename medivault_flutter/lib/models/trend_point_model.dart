@@ -21,10 +21,10 @@ class BiomarkerTrend {
     required this.points,
   });
 
-  TrendPoint get latest => points.last;
+  TrendPoint? get latest => points.isNotEmpty ? points.last : null;
   TrendPoint? get previous => points.length > 1 ? points[points.length - 2] : null;
 
-  double? get delta => previous != null ? latest.value - previous!.value : null;
-  double get minValue => points.map((p) => p.value).reduce((a, b) => a < b ? a : b);
-  double get maxValue => points.map((p) => p.value).reduce((a, b) => a > b ? a : b);
+  double? get delta => (previous != null && latest != null) ? latest!.value - previous!.value : null;
+  double get minValue => points.isNotEmpty ? points.map((p) => p.value).reduce((a, b) => a < b ? a : b) : 0.0;
+  double get maxValue => points.isNotEmpty ? points.map((p) => p.value).reduce((a, b) => a > b ? a : b) : 0.0;
 }

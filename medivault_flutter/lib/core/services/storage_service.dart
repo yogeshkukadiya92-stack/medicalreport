@@ -18,15 +18,23 @@ class StorageService {
 
   // Token management (Secure Keyring / Keystore)
   Future<void> saveToken(String token) async {
-    await _secureStorage.write(key: _tokenKey, value: token);
+    try {
+      await _secureStorage.write(key: _tokenKey, value: token);
+    } catch (_) {}
   }
 
   Future<String?> getToken() async {
-    return await _secureStorage.read(key: _tokenKey);
+    try {
+      return await _secureStorage.read(key: _tokenKey);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> clearToken() async {
-    await _secureStorage.delete(key: _tokenKey);
+    try {
+      await _secureStorage.delete(key: _tokenKey);
+    } catch (_) {}
   }
 
   // Vault snapshot caching for instant offline availability

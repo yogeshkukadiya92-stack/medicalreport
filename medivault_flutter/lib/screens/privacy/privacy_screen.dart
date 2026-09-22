@@ -113,10 +113,10 @@ class PrivacyScreen extends StatelessWidget {
                       child: const Icon(Icons.security_rounded, color: Colors.black, size: 28),
                     ),
                     const SizedBox(width: 16),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Zero-Knowledge Vault',
                             style: TextStyle(
@@ -128,12 +128,11 @@ class PrivacyScreen extends StatelessWidget {
                           ),
                           SizedBox(height: 4),
                           Text(
-                            'Your medical records and biometric values belong strictly to you and your authorized family members.',
+                            'End-to-end clinical client privacy with military-grade encryption keys.',
                             style: TextStyle(
                               color: AppColors.textSecondary,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w500,
-                              height: 1.35,
+                              fontSize: 12.5,
+                              height: 1.4,
                             ),
                           ),
                         ],
@@ -178,9 +177,9 @@ class PrivacyScreen extends StatelessWidget {
                     ),
                   ),
                   alignment: Alignment.center,
-                  child: Row(
+                  child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
+                    children: [
                       Icon(Icons.logout_rounded, size: 18, color: AppColors.criticalGlow),
                       SizedBox(width: 8),
                       Text(
@@ -188,8 +187,8 @@ class PrivacyScreen extends StatelessWidget {
                         style: TextStyle(
                           color: AppColors.criticalGlow,
                           fontSize: 12.5,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.8,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
                         ),
                       ),
                     ],

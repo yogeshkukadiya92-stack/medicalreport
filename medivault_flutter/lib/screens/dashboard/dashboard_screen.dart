@@ -529,8 +529,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: const Color(0xFFCFDED9)),
                       ),
-                      child: Row(
-                        children: const [
+                      child: const Row(
+                        children: [
                           Icon(Icons.people_outline_rounded, size: 16, color: Color(0xFF263633)),
                           SizedBox(width: 6),
                           Text(
@@ -646,24 +646,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Column(
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
                       'Health results',
                       style: TextStyle(
                         color: Color(0xFF17222B),
                         fontSize: 16,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
                       ),
                     ),
                     SizedBox(height: 2),
                     Text(
-                      'Tap any result to see its history',
+                      'Latest verified parameters from lab reports',
                       style: TextStyle(
-                        color: Color(0xFF74837F),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF71817D),
+                        fontSize: 11.5,
                       ),
                     ),
                   ],

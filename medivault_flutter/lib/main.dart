@@ -30,38 +30,51 @@ void main() async {
   final apiService = ApiService(storageService: storageService);
 
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(
-          create: (_) => AuthProvider(
-            apiService: apiService,
-            storageService: storageService,
-          ),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => VaultProvider(
-            apiService: apiService,
-            storageService: storageService,
-          ),
-        ),
-      ],
-      child: const MediVaultApp(),
+    MediVaultApp(
+      apiService: apiService,
+      storageService: storageService,
     ),
   );
 }
 
 class MediVaultApp extends StatelessWidget {
-  const MediVaultApp({super.key});
+  final StorageService? storageService;
+  final ApiService? apiService;
+
+  const MediVaultApp({
+    super.key,
+    this.storageService,
+    this.apiService,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MediVault',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.light,
-      home: const _AppRoot(),
+    final storage = storageService ?? StorageService();
+    final api = apiService ?? ApiService(storageService: storage);
+
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(
+            apiService: api,
+            storageService: storage,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => VaultProvider(
+            apiService: api,
+            storageService: storage,
+          ),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'MediVault',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.light,
+        home: const _AppRoot(),
+      ),
     );
   }
 }

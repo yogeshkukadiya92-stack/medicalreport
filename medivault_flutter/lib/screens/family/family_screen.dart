@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/app_colors.dart';
 import '../../models/family_member_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -401,7 +400,7 @@ class _AddMemberBottomSheetState extends State<_AddMemberBottomSheet> {
                         const Text('Relationship', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF17222B))),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
-                          value: _relation,
+                          initialValue: _relation,
                           items: _relations.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13)))).toList(),
                           onChanged: (v) => setState(() => _relation = v ?? _relation),
                           decoration: InputDecoration(
@@ -446,7 +445,7 @@ class _AddMemberBottomSheetState extends State<_AddMemberBottomSheet> {
                         const Text('Blood Group', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF17222B))),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
-                          value: _bloodGroup,
+                          initialValue: _bloodGroup,
                           items: _bloodGroups.map((b) => DropdownMenuItem(value: b, child: Text(b, style: const TextStyle(fontSize: 13)))).toList(),
                           onChanged: (v) => setState(() => _bloodGroup = v ?? _bloodGroup),
                           decoration: InputDecoration(

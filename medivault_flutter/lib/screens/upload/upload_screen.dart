@@ -3,7 +3,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/app_colors.dart';
 import '../../models/report_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -412,9 +411,9 @@ class _UploadScreenState extends State<UploadScreen> {
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: Row(
+            child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
+              children: [
                 Icon(Icons.auto_awesome_rounded, size: 18, color: Colors.white),
                 SizedBox(width: 8),
                 Text(

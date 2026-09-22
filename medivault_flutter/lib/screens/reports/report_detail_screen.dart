@@ -200,8 +200,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: const [
+                      const Row(
+                        children: [
                           Icon(Icons.auto_awesome_rounded, color: Color(0xFF0284C7), size: 16),
                           SizedBox(width: 8),
                           Text(
@@ -341,8 +341,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: const [
+                    const Row(
+                      children: [
                         Icon(Icons.lock_clock_outlined, color: AppColors.primary, size: 20),
                         SizedBox(width: 10),
                         Text(
@@ -416,9 +416,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                                 width: 20,
                                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                               )
-                            : Row(
+                            : const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
+                                children: [
                                   Icon(Icons.ios_share_rounded, size: 18, color: Colors.white),
                                   SizedBox(width: 8),
                                   Text(
