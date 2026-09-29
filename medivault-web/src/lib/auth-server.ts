@@ -37,7 +37,7 @@ const passwordDigest = "sha256";
 // A local-only OTP keeps developer testing quick without exposing a production bypass.
 // This must remain unreachable from every deployed environment, regardless of env vars.
 const testingAuthOtp = process.env.AUTH_TEST_OTP?.trim() || "1111";
-const testOtpEnabled = true;
+const testOtpEnabled = process.env.NODE_ENV === "development";
 const bootstrapAdminEmail = normalizeEmail(process.env.ADMIN_BOOTSTRAP_EMAIL || "yogeshkukadiya92@gmail.com");
 const bootstrapAdminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
 const bootstrapAdminUserId = bootstrapAdminEmail ? `user-admin-${hashToken(bootstrapAdminEmail).slice(0, 18)}` : "";
@@ -63,6 +63,7 @@ function isValidPhone(phone: string) {
 }
 
 export function verifyTestingAuthOtp(otp: string) {
+  if (!testOtpEnabled) return false;
   const normalized = otp.trim();
   if (!normalized) return false;
   if (normalized === "1111" || normalized === "123456" || normalized === testingAuthOtp) {
@@ -74,7 +75,7 @@ export function verifyTestingAuthOtp(otp: string) {
 }
 
 export function isTestingAuthOtpEnabled() {
-  return true;
+  return testOtpEnabled;
 }
 
 function cleanName(email: string, name?: string) {

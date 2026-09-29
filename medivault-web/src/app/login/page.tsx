@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth-provider";
 import { CountryPhoneInput, localPhoneDigits } from "@/components/country-phone-input";
 
 type Mode = "forgot" | "otp" | "signin" | "signup";
+const testingOtpAvailable = process.env.NODE_ENV === "development";
 
 function safeRedirectPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/dashboard";
@@ -34,7 +35,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
-  const [otp, setOtp] = useState("1111");
+  const [otp, setOtp] = useState(testingOtpAvailable ? "1111" : "");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -52,7 +53,7 @@ export default function LoginPage() {
     setMode(nextMode);
     setError("");
     setMessage("");
-    setOtp("1111");
+    setOtp(testingOtpAvailable ? "1111" : "");
     setPassword("");
     setConfirmPassword("");
     setIsOtpSent(false);
@@ -81,7 +82,7 @@ export default function LoginPage() {
       const purpose = mode === "forgot" ? "reset" : mode === "signup" ? "signup" : "login";
       setMessage(await requestOtp(phone, purpose));
       setIsOtpSent(true);
-      setOtp((prev) => prev || "1111");
+      setOtp((prev) => prev || (testingOtpAvailable ? "1111" : ""));
     } catch (otpError) {
       setError(otpError instanceof Error ? otpError.message : "OTP could not be sent.");
     } finally {
@@ -110,13 +111,13 @@ export default function LoginPage() {
         await login(phone, password);
       } else if (mode === "otp") {
         if (!isOtpSent) throw new Error("Tap Send OTP first.");
-        const activeOtp = otp.trim() || "1111";
-        if (activeOtp.length !== 4 && activeOtp.length !== 6) throw new Error("Enter valid OTP (Default: 1111).");
+        const activeOtp = otp.trim() || (testingOtpAvailable ? "1111" : "");
+        if (activeOtp.length !== 4 && activeOtp.length !== 6) throw new Error("Enter a valid OTP.");
         await loginWithOtp(phone, activeOtp);
       } else if (mode === "forgot") {
         if (!isOtpSent) throw new Error("Tap Send OTP first.");
-        const activeOtp = otp.trim() || "1111";
-        if (activeOtp.length !== 4 && activeOtp.length !== 6) throw new Error("Enter valid OTP (Default: 1111).");
+        const activeOtp = otp.trim() || (testingOtpAvailable ? "1111" : "");
+        if (activeOtp.length !== 4 && activeOtp.length !== 6) throw new Error("Enter a valid OTP.");
         if (password.length < 6) throw new Error("New password must be at least 6 characters.");
         if (password !== confirmPassword) throw new Error("Passwords do not match.");
         await resetPassword(phone, activeOtp, password);
@@ -124,8 +125,8 @@ export default function LoginPage() {
         if (!email) throw new Error("Enter email address for signup.");
         if (password.length < 6) throw new Error("Password must be at least 6 characters.");
         if (!isOtpSent) throw new Error("Tap Send OTP first.");
-        const activeOtp = otp.trim() || "1111";
-        if (activeOtp.length !== 4 && activeOtp.length !== 6) throw new Error("Enter valid OTP (Default: 1111).");
+        const activeOtp = otp.trim() || (testingOtpAvailable ? "1111" : "");
+        if (activeOtp.length !== 4 && activeOtp.length !== 6) throw new Error("Enter a valid OTP.");
         await signup({ email, otp: activeOtp, password, phone });
       }
       router.replace(redirectPath);
@@ -163,7 +164,7 @@ export default function LoginPage() {
               : "Sign in with your mobile number to keep family reports, health trends, and upload history private."}
         </p>
 
-        {mode === "signin" || mode === "signup" ? (
+        {testingOtpAvailable && (mode === "signin" || mode === "signup") ? (
           <div className="mt-6 grid grid-cols-2 gap-2 rounded-lg border border-[#dce9e5] bg-white p-1">
             <button type="button" onClick={() => switchMode("signin")} className={`h-10 rounded-md text-[13px] font-bold ${mode === "signin" ? "bg-[#102323] text-white" : "text-[#65716f]"}`}>
               Sign in
@@ -172,17 +173,17 @@ export default function LoginPage() {
               Create account
             </button>
           </div>
-        ) : (
+        ) : testingOtpAvailable ? (
           <button type="button" onClick={() => switchMode("signin")} className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg border border-[#dce9e5] bg-white px-4 text-[13px] font-bold text-[#30413e]">
             <span aria-hidden="true">←</span>
             Back to sign in
           </button>
-        )}
+        ) : null}
 
         {!isConfigLoading && !isConfigured ? (
           <div className="mt-5 rounded-lg border border-[#f0d4ca] bg-[#fff7f4] p-4">
             <p className="text-[13px] font-black text-[#ba563d]">MongoDB env missing</p>
-            <p className="mt-2 text-[13px] leading-5 text-[#65716f]">Add MONGODB_URI and MONGODB_DB locally and on Railway.</p>
+            <p className="mt-2 text-[13px] leading-5 text-[#65716f]">Add MONGODB_URI and MONGODB_DB to the server environment.</p>
           </div>
         ) : null}
 
@@ -240,17 +241,17 @@ export default function LoginPage() {
               <div className="flex items-end gap-2">
                 <label className="min-w-0 flex-1">
                   <span className="text-[12px] font-bold text-[#52605d]">Mobile OTP</span>
-                  <input type="text" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="1111" inputMode="numeric" autoComplete="one-time-code" disabled={!isOtpSent} maxLength={6} pattern="[0-9]{4,6}" required={isOtpSent} className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-center text-[16px] font-black tracking-[0.28em] outline-none focus:border-[#0a7d6e] disabled:bg-[#edf3f1] disabled:text-[#8a9794]" />
+                  <input type="text" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="Enter OTP" inputMode="numeric" autoComplete="one-time-code" disabled={!isOtpSent} maxLength={6} pattern="[0-9]{4,6}" required={isOtpSent} className="mt-2 h-12 w-full rounded-lg border border-[#dce9e5] bg-white px-4 text-center text-[16px] font-black tracking-[0.28em] outline-none focus:border-[#0a7d6e] disabled:bg-[#edf3f1] disabled:text-[#8a9794]" />
                 </label>
                 <button type="button" onClick={handleSendOtp} disabled={isSendingOtp} className="h-12 shrink-0 rounded-lg bg-[#102323] px-4 text-[12px] font-black text-white disabled:opacity-60">
                   {isSendingOtp ? "Sending" : isOtpSent ? "Resend" : "Send OTP"}
                 </button>
               </div>
-              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#65716f]">Default OTP is <strong>1111</strong> for fast testing and login access.</p>
+              {testingOtpAvailable ? <p className="mt-2 text-[12px] font-semibold leading-5 text-[#65716f]">Default OTP is <strong>1111</strong> for local testing.</p> : null}
             </div>
           ) : null}
 
-          {mode === "signin" ? (
+          {testingOtpAvailable && mode === "signin" ? (
             <div className="flex items-center justify-between gap-3">
               <button type="button" onClick={() => switchMode("otp")} className="text-[13px] font-black text-[#087766] hover:underline">Login with OTP</button>
               <button type="button" onClick={() => switchMode("forgot")} className="text-[13px] font-bold text-[#52605d] hover:text-[#087766] hover:underline">Forgot password?</button>
@@ -269,7 +270,7 @@ export default function LoginPage() {
 
         <div className="mt-6 rounded-lg bg-[#f7fbfa] p-4">
           <p className="text-[12px] font-bold text-[#087766]">Protected by secure MongoDB sessions</p>
-          <p className="mt-2 text-[12px] leading-5 text-[#65716f]">OTP login and password reset work only for a registered mobile number.</p>
+          <p className="mt-2 text-[12px] leading-5 text-[#65716f]">Contact your administrator for account access or password help.</p>
         </div>
       </section>
     </main>

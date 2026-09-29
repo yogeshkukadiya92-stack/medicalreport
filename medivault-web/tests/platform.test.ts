@@ -119,9 +119,10 @@ test("HL7 parser rejects non-ORU payloads", () => {
 });
 
 test("default OTP 1111 verification and status", () => {
-  assert.equal(isTestingAuthOtpEnabled(), true);
-  assert.equal(verifyTestingAuthOtp("1111"), true);
-  assert.equal(verifyTestingAuthOtp(" 1111 "), true);
+  const enabled = process.env.NODE_ENV === "development";
+  assert.equal(isTestingAuthOtpEnabled(), enabled);
+  assert.equal(verifyTestingAuthOtp("1111"), enabled);
+  assert.equal(verifyTestingAuthOtp(" 1111 "), enabled);
   assert.equal(verifyTestingAuthOtp("0000"), false);
   assert.equal(verifyTestingAuthOtp(""), false);
 });
