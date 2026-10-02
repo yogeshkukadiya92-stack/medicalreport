@@ -78,7 +78,20 @@ const requiredBodyCompositionNames = [
 ].join(", ");
 
 function getAiProvider() {
-  const provider = (process.env.AI_PROVIDER || "openai").toLowerCase();
+  const provider = (process.env.AI_PROVIDER || (process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY ? "gemini" : "openai")).toLowerCase();
+
+  if (provider === "gemini" || (!process.env.OPENAI_API_KEY && process.env.GEMINI_API_KEY)) {
+    return {
+      apiKey: process.env.GEMINI_API_KEY,
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+      imageLimit: 4,
+      keyName: "GEMINI_API_KEY",
+      model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
+      providerName: "Gemini",
+      supportsJsonMode: true,
+    };
+  }
+
   if (provider === "ollama") {
     const baseUrl = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
     return {
@@ -113,6 +126,17 @@ function getAiProvider() {
     providerName: "OpenAI",
     supportsJsonMode: true,
   };
+}
+
+export async function GET() {
+  const aiProvider = getAiProvider();
+  return NextResponse.json({
+    configured: Boolean(aiProvider.apiKey),
+    keyName: aiProvider.keyName,
+    model: aiProvider.model,
+    provider: aiProvider.providerName,
+    status: aiProvider.apiKey ? "ready" : "missing_key",
+  });
 }
 
 function fallbackAnalysis(title: string, reason: string): AnalysisResponse {
@@ -316,7 +340,12 @@ export async function POST(request: NextRequest) {
   const imageUrls = (Array.isArray(body.fileDataUrls) && body.fileDataUrls.length ? body.fileDataUrls : body.fileDataUrl ? [body.fileDataUrl] : [])
     .filter((url) => typeof url === "string" && url.startsWith("data:image/"))
     .slice(0, aiProvider.imageLimit);
-  const isImage = Boolean(body.mimeType?.startsWith("image/") && imageUrls.length);
+  const isImage = Boolean(
+    imageUrls.length &&
+    (imageUrls[0].startsWith("data:image/") ||
+      body.mimeType?.startsWith("image/") ||
+      body.fileName?.match(/\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i))
+  );
   if (!isImage) {
     return NextResponse.json(
       fallbackAnalysis(title, "This file could not be prepared for AI analysis. Upload a JPG, PNG, or readable PDF."),
@@ -337,7 +366,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       isBodyComposition
         ? await bodyCompositionOcrAnalysis(title, imageUrls, reason)
-        : fallbackAnalysis(title, `${reason} Add ${aiProvider.keyName} in Railway Variables to enable live AI analysis.`),
+        : fallbackAnalysis(title, `${reason} Set ${aiProvider.keyName} (or GEMINI_API_KEY) in server environment variables and redeploy the app.`),
       { status: 200 },
     );
   }
@@ -404,10 +433,12 @@ export async function POST(request: NextRequest) {
     const errorText = await openAiResponse.text();
     const friendlyError = aiProvider.providerName === "Ollama" && /model|not found/i.test(errorText)
       ? `Ollama model is not installed. Run "ollama pull ${aiProvider.model}" on the Ollama host.`
+      : errorText.includes("insufficient_quota") || errorText.includes("quota")
+        ? `${aiProvider.providerName} quota exceeded. Your account has $0 balance (add credit at platform.openai.com/settings/billing or set GEMINI_API_KEY for free AI).`
       : errorText.includes("model")
-        ? `AI model is not available for this key. Check ${aiProvider.providerName} model setting in Railway Variables.`
+        ? `AI model "${aiProvider.model}" is not available for this key. Check ${aiProvider.providerName} model setting.`
       : errorText.includes("Incorrect API key") || errorText.includes("invalid_api_key")
-        ? `${aiProvider.providerName} API key is invalid. Update ${aiProvider.keyName} in Railway Variables and redeploy.`
+        ? `${aiProvider.providerName} API key is invalid. Update ${aiProvider.keyName} in deployment variables and redeploy.`
         : `AI analysis could not finish (${openAiResponse.status}): ${errorText.slice(0, 180)}`;
     return NextResponse.json(
       isBodyComposition

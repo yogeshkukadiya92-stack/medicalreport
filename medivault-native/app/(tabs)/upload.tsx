@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -38,6 +39,15 @@ type DocumentScannerModule = {
 
 const documentScanner = NativeModules.DocumentScanner as DocumentScannerModule | undefined;
 
+function inferMimeType(name: string, rawMime?: string): string {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".pdf") || rawMime === "application/pdf") return "application/pdf";
+  if (lower.endsWith(".png") || rawMime === "image/png") return "image/png";
+  if (lower.endsWith(".webp") || rawMime === "image/webp") return "image/webp";
+  if (lower.match(/\.(jpe?g|heic|heif)$/) || rawMime?.startsWith("image/")) return "image/jpeg";
+  return rawMime || "application/octet-stream";
+}
+
 function fileDataUrl(file: PickedFile) {
   return new Promise<string>((resolve, reject) => {
     fetch(file.uri)
@@ -65,17 +75,47 @@ export default function UploadScreen() {
   const [isPreparing, setIsPreparing] = useState(false);
   const [step, setStep] = useState("");
 
+  async function pickPhotoFromGallery() {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Permission required", "Please allow photo access to select report images.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: false,
+        mediaTypes: ["images"],
+        quality: 0.82,
+      });
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        const fileName = asset.fileName || `report-${Date.now()}.jpg`;
+        const picked: PickedFile = {
+          mimeType: asset.mimeType || inferMimeType(fileName, "image/jpeg"),
+          name: fileName,
+          size: asset.fileSize,
+          uri: asset.uri,
+        };
+        setFile(picked);
+      }
+    } catch {
+      Alert.alert("Gallery error", "Could not open photo library. Try Browse Files.");
+    }
+  }
+
   async function pickDocument() {
     const result = await DocumentPicker.getDocumentAsync({
       copyToCacheDirectory: true,
       type: ["application/pdf", "image/*"],
     });
-    if (!result.canceled) {
+    if (!result.canceled && result.assets && result.assets[0]) {
+      const rawAsset = result.assets[0];
+      const mimeType = inferMimeType(rawAsset.name, rawAsset.mimeType);
       const picked: PickedFile = {
-        mimeType: result.assets[0].mimeType || "application/octet-stream",
-        name: result.assets[0].name,
-        size: result.assets[0].size,
-        uri: result.assets[0].uri,
+        mimeType,
+        name: rawAsset.name,
+        size: rawAsset.size,
+        uri: rawAsset.uri,
       };
       if (picked.mimeType.startsWith("image/") && documentScanner) {
         setIsPreparing(true);
@@ -170,7 +210,8 @@ export default function UploadScreen() {
       };
 
       const isPdf = file.mimeType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-      if (file.mimeType.startsWith("image/") || isPdf) {
+      const isImage = file.mimeType.startsWith("image/") || Boolean(file.name.match(/\.(jpe?g|png|webp|heic|heif)$/i));
+      if (isImage || isPdf) {
         let analysisFile = file;
         if (isPdf) {
           if (!documentScanner) {
@@ -181,6 +222,7 @@ export default function UploadScreen() {
         }
         setStep("Extracting clinical biomarkers via AI vision");
         const dataUrl = await fileDataUrl(analysisFile);
+        const resolvedMime = analysisFile.mimeType.startsWith("image/") ? analysisFile.mimeType : "image/jpeg";
         analysis = await apiRequest(
           "/analyze-report",
           {
@@ -189,7 +231,7 @@ export default function UploadScreen() {
               fileName: file.name,
               lab,
               memberName: activeMember.name,
-              mimeType: analysisFile.mimeType,
+              mimeType: resolvedMime,
               originalMimeType: file.mimeType,
               reportKind: kind,
               title: title || file.name.replace(/\.[^.]+$/, ""),
@@ -223,6 +265,12 @@ export default function UploadScreen() {
 
       setStep("Synchronizing private medical vault");
       await saveUploadedReport(report);
+      if (analysis.aiConfidence === 0 && (!analysis.markers || analysis.markers.length <= 1)) {
+        Alert.alert(
+          "AI Analysis Notice",
+          analysis.summary || "Report was saved, but AI could not extract biomarkers."
+        );
+      }
       router.replace({
         params: { reportId: report.id },
         pathname: "/(tabs)/reports",
@@ -367,8 +415,21 @@ export default function UploadScreen() {
                   pressed && { transform: [{ scale: 0.97 }] },
                 ]}
               >
-                <Ionicons name="camera-outline" size={18} color={colors.primary} />
-                <Text style={styles.pickerBtnText}>Smart Scan</Text>
+                <Ionicons name="camera-outline" size={17} color={colors.primary} />
+                <Text style={styles.pickerBtnText}>Camera</Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityLabel="Photo Gallery"
+                accessibilityRole="button"
+                onPress={pickPhotoFromGallery}
+                style={({ pressed }) => [
+                  styles.pickerBtn,
+                  pressed && { transform: [{ scale: 0.97 }] },
+                ]}
+              >
+                <Ionicons name="images-outline" size={17} color={colors.primary} />
+                <Text style={styles.pickerBtnText}>Photos</Text>
               </Pressable>
 
               <Pressable
@@ -380,8 +441,8 @@ export default function UploadScreen() {
                   pressed && { transform: [{ scale: 0.97 }] },
                 ]}
               >
-                <Ionicons name="folder-open-outline" size={18} color={colors.primary} />
-                <Text style={styles.pickerBtnText}>Browse Files</Text>
+                <Ionicons name="folder-open-outline" size={17} color={colors.primary} />
+                <Text style={styles.pickerBtnText}>Files / PDF</Text>
               </Pressable>
             </View>
           ) : null}
@@ -508,7 +569,9 @@ const styles = StyleSheet.create({
   },
   dropzoneActions: {
     flexDirection: "row",
-    gap: 10,
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center",
     marginTop: 18,
   },
   dropzoneCard: {
