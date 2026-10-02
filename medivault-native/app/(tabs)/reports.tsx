@@ -2,7 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Modal,
+  NativeModules,
   Pressable,
   ScrollView,
   Share,
@@ -12,7 +14,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { apiRequest } from "@/api";
+import { API_URL, apiRequest } from "@/api";
 import { useAuth } from "@/auth-context";
 import { Card, EmptyState, PrimaryButton, ScreenHeader, StatusPill } from "@/components";
 import { colors, radius, shadows } from "@/theme";
@@ -27,6 +29,12 @@ const CATEGORIES = [
   "Thyroid",
   "Body Composition",
 ];
+
+type DocumentPreviewModule = {
+  previewRemoteFile: (url: string, token: string, fileName: string) => Promise<boolean>;
+};
+
+const documentPreview = NativeModules.DocumentScanner as DocumentPreviewModule | undefined;
 
 export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
@@ -84,6 +92,26 @@ export default function ReportsScreen() {
       });
     } finally {
       setSharing(false);
+    }
+  }
+
+  async function openOriginalReport() {
+    if (!selected?.fileId || !token) return;
+    if (!documentPreview) {
+      Alert.alert("Preview unavailable", "Update MediVault to open the original report file.");
+      return;
+    }
+    try {
+      await documentPreview.previewRemoteFile(
+        `${API_URL}/files/${encodeURIComponent(selected.fileId)}`,
+        token,
+        selected.fileName || "medical-report.pdf"
+      );
+    } catch (error) {
+      Alert.alert(
+        "Report could not be opened",
+        error instanceof Error ? error.message : "Please try again."
+      );
     }
   }
 
@@ -255,6 +283,27 @@ export default function ReportsScreen() {
               ]}
               showsVerticalScrollIndicator={false}
             >
+              {selected.fileId ? (
+                <Pressable
+                  accessibilityLabel="Open original report"
+                  onPress={openOriginalReport}
+                  style={styles.originalFileButton}
+                >
+                  <View style={styles.originalFileIcon}>
+                    <Ionicons
+                      color={colors.primary}
+                      name={selected.fileMimeType === "application/pdf" ? "document-text" : "image"}
+                      size={21}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.originalFileTitle}>Open original report</Text>
+                    <Text numberOfLines={1} style={styles.originalFileName}>{selected.fileName}</Text>
+                  </View>
+                  <Ionicons color={colors.primary} name="open-outline" size={18} />
+                </Pressable>
+              ) : null}
+
               {/* Executive Summary Card */}
               <Card style={styles.modalSectionCard}>
                 <View style={styles.sectionTitleRow}>
@@ -354,6 +403,35 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 6,
+  },
+  originalFileButton: {
+    alignItems: "center",
+    backgroundColor: colors.primarySoft,
+    borderColor: "rgba(13,99,82,0.16)",
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 11,
+    padding: 13,
+  },
+  originalFileIcon: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  originalFileName: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  originalFileTitle: {
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: "800",
   },
   categoriesContent: {
     gap: 8,

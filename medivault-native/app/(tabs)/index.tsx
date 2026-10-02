@@ -29,7 +29,8 @@ export default function HomeScreen() {
   );
   const score = memberReports.length
     ? Math.max(25, Math.min(95, 90 - abnormal * 5))
-    : 78;
+    : 0;
+  const scoreDisplay = memberReports.length ? String(score) : "00";
 
   // SVG Circular progress math
   const ringRadius = 34;
@@ -105,9 +106,15 @@ export default function HomeScreen() {
                 <View style={styles.scoreBadgeDot} />
                 <Text style={styles.scoreBadgeText}>CLINICAL INDEX</Text>
               </View>
-              <Text style={styles.scoreNumber}>{score}</Text>
+              <Text style={styles.scoreNumber}>{scoreDisplay}</Text>
               <Text style={styles.scoreStatus}>
-                {score >= 85 ? "Optimal Health" : score >= 70 ? "Good Condition" : "Needs Review"}
+                {!memberReports.length
+                  ? "No health data yet"
+                  : score >= 85
+                    ? "Optimal Health"
+                    : score >= 70
+                      ? "Good Condition"
+                      : "Needs Review"}
               </Text>
               <Text style={styles.scoreSubtitle}>
                 Based on {memberReports.length} verified lab report{memberReports.length === 1 ? "" : "s"}
@@ -142,7 +149,7 @@ export default function HomeScreen() {
                 />
               </Svg>
               <View style={styles.ringCenterTextWrap}>
-                <Text style={styles.ringCenterText}>{score}%</Text>
+                <Text style={styles.ringCenterText}>{scoreDisplay}%</Text>
               </View>
             </View>
           </View>

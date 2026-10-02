@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
-import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  NativeModules,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,7 +22,21 @@ import { colors, radius, shadows } from "@/theme";
 import type { AppReport, ReportMarker } from "@/types";
 import { useVault } from "@/vault-context";
 
-type PickedFile = { mimeType: string; name: string; size?: number; uri: string };
+type PickedFile = {
+  enhanced?: boolean;
+  mimeType: string;
+  name: string;
+  size?: number;
+  uri: string;
+};
+
+type DocumentScannerModule = {
+  enhanceImage: (uri: string) => Promise<PickedFile>;
+  previewRemoteFile: (url: string, token: string, fileName: string) => Promise<boolean>;
+  scan: () => Promise<PickedFile[]>;
+};
+
+const documentScanner = NativeModules.DocumentScanner as DocumentScannerModule | undefined;
 
 function fileDataUrl(file: PickedFile) {
   return new Promise<string>((resolve, reject) => {
@@ -47,6 +62,7 @@ export default function UploadScreen() {
   const [lab, setLab] = useState("");
   const [kind, setKind] = useState<"medical" | "body_composition">("medical");
   const [isSaving, setIsSaving] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
   const [step, setStep] = useState("");
 
   async function pickDocument() {
@@ -55,34 +71,57 @@ export default function UploadScreen() {
       type: ["application/pdf", "image/*"],
     });
     if (!result.canceled) {
-      setFile({
+      const picked: PickedFile = {
         mimeType: result.assets[0].mimeType || "application/octet-stream",
         name: result.assets[0].name,
         size: result.assets[0].size,
         uri: result.assets[0].uri,
-      });
+      };
+      if (picked.mimeType.startsWith("image/") && documentScanner) {
+        setIsPreparing(true);
+        try {
+          setFile(await documentScanner.enhanceImage(picked.uri));
+        } catch {
+          setFile(picked);
+          Alert.alert(
+            "Original image selected",
+            "Automatic edge correction was unavailable, so MediVault kept the original image."
+          );
+        } finally {
+          setIsPreparing(false);
+        }
+      } else {
+        setFile(picked);
+      }
     }
   }
 
-  async function takePhoto() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
+  async function scanDocument() {
+    if (Platform.OS !== "ios" || !documentScanner) {
       return Alert.alert(
-        "Camera permission required",
-        "Please allow camera access to capture and scan a physical medical report."
+        "Scanner unavailable",
+        "Use Browse Files to select a clear report image or PDF on this device."
       );
     }
-    const result = await ImagePicker.launchCameraAsync({
-      cameraType: ImagePicker.CameraType.back,
-      quality: 0.9,
-    });
-    if (!result.canceled) {
-      setFile({
-        mimeType: result.assets[0].mimeType || "image/jpeg",
-        name: result.assets[0].fileName || `report-${Date.now()}.jpg`,
-        size: result.assets[0].fileSize,
-        uri: result.assets[0].uri,
-      });
+    setIsPreparing(true);
+    try {
+      const pages = await documentScanner.scan();
+      if (pages.length) {
+        setFile(pages[0]);
+        if (pages.length > 1) {
+          Alert.alert(
+            "First page ready",
+            `The scan contains ${pages.length} pages. This upload currently analyzes the first page; upload the remaining pages separately for complete extraction.`
+          );
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Document scan could not be completed.";
+      if (!message.toLowerCase().includes("cancel")) {
+        Alert.alert("Scanner unavailable", message);
+      }
+    } finally {
+      setIsPreparing(false);
     }
   }
 
@@ -130,9 +169,18 @@ export default function UploadScreen() {
         title: title || file.name.replace(/\.[^.]+$/, ""),
       };
 
-      if (file.mimeType.startsWith("image/")) {
+      const isPdf = file.mimeType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      if (file.mimeType.startsWith("image/") || isPdf) {
+        let analysisFile = file;
+        if (isPdf) {
+          if (!documentScanner) {
+            throw new Error("PDF analysis is unavailable in this app build. Please update MediVault or upload a report image.");
+          }
+          setStep("Preparing the first PDF page for secure analysis");
+          analysisFile = await documentScanner.enhanceImage(file.uri);
+        }
         setStep("Extracting clinical biomarkers via AI vision");
-        const dataUrl = await fileDataUrl(file);
+        const dataUrl = await fileDataUrl(analysisFile);
         analysis = await apiRequest(
           "/analyze-report",
           {
@@ -141,7 +189,7 @@ export default function UploadScreen() {
               fileName: file.name,
               lab,
               memberName: activeMember.name,
-              mimeType: file.mimeType,
+              mimeType: analysisFile.mimeType,
               originalMimeType: file.mimeType,
               reportKind: kind,
               title: title || file.name.replace(/\.[^.]+$/, ""),
@@ -292,29 +340,40 @@ export default function UploadScreen() {
             {file
               ? `${file.mimeType} · ${
                   file.size ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : "ready"
-                }`
-              : "Direct lab PDF or clinic invoice photo. All original documents remain encrypted."}
+                }${file.enhanced ? " · Auto-cropped & enhanced" : ""}`
+              : "Scan with automatic borders, perspective correction and clarity enhancement. Originals remain encrypted."}
           </Text>
 
-          {file ? (
+          {isPreparing ? (
+            <View style={styles.preparingRow}>
+              <ActivityIndicator color={colors.primary} size="small" />
+              <Text style={styles.preparingText}>Preparing a clear scan...</Text>
+            </View>
+          ) : null}
+
+          {file && !isPreparing ? (
             <Pressable onPress={() => setFile(null)} style={styles.clearFileBadge}>
               <Ionicons name="trash-outline" size={13} color={colors.critical} />
               <Text style={styles.clearFileText}>Remove document</Text>
             </Pressable>
-          ) : (
+          ) : !isPreparing ? (
             <View style={styles.dropzoneActions}>
               <Pressable
-                onPress={takePhoto}
+                accessibilityLabel="Smart Scan"
+                accessibilityRole="button"
+                onPress={scanDocument}
                 style={({ pressed }) => [
                   styles.pickerBtn,
                   pressed && { transform: [{ scale: 0.97 }] },
                 ]}
               >
                 <Ionicons name="camera-outline" size={18} color={colors.primary} />
-                <Text style={styles.pickerBtnText}>Camera Scan</Text>
+                <Text style={styles.pickerBtnText}>Smart Scan</Text>
               </Pressable>
 
               <Pressable
+                accessibilityLabel="Browse Files"
+                accessibilityRole="button"
                 onPress={pickDocument}
                 style={({ pressed }) => [
                   styles.pickerBtn,
@@ -325,7 +384,7 @@ export default function UploadScreen() {
                 <Text style={styles.pickerBtnText}>Browse Files</Text>
               </Pressable>
             </View>
-          )}
+          ) : null}
         </Card>
 
         {/* Form Fields */}
@@ -530,6 +589,17 @@ const styles = StyleSheet.create({
   pickerBtnText: {
     color: colors.primary,
     fontSize: 13,
+    fontWeight: "800",
+  },
+  preparingRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 16,
+  },
+  preparingText: {
+    color: colors.primary,
+    fontSize: 12,
     fontWeight: "800",
   },
   screen: {
