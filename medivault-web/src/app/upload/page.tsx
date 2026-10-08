@@ -47,13 +47,15 @@ export default function Upload() {
     return () => window.clearInterval(timer);
   }, [isSaving]);
 
-  async function prepareFileForAi(file: File): Promise<PreparedFile> {
+  async function prepareFileForAi(file: File, isBodyComposition: boolean): Promise<PreparedFile> {
+    const maxSide = isBodyComposition ? 1280 : 1500;
+    const quality = isBodyComposition ? 0.76 : 0.8;
     if (file.type.startsWith("image/")) {
-      return { dataUrls: [await compressImageForAi(file)], mimeType: "image/jpeg" };
+      return { dataUrls: [await compressImageForAi(file, maxSide, quality)], mimeType: "image/jpeg" };
     }
 
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-      return { dataUrls: await renderPdfForAi(file), mimeType: "image/jpeg" };
+      return { dataUrls: await renderPdfForAi(file, maxSide, quality), mimeType: "image/jpeg" };
     }
 
     const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -65,7 +67,7 @@ export default function Upload() {
     return { dataUrls: [dataUrl], mimeType: file.type };
   }
 
-  async function compressImageForAi(file: File) {
+  async function compressImageForAi(file: File, maxSide: number, quality: number) {
     const sourceUrl = URL.createObjectURL(file);
     try {
       const image = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -75,7 +77,6 @@ export default function Upload() {
         img.src = sourceUrl;
       });
 
-      const maxSide = 1600;
       const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
       const width = Math.max(1, Math.round(image.width * scale));
       const height = Math.max(1, Math.round(image.height * scale));
@@ -85,13 +86,13 @@ export default function Upload() {
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Image processing is not available on this device.");
       context.drawImage(image, 0, 0, width, height);
-      return canvas.toDataURL("image/jpeg", 0.82);
+      return canvas.toDataURL("image/jpeg", quality);
     } finally {
       URL.revokeObjectURL(sourceUrl);
     }
   }
 
-  async function renderPdfForAi(file: File) {
+  async function renderPdfForAi(file: File, maxSide: number, quality: number) {
     const pdfjs = await import("pdfjs-dist");
     pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
 
@@ -102,7 +103,7 @@ export default function Upload() {
     for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber);
       const baseViewport = page.getViewport({ scale: 1 });
-      const scale = Math.min(2, 1500 / Math.max(baseViewport.width, baseViewport.height));
+      const scale = Math.min(2, maxSide / Math.max(baseViewport.width, baseViewport.height));
       const viewport = page.getViewport({ scale });
       const canvas = document.createElement("canvas");
       canvas.width = Math.floor(viewport.width);
@@ -110,7 +111,7 @@ export default function Upload() {
       const context = canvas.getContext("2d");
       if (!context) throw new Error("PDF rendering is not available on this device.");
       await page.render({ canvasContext: context, viewport }).promise;
-      pages.push(canvas.toDataURL("image/jpeg", 0.82));
+      pages.push(canvas.toDataURL("image/jpeg", quality));
     }
 
     if (!pages.length) throw new Error("Could not read this PDF. Try uploading a clearer report image.");
@@ -179,8 +180,11 @@ export default function Upload() {
 
     try {
       setAnalysisProgress(18);
-      setAnalysisStep("Storing original file");
-      const storedFile = await storeOriginalFile(file);
+      setAnalysisStep("Preparing secure upload");
+      const [storedFile, preparedFile] = await Promise.all([
+        storeOriginalFile(file),
+        prepareFileForAi(file, reportKind === "body_composition"),
+      ]);
       if (storedFile) {
         updateReport(report.id, {
           fileId: storedFile.fileId,
@@ -188,9 +192,6 @@ export default function Upload() {
           fileSizeBytes: storedFile.fileSizeBytes,
         });
       }
-      setAnalysisProgress(28);
-      setAnalysisStep(file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf") ? "Preparing PDF pages" : "Preparing image");
-      const preparedFile = await prepareFileForAi(file);
       setAnalysisProgress(44);
       setAnalysisStep("Uploading securely");
       const response = await fetch("/api/analyze-report", {

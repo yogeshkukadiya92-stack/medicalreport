@@ -10,6 +10,8 @@ import type { ReportMarker, ReportStatus } from "@/lib/vault-types";
 
 export const maxDuration = 60;
 
+const aiRequestTimeoutMs = 25_000;
+
 type AnalysisResponse = {
   abnormal: number;
   aiConfidence: number;
@@ -408,23 +410,29 @@ export async function POST(request: NextRequest) {
       },
     ],
     ...(aiProvider.supportsJsonMode ? { response_format: { type: "json_object" } } : {}),
+    max_tokens: isBodyComposition ? 1_400 : 900,
     temperature: 0.1,
   };
 
   try {
     openAiResponse = await fetch(`${aiProvider.baseUrl}/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${aiProvider.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestPayload),
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${aiProvider.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestPayload),
+      signal: AbortSignal.timeout(aiRequestTimeoutMs),
     });
-  } catch {
+  } catch (error) {
+    const timedOut = error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
+    const failureReason = timedOut
+      ? `${aiProvider.providerName} analysis exceeded ${Math.round(aiRequestTimeoutMs / 1_000)} seconds.`
+      : `${aiProvider.providerName} service connection failed.`;
     return NextResponse.json(
       isBodyComposition
-        ? await bodyCompositionOcrAnalysis(title, imageUrls, `${aiProvider.providerName} service connection failed.`)
-        : fallbackAnalysis(title, `${aiProvider.providerName} service connection failed. Confirm ${aiProvider.keyName} is set on Railway and redeploy the app.`),
+        ? await bodyCompositionOcrAnalysis(title, imageUrls, failureReason)
+        : fallbackAnalysis(title, `${failureReason} Confirm ${aiProvider.keyName} is set in the deployment environment and redeploy the app.`),
       { status: 200 },
     );
   }
