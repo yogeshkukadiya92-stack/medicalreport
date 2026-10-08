@@ -231,8 +231,9 @@ function numberAfterLabel(lines: string[], metric: OcrMetric) {
 async function bodyCompositionOcrAnalysis(title: string, imageUrls: string[], failureReason: string): Promise<AnalysisResponse> {
   if (!imageUrls.length) return fallbackAnalysis(title, failureReason);
 
-  const worker = await createWorker("eng", OEM.LSTM_ONLY, { cachePath: "/tmp/tesseract" });
+  let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
   try {
+    worker = await createWorker("eng", OEM.LSTM_ONLY, { cachePath: "/tmp/tesseract" });
     const pages: string[] = [];
     for (const dataUrl of imageUrls.slice(0, 2)) {
       const encoded = dataUrl.split(",", 2)[1];
@@ -270,7 +271,7 @@ async function bodyCompositionOcrAnalysis(title: string, imageUrls: string[], fa
   } catch {
     return fallbackAnalysis(title, `${failureReason} OCR processing also failed. Try a clearer JPG/PNG or configure the vision API.`);
   } finally {
-    await worker.terminate();
+    await worker?.terminate().catch(() => undefined);
   }
 }
 

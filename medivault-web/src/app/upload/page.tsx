@@ -193,7 +193,7 @@ export default function Upload() {
         });
       }
       setAnalysisProgress(44);
-      setAnalysisStep("Uploading securely");
+      setAnalysisStep("AI is reading values");
       const response = await fetch("/api/analyze-report", {
         method: "POST",
         headers: {
@@ -210,6 +210,7 @@ export default function Upload() {
           reportKind,
           title: report.title,
         }),
+        signal: AbortSignal.timeout(55_000),
       });
       setAnalysisProgress(76);
       setAnalysisStep("Reading values");
@@ -231,13 +232,16 @@ export default function Upload() {
       setAnalysisStep("Complete");
       setMessage(`${report.title} analyzed and added to reports.`);
     } catch (analysisError) {
+      const timedOut = analysisError instanceof Error && (analysisError.name === "AbortError" || analysisError.name === "TimeoutError");
       setAnalysisProgress(100);
       setAnalysisStep("Needs attention");
       updateReport(report.id, {
         category: "General",
         status: "Watch",
         summary:
-          analysisError instanceof Error && analysisError.message !== "Load failed"
+          timedOut
+            ? "Analysis took too long and was safely stopped. Try again with a clear, cropped report image."
+            : analysisError instanceof Error && analysisError.message !== "Load failed"
             ? analysisError.message
             : "AI analysis could not connect. Check Railway OPENAI_API_KEY and try again with a clear JPG/PNG report image.",
       });
