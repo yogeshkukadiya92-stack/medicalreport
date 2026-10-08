@@ -314,6 +314,19 @@ function extractJsonObject(content: string) {
   return JSON.parse(candidate.slice(firstBrace, lastBrace + 1));
 }
 
+function completionText(content: unknown) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) => {
+      if (typeof part === "string") return part;
+      if (part && typeof part === "object" && "text" in part && typeof part.text === "string") return part.text;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
 
@@ -410,7 +423,7 @@ export async function POST(request: NextRequest) {
       },
     ],
     ...(aiProvider.supportsJsonMode ? { response_format: { type: "json_object" } } : {}),
-    max_tokens: isBodyComposition ? 1_400 : 900,
+    max_tokens: isBodyComposition ? 2_800 : 1_400,
     temperature: 0.1,
   };
 
@@ -457,10 +470,36 @@ export async function POST(request: NextRequest) {
   }
 
   const completion = await openAiResponse.json();
-  const content = completion?.choices?.[0]?.message?.content;
-  const parsed = extractJsonObject(content || "{}") as Partial<AnalysisResponse>;
-  const rawMarkers = Array.isArray(parsed.markers) ? parsed.markers.slice(0, isBodyComposition ? 48 : 8).map(cleanMarker) : fallbackMarkers;
+  const content = completionText(completion?.choices?.[0]?.message?.content);
+  let parsed: Partial<AnalysisResponse> = {};
+  try {
+    parsed = extractJsonObject(content || "{}") as Partial<AnalysisResponse>;
+  } catch {
+    parsed = {};
+  }
+  const rawMarkers = Array.isArray(parsed.markers)
+    ? parsed.markers.slice(0, isBodyComposition ? 48 : 8).map(cleanMarker)
+    : [];
   const markers = isBodyComposition ? normalizeBodyCompositionMarkers(rawMarkers).slice(0, 40) : rawMarkers;
+
+  if (isBodyComposition && markers.length < 3) {
+    return NextResponse.json(
+      await bodyCompositionOcrAnalysis(
+        title,
+        imageUrls,
+        `${aiProvider.providerName} did not return enough structured body-composition values.`,
+      ),
+      { status: 200 },
+    );
+  }
+
+  if (!markers.length) {
+    return NextResponse.json(
+      fallbackAnalysis(title, `${aiProvider.providerName} could not detect structured report values. Try a clearer, straight image.`),
+      { status: 200 },
+    );
+  }
+
   const abnormal = markers.filter((marker) => marker.status !== "Normal").length;
 
   return NextResponse.json({
@@ -468,7 +507,7 @@ export async function POST(request: NextRequest) {
     aiConfidence: markers.length ? 88 : 60,
     category: String(parsed.category || (isBodyComposition ? "Body Composition" : "General")).slice(0, 40),
     markers,
-    parameters: Math.max(markers.length, 1),
+    parameters: markers.length,
     status: abnormal ? "Needs review" : "Reviewed",
     summary: String(parsed.summary || "Report analyzed. Review values with your doctor.").slice(0, 280),
     title: String(parsed.title || title).slice(0, 80),

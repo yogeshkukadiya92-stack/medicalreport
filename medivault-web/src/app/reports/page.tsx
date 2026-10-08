@@ -271,6 +271,15 @@ export default function Reports() {
     if (linkedReport && selectedReport?.id !== linkedReport.id) setSelectedReport(linkedReport);
   }, [reportsForActiveMember, selectedReport?.id]);
 
+  useEffect(() => {
+    if (!selectedReport) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeReport();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedReport]);
+
   function saveEdit() {
     if (!editingReport) return;
     updateReport(editingReport.id, {
@@ -554,16 +563,31 @@ export default function Reports() {
         )}
 
         {selectedReport ? (
-          <div className="fixed inset-0 z-40 grid place-items-end bg-black/30 px-4 pb-4">
-            <div className="max-h-[86vh] w-full max-w-[430px] overflow-y-auto rounded-lg bg-white p-5 shadow-[0_24px_70px_rgba(0,0,0,0.22)]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
+          <div
+            className="fixed inset-0 z-40 grid place-items-end bg-black/30 px-4 pb-4"
+            onClick={closeReport}
+            role="presentation"
+          >
+            <div
+              aria-labelledby="report-details-title"
+              aria-modal="true"
+              className="relative max-h-[86vh] w-full max-w-[430px] overflow-y-auto rounded-lg bg-white p-5 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+            >
+              <button
+                aria-label="Close report details"
+                className="sticky top-0 z-10 float-right grid h-10 w-10 place-items-center rounded-full border border-[#dce9e5] bg-white text-[22px] font-medium leading-none text-[#33413e] shadow-sm"
+                onClick={closeReport}
+                type="button"
+              >
+                ×
+              </button>
+              <div className="min-w-0 pr-12">
+                <div className="min-w-0">
                   <p className="text-[12px] font-bold text-[#087766]">Report details</p>
-                  <h2 className="mt-1 text-[20px] font-black text-[#162523]">{selectedReport.title}</h2>
+                  <h2 id="report-details-title" className="mt-1 break-words text-[20px] font-black text-[#162523]">{selectedReport.title}</h2>
                 </div>
-                <button onClick={closeReport} className="h-9 rounded-md border border-[#dce9e5] px-3 text-[12px] font-bold">
-                  Close
-                </button>
               </div>
               <div className="mt-4 space-y-2 text-[13px] text-[#52605d]">
                 <p><strong>Member:</strong> {selectedReport.memberName}</p>
