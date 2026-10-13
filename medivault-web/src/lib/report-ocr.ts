@@ -1,5 +1,4 @@
-import { createRequire } from "node:module";
-import path from "node:path";
+import englishData from "@tesseract.js-data/eng";
 import { createWorker, OEM } from "tesseract.js";
 
 type OcrWorker = Pick<Awaited<ReturnType<typeof createWorker>>, "recognize" | "terminate">;
@@ -9,9 +8,7 @@ export async function recognizeReportPages(
   images: Buffer[],
   timeoutMs = 18_000,
   factory: () => Promise<OcrWorker> = () => {
-    const require = createRequire(path.join(process.cwd(), "package.json"));
-    const langPath = path.join(path.dirname(require.resolve("@tesseract.js-data/eng")), "4.0.0");
-    return createWorker("eng", OEM.LSTM_ONLY, { langPath, cacheMethod: "none" });
+    return createWorker("eng", OEM.LSTM_ONLY, { langPath: englishData.langPath, cacheMethod: "none" });
   },
 ): Promise<string[]> {
   let worker: OcrWorker | undefined;
