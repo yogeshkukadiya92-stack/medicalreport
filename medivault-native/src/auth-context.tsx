@@ -1,7 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Platform } from "react-native";
-import { apiRequest } from "@/api";
+import { ApiError, apiRequest } from "@/api";
 import type { AuthUser } from "@/types";
 
 const tokenKey = "medivault_access_token";
@@ -54,8 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const result = await apiRequest<{ user: AuthUser }>("/auth/session", {}, storedToken);
         setToken(storedToken);
         setUser(result.user);
-      } catch {
-        await removeToken();
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) await removeToken();
+        else setToken(storedToken);
       }
     }).finally(() => setIsLoading(false));
   }, []);

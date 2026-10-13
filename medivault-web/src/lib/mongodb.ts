@@ -19,8 +19,12 @@ export async function getMongoDb() {
   const globalForMongo = globalThis as MongoGlobal;
 
   if (!globalForMongo._medivaultMongoClientPromise) {
-    const client = new MongoClient(uri);
-    globalForMongo._medivaultMongoClientPromise = client.connect();
+    const client = new MongoClient(uri, { serverSelectionTimeoutMS: 10_000, connectTimeoutMS: 10_000, socketTimeoutMS: 20_000 });
+    globalForMongo._medivaultMongoClientPromise = client.connect().catch((error) => {
+      globalForMongo._medivaultMongoClientPromise = undefined;
+      void client.close();
+      throw error;
+    });
   }
 
   const client = await globalForMongo._medivaultMongoClientPromise;

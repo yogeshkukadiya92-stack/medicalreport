@@ -1,3 +1,7 @@
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import { prepareReportAnalysis } from "@/prepare-report";
+import { measuredMarkers } from "@/report-analysis";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -31,6 +35,8 @@ const CATEGORIES = [
 ];
 
 type DocumentPreviewModule = {
+  readReportDataUrl?: (uri: string) => Promise<string>;
+  enhanceImage: (uri: string) => Promise<{ uri: string; mimeType: string }>;
   previewRemoteFile: (url: string, token: string, fileName: string) => Promise<boolean>;
 };
 
@@ -40,12 +46,14 @@ export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ reportId?: string }>();
   const { token } = useAuth();
-  const { activeMember, reports } = useVault();
+  const { activeMember, reports, updateReport } = useVault();
 
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selected, setSelected] = useState<AppReport | null>(null);
   const [recipient, setRecipient] = useState("");
+  const [analysisStep, setAnalysisStep] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
   const [sharing, setSharing] = useState(false);
 
   const memberReports = reports.filter(
@@ -70,6 +78,78 @@ export default function ReportsScreen() {
       setSelected(reports.find((item) => item.id === params.reportId) ?? null);
     }
   }, [params.reportId, reports]);
+
+  async function extractSavedParameters() {
+    if (!selected?.fileId || !token) return;
+    const report = selected;
+    setAnalyzing(true);
+    setAnalysisStep("Extracting saved report parameters...");
+    try {
+      const result = await apiRequest<Partial<AppReport>>("/analyze-report", {
+        method: "POST", body: JSON.stringify({
+          fileId: report.fileId, fileName: report.fileName, title: report.title,
+          lab: report.lab, memberName: report.memberName,
+          reportKind: /inbody|body composition/i.test(report.title + report.category) ? "body_composition" : "medical",
+        }),
+      }, token);
+      const markers = measuredMarkers(result.markers);
+      if (!markers.length) throw new Error(result.summary || "No parameters could be read. Retry with a clearer report photo.");
+      const updated = { ...report, ...result, id: report.id, fileId: report.fileId, markers, parameters: markers.length } as AppReport;
+      await updateReport(updated);
+      setSelected(updated);
+    } catch (error) {
+      Alert.alert("Parameters could not be extracted", error instanceof Error ? error.message : "Please retry.");
+    } finally { setAnalyzing(false); }
+  }
+
+  async function retryAnalysis(fromPhotos = false) {
+    if (!selected || !token) return;
+    const report = selected;
+    let file: { uri: string; name: string; mimeType?: string };
+    if (fromPhotos) {
+      const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 });
+      if (picked.canceled || !picked.assets?.[0]) return;
+      const asset = picked.assets[0];
+      file = { uri: asset.uri, name: asset.fileName || "report.jpg", mimeType: asset.mimeType || "image/jpeg" };
+    } else {
+      const picked = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, type: ["application/pdf", "image/*"] });
+      if (picked.canceled || !picked.assets?.[0]) return;
+      file = picked.assets[0];
+    }
+    setAnalyzing(true);
+    setAnalysisStep("Saving original...");
+    try {
+      const form = new FormData();
+      form.append("file", { uri: file.uri, name: file.name, type: file.mimeType || "application/pdf" } as unknown as Blob);
+      const stored = await apiRequest<{ fileId: string; fileMimeType: string }>("/files", { method: "POST", body: form }, token);
+      const attached = { ...report, ...stored, fileName: file.name };
+      await updateReport(attached);
+      setSelected(attached);
+      try {
+        setAnalysisStep("Reading report...");
+        const prepared = await prepareReportAnalysis(file, stored.fileId);
+        setAnalysisStep("Extracting measured values...");
+        const result = await apiRequest<Partial<AppReport>>("/analyze-report", { method: "POST", body: JSON.stringify({
+          ...prepared, fileName: file.name, title: report.title, lab: report.lab,
+          memberName: report.memberName,
+          reportKind: /inbody|body composition/i.test(report.title + report.category) ? "body_composition" : "medical",
+        }) }, token);
+        const markers = measuredMarkers(result.markers);
+        if (!markers.length) throw new Error(result.summary && !/Report analyzed/i.test(result.summary) ? result.summary : "No measured values were detected. Try a clearer original report.");
+        const updated = { ...attached, ...result, id: report.id, markers, parameters: markers.length } as AppReport;
+        await updateReport(updated);
+        setSelected(updated);
+      } catch (error) {
+        const summary = error instanceof Error ? error.message : "Extraction failed. Please retry.";
+        const failed = { ...attached, status: "Needs review", summary };
+        await updateReport(failed);
+        setSelected(failed);
+        Alert.alert("Original saved; extraction needs attention", summary);
+      }
+    } catch (error) {
+      Alert.alert("Report could not be saved", error instanceof Error ? error.message : "Please try again.");
+    } finally { setAnalyzing(false); }
+  }
 
   async function shareReport() {
     if (!selected || !token) return;
@@ -264,7 +344,7 @@ export default function ReportsScreen() {
                 </View>
                 <Text style={styles.modalTitle}>{selected.title}</Text>
                 <Text style={styles.modalSubtitle}>
-                  {selected.lab} · Verified on {selected.date}
+                  {selected.lab} · Report date {selected.date}
                 </Text>
               </View>
               <Pressable
@@ -304,6 +384,21 @@ export default function ReportsScreen() {
                 </Pressable>
               ) : null}
 
+              {!selected.fileId ? (
+                <Card><Text style={styles.detailText}>The original document is not linked to this record. Select it below to restore the preview and extract measured values.</Text></Card>
+              ) : null}
+              {selected.fileId && selected.source !== "lab" ? <PrimaryButton
+                title={analyzing ? analysisStep : "Extract parameters from saved report"}
+                icon="sparkles-outline" loading={analyzing} disabled={analyzing}
+                onPress={extractSavedParameters}
+              /> : null}
+              {selected.source !== "lab" ? <PrimaryButton
+                title={analyzing ? analysisStep : selected.fileId ? "Select original & retry extraction" : "Attach original & extract values"}
+                icon="document-attach-outline" loading={analyzing} disabled={analyzing}
+                onPress={() => retryAnalysis()}
+              /> : null}
+              {selected.source !== "lab" ? <PrimaryButton title="Select report photo & extract" icon="images-outline" disabled={analyzing} onPress={() => retryAnalysis(true)} /> : null}
+              {!selected.markers.length ? <Card><EmptyState title="No measured values extracted" description="Attach a readable original PDF or photo to extract the report values." icon="document-text-outline" /></Card> : null}
               {/* Executive Summary Card */}
               <Card style={styles.modalSectionCard}>
                 <View style={styles.sectionTitleRow}>

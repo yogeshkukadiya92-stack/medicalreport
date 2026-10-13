@@ -1,5 +1,8 @@
+import { GridFSBucket, ObjectId } from "mongodb";
+import { getMongoDb } from "@/lib/mongodb";
+import { renderReportPdf } from "@/lib/report-pages";
 import { NextRequest, NextResponse } from "next/server";
-import { createWorker, OEM } from "tesseract.js";
+import { recognizeReportPages } from "@/lib/report-ocr";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
 import {
   canonicalBodyMetricName,
@@ -22,10 +25,6 @@ type AnalysisResponse = {
   summary: string;
   title: string;
 };
-
-const fallbackMarkers: ReportMarker[] = [
-  { name: "Report", value: "Uploaded", range: "Needs review", status: "Watch" },
-];
 
 const bodyCompositionOrder = [
   "Height",
@@ -134,6 +133,9 @@ export async function GET() {
   const aiProvider = getAiProvider();
   return NextResponse.json({
     configured: Boolean(aiProvider.apiKey),
+    extractionVersion: 2,
+    visionTimeoutSeconds: aiRequestTimeoutMs / 1_000,
+    ocrTimeoutSeconds: 18,
     keyName: aiProvider.keyName,
     model: aiProvider.model,
     provider: aiProvider.providerName,
@@ -143,11 +145,11 @@ export async function GET() {
 
 function fallbackAnalysis(title: string, reason: string): AnalysisResponse {
   return {
-    abnormal: 1,
+    abnormal: 0,
     aiConfidence: 0,
     category: "General",
-    markers: fallbackMarkers,
-    parameters: 1,
+    markers: [],
+    parameters: 0,
     status: "Watch",
     summary: reason,
     title: title || "Medical Report",
@@ -231,16 +233,12 @@ function numberAfterLabel(lines: string[], metric: OcrMetric) {
 async function bodyCompositionOcrAnalysis(title: string, imageUrls: string[], failureReason: string): Promise<AnalysisResponse> {
   if (!imageUrls.length) return fallbackAnalysis(title, failureReason);
 
-  let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
   try {
-    worker = await createWorker("eng", OEM.LSTM_ONLY, { cachePath: "/tmp/tesseract" });
-    const pages: string[] = [];
-    for (const dataUrl of imageUrls.slice(0, 2)) {
+    const images = imageUrls.slice(0, 2).flatMap((dataUrl) => {
       const encoded = dataUrl.split(",", 2)[1];
-      if (!encoded) continue;
-      const result = await worker.recognize(Buffer.from(encoded, "base64"));
-      pages.push(result.data.text);
-    }
+      return encoded ? [Buffer.from(encoded, "base64")] : [];
+    });
+    const pages = await recognizeReportPages(images);
     const lines = pages.join("\n").split(/\r?\n/).map((line) => line.replace(/[|_]/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
     const markers = bodyOcrMetrics.flatMap((metric) => {
       const value = numberAfterLabel(lines, metric);
@@ -270,13 +268,11 @@ async function bodyCompositionOcrAnalysis(title: string, imageUrls: string[], fa
     };
   } catch {
     return fallbackAnalysis(title, `${failureReason} OCR processing also failed. Try a clearer JPG/PNG or configure the vision API.`);
-  } finally {
-    await worker?.terminate().catch(() => undefined);
   }
 }
 
 function cleanMarker(marker: Partial<ReportMarker>): ReportMarker {
-  const status = marker.status === "High" || marker.status === "Low" || marker.status === "Watch" ? marker.status : "Normal";
+  const status = marker.status === "High" || marker.status === "Low" || marker.status === "Normal" ? marker.status : "Watch";
   return {
     name: String(marker.name || "Detected value").slice(0, 60),
     range: String(marker.range || "Reference range not detected").slice(0, 80),
@@ -337,6 +333,7 @@ export async function POST(request: NextRequest) {
 
   const aiProvider = getAiProvider();
   const body = await request.json().catch(() => null) as {
+    fileId?: string;
     fileDataUrl?: string;
     fileDataUrls?: string[];
     fileName?: string;
@@ -353,9 +350,28 @@ export async function POST(request: NextRequest) {
   }
 
   const title = body.title || body.fileName?.replace(/\.[^.]+$/, "") || "Medical Report";
-  const imageUrls = (Array.isArray(body.fileDataUrls) && body.fileDataUrls.length ? body.fileDataUrls : body.fileDataUrl ? [body.fileDataUrl] : [])
+  let imageUrls = (Array.isArray(body.fileDataUrls) && body.fileDataUrls.length ? body.fileDataUrls : body.fileDataUrl ? [body.fileDataUrl] : [])
     .filter((url) => typeof url === "string" && url.startsWith("data:image/"))
     .slice(0, aiProvider.imageLimit);
+  if (body.fileId) {
+    if (!ObjectId.isValid(body.fileId)) return NextResponse.json({ error: "Invalid report file." }, { status: 400 });
+    const db = await getMongoDb();
+    const bucket = new GridFSBucket(db, { bucketName: "reportFiles" });
+    const id = new ObjectId(body.fileId);
+    const file = await bucket.find({ _id: id, "metadata.userId": userId }).next();
+    if (!file) return NextResponse.json({ error: "Report file not found for this account." }, { status: 404 });
+    if (file.length > 20 * 1024 * 1024) return NextResponse.json({ error: "Report exceeds the 20 MB limit." }, { status: 413 });
+    const chunks: Buffer[] = [];
+    for await (const chunk of bucket.openDownloadStream(id)) chunks.push(Buffer.from(chunk));
+    const buffer = Buffer.concat(chunks);
+    try {
+      imageUrls = file.contentType === "application/pdf"
+        ? await renderReportPdf(buffer, aiProvider.imageLimit)
+        : file.contentType?.startsWith("image/") ? [`data:${file.contentType};base64,${buffer.toString("base64")}`] : [];
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "PDF pages could not be read. Upload a readable report photo." }, { status: 422 });
+    }
+  }
   const isImage = Boolean(
     imageUrls.length &&
     (imageUrls[0].startsWith("data:image/") ||
@@ -395,6 +411,7 @@ export async function POST(request: NextRequest) {
       ? "This is a BMI/body composition report or machine/photo reading, often an InBody-style printout. Extract visible values exactly. Do not only store the photo. Return structured markers for every visible current body-composition value."
       : "Prioritize clinical lab values and biomarkers visible in the report.",
     "Return only JSON with: title, category, summary, markers.",
+    "Extract all visible measured parameters, including qualitative results. Keep units in value and the printed reference interval in range. Never invent values, use upload placeholders, or treat patient identifiers as measurements. Mark uncertain or unreadable results Watch; omit values that cannot be read.",
     "markers must be an array of {name,value,range,status}; status must be Normal, High, Low, or Watch.",
     "For body composition values, keep consistent marker names so history graphs work across uploads. Put units in value when visible, for example \"67.7 kg\", \"22.8 %\", or \"1499 kcal\".",
     isBodyComposition ? `Required body-composition marker names when visible: ${requiredBodyCompositionNames}. Also extract segmental lean/fat values when visible, for example Right Arm Lean, Left Arm Lean, Trunk Lean, Right Leg Lean, Left Leg Lean, Right Arm Fat, Left Arm Fat, Trunk Fat, Right Leg Fat, Left Leg Fat.` : "",
@@ -424,7 +441,7 @@ export async function POST(request: NextRequest) {
       },
     ],
     ...(aiProvider.supportsJsonMode ? { response_format: { type: "json_object" } } : {}),
-    max_tokens: isBodyComposition ? 2_800 : 1_400,
+    max_tokens: 4_000,
     temperature: 0.1,
   };
 
@@ -479,7 +496,7 @@ export async function POST(request: NextRequest) {
     parsed = {};
   }
   const rawMarkers = Array.isArray(parsed.markers)
-    ? parsed.markers.slice(0, isBodyComposition ? 48 : 8).map(cleanMarker)
+    ? parsed.markers.slice(0, 80).map(cleanMarker).filter((marker) => !/^(uploaded|pending|processing|--|n\/a)$/i.test(marker.value.trim()))
     : [];
   const markers = isBodyComposition ? normalizeBodyCompositionMarkers(rawMarkers).slice(0, 40) : rawMarkers;
 

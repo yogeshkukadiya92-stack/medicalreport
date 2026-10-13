@@ -16,6 +16,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,md}\""
   },
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.11",
+    "@tesseract.js-data/eng": "^1.0.0",
     "axios": "^1.6.0",
     "clsx": "^2.0.0",
     "jsbarcode": "^3.12.3",

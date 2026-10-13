@@ -16,6 +16,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { prepareReportAnalysis } from "@/prepare-report";
+import { measuredMarkers } from "@/report-analysis";
 import { apiRequest } from "@/api";
 import { useAuth } from "@/auth-context";
 import { Card, EmptyState, PrimaryButton, ScreenHeader } from "@/components";
@@ -32,6 +34,7 @@ type PickedFile = {
 };
 
 type DocumentScannerModule = {
+  readReportDataUrl?: (uri: string) => Promise<string>;
   enhanceImage: (uri: string) => Promise<PickedFile>;
   previewRemoteFile: (url: string, token: string, fileName: string) => Promise<boolean>;
   scan: () => Promise<PickedFile[]>;
@@ -46,20 +49,6 @@ function inferMimeType(name: string, rawMime?: string): string {
   if (lower.endsWith(".webp") || rawMime === "image/webp") return "image/webp";
   if (lower.match(/\.(jpe?g|heic|heif)$/) || rawMime?.startsWith("image/")) return "image/jpeg";
   return rawMime || "application/octet-stream";
-}
-
-function fileDataUrl(file: PickedFile) {
-  return new Promise<string>((resolve, reject) => {
-    fetch(file.uri)
-      .then((response) => response.blob())
-      .then((blob) => {
-        const reader = new FileReader();
-        reader.onerror = reject;
-        reader.onload = () => resolve(String(reader.result));
-        reader.readAsDataURL(blob);
-      })
-      .catch(reject);
-  });
 }
 
 export default function UploadScreen() {
@@ -209,37 +198,30 @@ export default function UploadScreen() {
         title: title || file.name.replace(/\.[^.]+$/, ""),
       };
 
-      const isPdf = file.mimeType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-      const isImage = file.mimeType.startsWith("image/") || Boolean(file.name.match(/\.(jpe?g|png|webp|heic|heif)$/i));
-      if (isImage || isPdf) {
-        let analysisFile = file;
-        if (isPdf) {
-          if (!documentScanner) {
-            throw new Error("PDF analysis is unavailable in this app build. Please update MediVault or upload a report image.");
-          }
-          setStep("Preparing the first PDF page for secure analysis");
-          analysisFile = await documentScanner.enhanceImage(file.uri);
-        }
-        setStep("Extracting clinical biomarkers via AI vision");
-        const dataUrl = await fileDataUrl(analysisFile);
-        const resolvedMime = analysisFile.mimeType.startsWith("image/") ? analysisFile.mimeType : "image/jpeg";
-        analysis = await apiRequest(
-          "/analyze-report",
-          {
-            body: JSON.stringify({
-              fileDataUrls: [dataUrl],
-              fileName: file.name,
-              lab,
-              memberName: activeMember.name,
-              mimeType: resolvedMime,
-              originalMimeType: file.mimeType,
-              reportKind: kind,
-              title: title || file.name.replace(/\.[^.]+$/, ""),
-            }),
-            method: "POST",
-          },
-          token
-        );
+      let extractionError = "";
+      try {
+        setStep("Preparing report for parameter extraction");
+        const prepared = await prepareReportAnalysis(file, stored.fileId);
+        setStep("Extracting report parameters");
+        analysis = await apiRequest("/analyze-report", {
+          method: "POST",
+          body: JSON.stringify({ ...prepared, fileName: file.name, lab,
+            memberName: activeMember.name, reportKind: kind,
+            title: title || file.name.replace(/\.[^.]+$/, ""),
+          }),
+        }, token);
+
+      } catch (error) {
+        extractionError = error instanceof Error ? error.message : "Extraction failed. Retry from the report details.";
+        analysis.summary = extractionError;
+      }
+      analysis.markers = measuredMarkers(analysis.markers);
+      analysis.parameters = analysis.markers.length;
+      if (!analysis.parameters) {
+        analysis.status = "Needs review";
+        analysis.abnormal = 0;
+        analysis.aiConfidence = 0;
+        if (!extractionError && /Report analyzed/i.test(analysis.summary)) analysis.summary = "No measured values were extracted. Retry with a readable original report.";
       }
 
       const report: AppReport = {

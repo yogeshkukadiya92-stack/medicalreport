@@ -181,10 +181,7 @@ export default function Upload() {
     try {
       setAnalysisProgress(18);
       setAnalysisStep("Preparing secure upload");
-      const [storedFile, preparedFile] = await Promise.all([
-        storeOriginalFile(file),
-        prepareFileForAi(file, reportKind === "body_composition"),
-      ]);
+      const storedFile = await storeOriginalFile(file);
       if (storedFile) {
         updateReport(report.id, {
           fileId: storedFile.fileId,
@@ -192,6 +189,7 @@ export default function Upload() {
           fileSizeBytes: storedFile.fileSizeBytes,
         });
       }
+      const preparedFile = await prepareFileForAi(file, reportKind === "body_composition");
       setAnalysisProgress(44);
       setAnalysisStep("AI is reading values");
       const response = await fetch("/api/analyze-report", {
@@ -229,8 +227,8 @@ export default function Upload() {
         title: result.title || report.title,
       });
       setAnalysisProgress(100);
-      setAnalysisStep("Complete");
-      setMessage(`${report.title} analyzed and added to reports.`);
+      setAnalysisStep(result.aiConfidence === 0 ? "Needs attention" : "Complete");
+      setMessage(result.aiConfidence === 0 ? `${report.title} saved. Extraction needs attention: ${result.summary}` : `${report.title} analyzed and added to reports.`);
     } catch (analysisError) {
       const timedOut = analysisError instanceof Error && (analysisError.name === "AbortError" || analysisError.name === "TimeoutError");
       setAnalysisProgress(100);

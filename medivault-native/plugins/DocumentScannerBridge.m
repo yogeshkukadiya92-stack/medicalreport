@@ -15,4 +15,8 @@ RCT_EXTERN_METHOD(previewRemoteFile:(NSString *)url
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(readReportDataUrl:(NSString *)uri
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 @end

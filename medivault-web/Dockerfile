@@ -24,6 +24,7 @@ COPY --from=builder /app/public ./public
 # does not include it automatically. Keep the OCR fallback available at runtime.
 COPY --from=builder /app/node_modules/tesseract.js ./node_modules/tesseract.js
 COPY --from=builder /app/node_modules/tesseract.js-core ./node_modules/tesseract.js-core
+COPY --from=builder /app/node_modules/@tesseract.js-data/eng ./node_modules/@tesseract.js-data/eng
 COPY --from=builder /app/node_modules/bmp-js ./node_modules/bmp-js
 COPY --from=builder /app/node_modules/idb-keyval ./node_modules/idb-keyval
 COPY --from=builder /app/node_modules/is-url ./node_modules/is-url

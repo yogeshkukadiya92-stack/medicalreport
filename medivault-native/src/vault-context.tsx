@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { normalizeReport } from "./report-analysis";
 import { apiRequest } from "@/api";
 import { useAuth } from "@/auth-context";
 import type { AppReport, FamilyMember, VaultSnapshot } from "@/types";
@@ -14,6 +15,7 @@ type VaultContextValue = VaultSnapshot & {
   isLoading: boolean;
   isOffline: boolean;
   refresh: () => Promise<void>;
+  updateReport: (report: AppReport) => Promise<void>;
   saveUploadedReport: (report: AppReport) => Promise<void>;
   selectMember: (memberId: string) => Promise<void>;
 };
@@ -37,13 +39,17 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       const result = await apiRequest<{ vault: VaultSnapshot | null }>("/vault", {}, token);
-      const next = result.vault ?? emptyVault;
+      const snapshot = result.vault ?? emptyVault;
+      const next = { ...snapshot, reports: snapshot.reports.map(normalizeReport) };
       setVault(next);
       await AsyncStorage.setItem(cacheKey, JSON.stringify(next));
       setIsOffline(false);
     } catch {
       const cached = await AsyncStorage.getItem(cacheKey);
-      if (cached) setVault(JSON.parse(cached) as VaultSnapshot);
+      if (cached) {
+        const snapshot = JSON.parse(cached) as VaultSnapshot;
+        setVault({ ...snapshot, reports: snapshot.reports.map(normalizeReport) });
+      }
       setIsOffline(true);
     } finally {
       setIsLoading(false);
@@ -81,9 +87,12 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       ...vault,
       reports: vault.reports.filter((report) => report.id !== reportId || report.source === "lab"),
     }),
+    updateReport: async (report) => persist({
+      ...vault, reports: vault.reports.map((item) => item.id === report.id ? normalizeReport(report) : item),
+    }),
     saveUploadedReport: async (report) => persist({
       ...vault,
-      reports: [report, ...vault.reports],
+      reports: [normalizeReport(report), ...vault.reports],
     }),
   }), [isLoading, isOffline, persist, refresh, vault]);
   return <VaultContext.Provider value={value}>{children}</VaultContext.Provider>;

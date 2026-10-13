@@ -67,6 +67,22 @@ class DocumentScanner: NSObject, RCTBridgeModule, VNDocumentCameraViewController
     }
   }
 
+  @objc(readReportDataUrl:resolver:rejecter:)
+  func readReportDataUrl(_ uri: String, resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        guard let url = URL(string: uri), url.isFileURL else {
+          reject("INVALID_LOCAL_FILE", "Select a local report file.", nil)
+          return
+        }
+        let isPDF = url.pathExtension.lowercased() == "pdf"
+        let data = isPDF ? try self.renderFirstPDFPage(url) : try Data(contentsOf: url)
+        let mime = url.pathExtension.lowercased() == "png" ? "image/png" : "image/jpeg"
+        resolve("data:\(mime);base64,\(data.base64EncodedString())")
+      } catch { reject("REPORT_READ_FAILED", error.localizedDescription, error) }
+    }
+  }
+
   @objc(previewRemoteFile:token:fileName:resolver:rejecter:)
   func previewRemoteFile(
     _ urlString: String,

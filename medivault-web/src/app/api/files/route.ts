@@ -29,8 +29,12 @@ function uploadBuffer(bucket: GridFSBucket, file: File, buffer: Buffer, userId: 
       },
     });
 
-    uploadStream.on("error", reject);
-    uploadStream.on("finish", () => resolve(uploadStream.id.toString()));
+    const timer = setTimeout(() => {
+      void uploadStream.abort().catch(() => undefined);
+      reject(new Error("Original report storage timed out. Please try again."));
+    }, 20_000);
+    uploadStream.on("error", (error) => { clearTimeout(timer); reject(error); });
+    uploadStream.on("finish", () => { clearTimeout(timer); resolve(uploadStream.id.toString()); });
     uploadStream.end(buffer);
   });
 }
@@ -72,9 +76,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Uploaded file type does not match the file contents." }, { status: 415 });
   }
 
-  const db = await getMongoDb();
-  const bucket = new GridFSBucket(db, { bucketName: "reportFiles" });
-  const fileId = await uploadBuffer(bucket, file, buffer, userId, detectedMimeType);
+  let fileId: string;
+  try {
+    const db = await getMongoDb();
+    const bucket = new GridFSBucket(db, { bucketName: "reportFiles" });
+    fileId = await uploadBuffer(bucket, file, buffer, userId, detectedMimeType);
+  } catch {
+    return NextResponse.json({ error: "Original report could not be saved within the time limit. Please try again." }, { status: 503 });
+  }
 
   return NextResponse.json({
     fileId,
