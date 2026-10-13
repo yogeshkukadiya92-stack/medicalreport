@@ -3,6 +3,7 @@ import { getMongoDb } from "@/lib/mongodb";
 import { renderReportPdf } from "@/lib/report-pages";
 import { NextRequest, NextResponse } from "next/server";
 import { recognizeReportPages } from "@/lib/report-ocr";
+import { isBodyCompositionReport } from "@/lib/report-kind";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
 import {
   canonicalBodyMetricName,
@@ -133,7 +134,7 @@ export async function GET() {
   const aiProvider = getAiProvider();
   return NextResponse.json({
     configured: Boolean(aiProvider.apiKey),
-    extractionVersion: 3,
+    extractionVersion: 4,
     visionTimeoutSeconds: aiRequestTimeoutMs / 1_000,
     ocrTimeoutSeconds: 18,
     keyName: aiProvider.keyName,
@@ -205,7 +206,8 @@ function numberAfterLabel(lines: string[], metric: OcrMetric) {
     const line = lines[index];
     const match = line.match(metric.pattern);
     if (!match || match.index === undefined) continue;
-    const afterLabel = line.slice(match.index + match[0].length);
+    // OCR can read the unit '(kg)' as '9)'; it is not a measurement.
+    const afterLabel = line.slice(match.index + match[0].length).replace(/^\s*[([]?[^\s)]+\)\s*/, "");
     let values = afterLabel.match(/[+-]?\s*\d+(?:[.,]\d+)?/g) ?? [];
     if (metric.name === "Weight" && /target weight/i.test(afterLabel) && lines[index + 1]) {
       values = lines[index + 1].match(/[+-]?\s*\d+(?:[.,]\d+)?/g) ?? [];
@@ -215,11 +217,8 @@ function numberAfterLabel(lines: string[], metric: OcrMetric) {
     let selected = metric.nextLineWhenEmpty && afterLabel.match(/\d/) === null && metric.nextLineIndex !== undefined
       ? values[metric.nextLineIndex]
       : metric.pick === "last" ? values.at(-1) : values[0];
-    if (metric.joinTrailingDecimal && values.length >= 2) {
-      const integer = values.at(-2)?.replace(/\s/g, "");
-      const decimal = values.at(-1)?.replace(/\s/g, "");
-      if (integer && decimal && /^\d{1,2}$/.test(integer) && /^\d$/.test(decimal)) selected = `${integer}.${decimal}`;
-    }
+    // Do not reconstruct missing decimal digits from unrelated chart labels.
+    if (metric.joinTrailingDecimal && !selected?.match(/\d[.,]\d/)) continue;
     if (!selected) continue;
     const cleanValue = selected.replace(/\s/g, "").replace(",", ".");
     const numericValue = Number(cleanValue);
@@ -245,8 +244,8 @@ async function bodyCompositionOcrAnalysis(title: string, imageUrls: string[], fa
       if (!value) return [];
       return [{
         name: metric.name,
-        range: metric.range || "Manual review",
-        status: markerStatus(value, metric.range),
+        range: "Confirm reference range in original",
+        status: "Watch",
         value: `${value} ${metric.unit}`.trim(),
       } satisfies ReportMarker];
     });
@@ -262,7 +261,7 @@ async function bodyCompositionOcrAnalysis(title: string, imageUrls: string[], fa
       category: "Body Composition",
       markers: normalized,
       parameters: normalized.length,
-      status: abnormal ? "Needs review" : "Reviewed",
+      status: "Needs review",
       summary: `${normalized.length} body-composition values extracted with OCR. Review every value before verification.`,
       title: title || "BMI & Body Composition",
     };
@@ -392,12 +391,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const isBodyComposition = body.reportKind === "body_composition" || /body composition|bmi|body scan|inbody|smart scale/i.test(`${title} ${body.lab || ""}`);
+  const isBodyComposition = isBodyCompositionReport({ ...body, title });
+  // Known InBody files can be read locally without waiting for the vision API.
+  const bodyOcrResult = isBodyComposition
+    ? await bodyCompositionOcrAnalysis(title, imageUrls, "Local extraction could not finish.")
+    : null;
+  if (bodyOcrResult?.parameters) return NextResponse.json(bodyOcrResult);
   if (!aiProvider.apiKey) {
     const reason = `${aiProvider.providerName} API key is not configured.`;
     return NextResponse.json(
       isBodyComposition
-        ? await bodyCompositionOcrAnalysis(title, imageUrls, reason)
+        ? { ...bodyOcrResult!, summary: `${reason} ${bodyOcrResult!.summary}` }
         : fallbackAnalysis(title, `${reason} Set ${aiProvider.keyName} (or GEMINI_API_KEY) in server environment variables and redeploy the app.`),
       { status: 200 },
     );
@@ -462,8 +466,8 @@ export async function POST(request: NextRequest) {
       : `${aiProvider.providerName} service connection failed.`;
     return NextResponse.json(
       isBodyComposition
-        ? await bodyCompositionOcrAnalysis(title, imageUrls, failureReason)
-        : fallbackAnalysis(title, `${failureReason} Confirm ${aiProvider.keyName} is set in the deployment environment and redeploy the app.`),
+        ? { ...bodyOcrResult!, summary: `${failureReason} ${bodyOcrResult!.summary}` }
+        : fallbackAnalysis(title, `${failureReason} Original report is saved. Retry extraction from the report details.`),
       { status: 200 },
     );
   }
@@ -481,7 +485,7 @@ export async function POST(request: NextRequest) {
         : `AI analysis could not finish (${openAiResponse.status}): ${errorText.slice(0, 180)}`;
     return NextResponse.json(
       isBodyComposition
-        ? await bodyCompositionOcrAnalysis(title, imageUrls, friendlyError)
+        ? { ...bodyOcrResult!, summary: `${friendlyError} ${bodyOcrResult!.summary}` }
         : fallbackAnalysis(title, friendlyError),
       { status: 200 },
     );
@@ -502,11 +506,7 @@ export async function POST(request: NextRequest) {
 
   if (isBodyComposition && markers.length < 3) {
     return NextResponse.json(
-      await bodyCompositionOcrAnalysis(
-        title,
-        imageUrls,
-        `${aiProvider.providerName} did not return enough structured body-composition values.`,
-      ),
+      { ...bodyOcrResult!, summary: `${aiProvider.providerName} did not return enough structured body-composition values. ${bodyOcrResult!.summary}` },
       { status: 200 },
     );
   }
