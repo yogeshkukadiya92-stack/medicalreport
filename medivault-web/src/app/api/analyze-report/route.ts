@@ -133,7 +133,7 @@ export async function GET() {
   const aiProvider = getAiProvider();
   return NextResponse.json({
     configured: Boolean(aiProvider.apiKey),
-    extractionVersion: 2,
+    extractionVersion: 3,
     visionTimeoutSeconds: aiRequestTimeoutMs / 1_000,
     ocrTimeoutSeconds: 18,
     keyName: aiProvider.keyName,
