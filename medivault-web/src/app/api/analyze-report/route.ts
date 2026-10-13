@@ -82,13 +82,13 @@ const requiredBodyCompositionNames = [
 function getAiProvider() {
   const provider = (process.env.AI_PROVIDER || (process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY ? "gemini" : "openai")).toLowerCase();
 
-  if (provider === "gemini" || (!process.env.OPENAI_API_KEY && process.env.GEMINI_API_KEY)) {
+  if (provider === "gemini") {
     return {
       apiKey: process.env.GEMINI_API_KEY,
       baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
       imageLimit: 4,
       keyName: "GEMINI_API_KEY",
-      model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
+      model: process.env.GEMINI_MODEL || "gemini-2.5-flash-lite",
       providerName: "Gemini",
       supportsJsonMode: true,
     };
@@ -134,7 +134,7 @@ export async function GET() {
   const aiProvider = getAiProvider();
   return NextResponse.json({
     configured: Boolean(aiProvider.apiKey),
-    extractionVersion: 4,
+    extractionVersion: 5,
     visionTimeoutSeconds: aiRequestTimeoutMs / 1_000,
     ocrTimeoutSeconds: 18,
     keyName: aiProvider.keyName,
@@ -450,7 +450,7 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    openAiResponse = await fetch(`${aiProvider.baseUrl}/v1/chat/completions`, {
+    openAiResponse = await fetch(`${aiProvider.baseUrl}${aiProvider.providerName === "Gemini" ? "" : "/v1"}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${aiProvider.apiKey}`,
