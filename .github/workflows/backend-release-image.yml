@@ -21,6 +21,23 @@ jobs:
         run: docker build --tag medivault-backend:${{ github.sha }} medivault-web
       - name: Verify bundled PDF renderer worker
         run: docker run --rm --entrypoint node medivault-backend:${{ github.sha }} -e 'const fs=require("fs");fs.accessSync("/app/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs");console.log("PDF worker packaged")'
+      - name: Verify text rendering without operating-system fonts
+        run: |
+          docker run --rm --entrypoint node -v "$PWD/medivault-web/tests/fixtures/synthetic-report.pdf:/tmp/synthetic-report.pdf:ro" medivault-backend:${{ github.sha }} --input-type=module -e '
+            import fs from "node:fs";
+            import assert from "node:assert/strict";
+            import {createCanvas, DOMMatrix, ImageData, Path2D} from "@napi-rs/canvas";
+            Object.assign(globalThis,{DOMMatrix,ImageData,Path2D});
+            const {getDocument}=await import("pdfjs-dist/legacy/build/pdf.mjs");
+            const pdf=await getDocument({data:new Uint8Array(fs.readFileSync("/tmp/synthetic-report.pdf")),standardFontDataUrl:"/app/node_modules/pdfjs-dist/standard_fonts/",useSystemFonts:false,disableFontFace:true,isEvalSupported:false}).promise;
+            const page=await pdf.getPage(1),viewport=page.getViewport({scale:2});
+            const canvas=createCanvas(Math.ceil(viewport.width),Math.ceil(viewport.height));
+            const context=canvas.getContext("2d");
+            await page.render({canvasContext:context,viewport}).promise;
+            const pixels=context.getImageData(0,0,canvas.width,canvas.height).data;
+            let ink=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]<100&&pixels[i+1]<100&&pixels[i+2]<100)ink++;
+            assert.ok(ink>1000,"Standard PDF text must render inside the production container");
+            console.log("PDF text rendered:",ink,"dark pixels");await pdf.destroy();'
       - name: Exercise the production image with isolated synthetic data
         shell: bash
         run: |

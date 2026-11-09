@@ -1,10 +1,19 @@
 import { createCanvas, DOMMatrix, ImageData, Path2D } from "@napi-rs/canvas";
+import path from "node:path";
 
 export async function renderReportPdf(buffer: Buffer, pageLimit: number): Promise<string[]> {
   // PDF.js needs these graphics primitives when rendering under Node.
   Object.assign(globalThis, { DOMMatrix, ImageData, Path2D });
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const loading = getDocument({ data: new Uint8Array(buffer), useSystemFonts: true, disableFontFace: false, isEvalSupported: false });
+  const loading = getDocument({
+    data: new Uint8Array(buffer),
+    // Minimal production containers have no operating-system fonts. Resolve
+    // standard PDF fonts from the assets bundled with PDF.js instead.
+    standardFontDataUrl: path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts/"),
+    useSystemFonts: false,
+    disableFontFace: true,
+    isEvalSupported: false,
+  });
   const document = await loading.promise;
   try {
     if (document.numPages > pageLimit) throw new Error(`This PDF has ${document.numPages} pages. Upload at most ${pageLimit} pages at a time so every page is analyzed.`);
