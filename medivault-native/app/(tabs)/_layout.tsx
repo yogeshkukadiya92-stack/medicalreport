@@ -1,14 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Redirect, Tabs } from "expo-router";
 import { Platform, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LoadingBlock } from "@/components";
 import { useAuth } from "@/auth-context";
 import { useLanguage } from "@/i18n";
 import { colors, shadows } from "@/theme";
 
 export default function TabsLayout() {
-  const { token } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { token, isLoading } = useAuth();
   const { t } = useLanguage();
 
+  if (isLoading) return <LoadingBlock message="Opening your session..." />;
   if (!token) return <Redirect href="/login" />;
 
   return (
@@ -22,7 +26,8 @@ export default function TabsLayout() {
           fontWeight: "800",
           marginTop: -2,
         },
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [styles.tabBar, { height: 60 + Math.max(insets.bottom, 10), paddingBottom: Math.max(insets.bottom, 10) }],
+        tabBarHideOnKeyboard: true,
       }}
     >
       <Tabs.Screen
@@ -60,6 +65,7 @@ export default function TabsLayout() {
             </View>
           ),
           tabBarLabel: () => null,
+          tabBarAccessibilityLabel: t("upload"),
           title: t("upload"),
         }}
       />

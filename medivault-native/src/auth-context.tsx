@@ -1,3 +1,5 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Platform } from "react-native";
@@ -58,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error instanceof ApiError && error.status === 401) await removeToken();
         else setToken(storedToken);
       }
-    }).finally(() => setIsLoading(false));
+    }).catch(() => setError("Your saved session could not be opened. Please sign in again.")).finally(() => setIsLoading(false));
   }, []);
 
   async function authenticate(input: { action: "login" | "otp_login"; otp?: string; password?: string; phone: string }) {
@@ -91,6 +93,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut: async () => {
       if (token) await apiRequest("/auth/logout", { method: "POST" }, token).catch(() => null);
       await removeToken();
+      if (user?.id) await AsyncStorage.removeItem(`medivault_vault_cache_v1:${user.id}`).catch(() => null);
+      if (Platform.OS !== "web" && FileSystem.cacheDirectory) {
+        await FileSystem.deleteAsync(`${FileSystem.cacheDirectory}medivault-previews/`, { idempotent: true }).catch(() => null);
+      }
       setToken(null);
       setUser(null);
     },

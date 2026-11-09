@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiRequest } from "@/api";
 import { useAuth } from "@/auth-context";
-import { Card, ScreenHeader } from "@/components";
+import { Card, ScreenHeader, SecondaryButton, LoadingBlock, PrimaryButton } from "@/components";
 import { useLanguage, type Language } from "@/i18n";
 import { colors, radius, shadows } from "@/theme";
 
@@ -35,7 +36,7 @@ const definitions = [
   [
     "provider_sharing",
     "Doctor & Provider Links",
-    "Enable end-to-end encrypted revocable links that you explicitly share with doctors.",
+    "Enable expiring report links that you explicitly share with doctors.",
   ],
   [
     "analytics",
@@ -51,19 +52,31 @@ const definitions = [
 
 export default function PrivacyScreen() {
   const insets = useSafeAreaInsets();
-  const { signOut, token } = useAuth();
+  const { signOut, token, isLoading: authLoading } = useAuth();
   const { language, setLanguage } = useLanguage();
   const [consents, setConsents] = useState<Consent[]>([]);
   const [events, setEvents] = useState<AccessEvent[]>([]);
 
+  const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [savingConsent, setSavingConsent] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
   async function load() {
     if (!token) return;
+    setLoading(true);
+    setLoadError("");
+    try {
     const [consentResult, historyResult] = await Promise.all([
       apiRequest<{ consents: Consent[] }>("/consents", {}, token),
       apiRequest<{ events: AccessEvent[] }>("/access-history", {}, token),
     ]);
     setConsents(consentResult.consents);
     setEvents(historyResult.events);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Privacy settings could not be loaded.");
+    } finally { setLoading(false); }
   }
 
   useEffect(() => {
@@ -71,7 +84,9 @@ export default function PrivacyScreen() {
   }, [token]);
 
   async function updateConsent(consentType: string, isGranted: boolean) {
-    if (!token) return;
+    if (!token || savingConsent) return;
+    setSavingConsent(true);
+    try {
     await apiRequest(
       "/consents",
       {
@@ -85,25 +100,40 @@ export default function PrivacyScreen() {
       token
     );
     await load();
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Permission could not be updated. Please retry.");
+    } finally { setSavingConsent(false); }
+  }
+
+  async function finishLogout() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+      router.replace("/login");
+    } catch {
+      setLoadError("Could not sign out securely. Please retry.");
+    } finally { setSigningOut(false); }
   }
 
   function handleLogout() {
+    if (Platform.OS === "web") { setConfirmLogout(true); return; }
     Alert.alert(
       "Sign out of MediVault",
       "Are you sure you want to log out? You will need your phone OTP or password to sign in again.",
       [
         { style: "cancel", text: "Cancel" },
         {
-          onPress: async () => {
-            await signOut();
-            router.replace("/login");
-          },
+          onPress: finishLogout,
           style: "destructive",
           text: "Sign out",
         },
       ]
     );
   }
+
+  if (authLoading) return <LoadingBlock message="Opening your session..." />;
+  if (!token) return <Redirect href="/login" />;
 
   return (
     <ScrollView
@@ -120,7 +150,8 @@ export default function PrivacyScreen() {
       <ScreenHeader
         action={
           <Pressable
-            accessibilityLabel="Close"
+            accessibilityRole="button"
+                  accessibilityLabel="Close"
             onPress={() => router.back()}
             style={({ pressed }) => [
               styles.closeBtn,
@@ -131,16 +162,18 @@ export default function PrivacyScreen() {
           </Pressable>
         }
         eyebrow="Patient Sovereignty"
-        subtitle="Consent controls, language preferences & cryptographic audit logs"
+        subtitle="Consent controls, language preferences & account activity"
         title="Privacy & Security"
       />
 
       <View style={styles.content}>
+        {loadError ? <Card><Text accessibilityRole="alert" style={{ color: colors.critical, marginBottom: 12 }}>{loadError}</Text><SecondaryButton title="Retry privacy settings" onPress={load} disabled={loading} /></Card> : null}
+        {loading ? <Text accessibilityLiveRegion="polite">Loading privacy settings...</Text> : null}
         {/* App Language Section */}
         <Card style={styles.sectionCard}>
           <View style={styles.sectionTitleRow}>
             <Ionicons name="globe-outline" size={17} color={colors.primary} />
-            <Text style={styles.sectionLabel}>APP LANGUAGE / ભાષા / भाषा</Text>
+            <Text style={styles.sectionLabel}>NAVIGATION LANGUAGE / ભાષા / भाषा</Text>
           </View>
           <View style={styles.languagesRow}>
             {(
@@ -203,6 +236,8 @@ export default function PrivacyScreen() {
                   <Text style={styles.consentNote}>{note}</Text>
                 </View>
                 <Switch
+                  accessibilityLabel={label}
+                  disabled={loading || savingConsent || Boolean(loadError)}
                   onValueChange={(val) => updateConsent(id, val)}
                   thumbColor={enabled ? colors.primary : "#fff"}
                   trackColor={{
@@ -255,7 +290,7 @@ export default function PrivacyScreen() {
             </View>
           ))}
 
-          {!events.length ? (
+          {!loading && !loadError && !events.length ? (
             <Text style={styles.emptyHistory}>No access activity recorded yet.</Text>
           ) : null}
         </Card>
@@ -266,15 +301,23 @@ export default function PrivacyScreen() {
             <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.securityBadgeTitle}>End-to-End Vault Encryption</Text>
+            <Text style={styles.securityBadgeTitle}>Secure Session Storage</Text>
             <Text style={styles.securityBadgeCopy}>
-              Stored in secure iOS Keychain with revocable 30-day session tokens. Your data belongs entirely to you.
+              Your sign-in token is protected using secure device storage on iOS and Android.
             </Text>
           </View>
         </Card>
 
+        {confirmLogout ? <Card>
+          <Text style={{ color: colors.ink, marginBottom: 12 }}>Sign out of MediVault? You will need to sign in again.</Text>
+          <PrimaryButton title="Confirm sign out" loading={signingOut} onPress={finishLogout} />
+          <View style={{ marginTop: 8 }}><SecondaryButton title="Stay signed in" disabled={signingOut} onPress={() => setConfirmLogout(false)} /></View>
+        </Card> : null}
         {/* Sign Out Button */}
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Sign out of MediVault"
+          disabled={signingOut}
           onPress={handleLogout}
           style={({ pressed }) => [
             styles.logoutBtn,
@@ -379,6 +422,7 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   languageBtn: {
+    minWidth: 100,
     alignItems: "center",
     backgroundColor: "#fff",
     borderColor: colors.stroke,
@@ -406,6 +450,7 @@ const styles = StyleSheet.create({
   },
   languagesRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginTop: 12,
   },

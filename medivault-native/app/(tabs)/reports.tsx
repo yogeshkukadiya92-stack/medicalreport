@@ -1,13 +1,19 @@
+import { reportUploadForm } from "@/report-upload";
+import { matchesReportSearch } from "@/report-search";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { prepareReportAnalysis } from "@/prepare-report";
 import { measuredMarkers } from "@/report-analysis";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
   NativeModules,
   Pressable,
   ScrollView,
@@ -53,8 +59,13 @@ export default function ReportsScreen() {
   const [selected, setSelected] = useState<AppReport | null>(null);
   const [recipient, setRecipient] = useState("");
   const [analysisStep, setAnalysisStep] = useState("");
+  const [analysisError, setAnalysisError] = useState("");
+  useEffect(() => { setAnalysisError(""); }, [selected?.id]);
   const [analyzing, setAnalyzing] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareError, setShareError] = useState("");
+  useEffect(() => { setShareUrl(""); setShareError(""); }, [selected?.id]);
 
   const memberReports = reports.filter(
     (report) => !activeMember || report.memberId === activeMember.id
@@ -62,9 +73,7 @@ export default function ReportsScreen() {
 
   const filtered = useMemo(() => {
     return memberReports.filter((report) => {
-      const matchesSearch = `${report.title} ${report.lab} ${report.category}`
-        .toLowerCase()
-        .includes(search.toLowerCase());
+      const matchesSearch = matchesReportSearch(report, search);
       const matchesCat =
         selectedCategory === "All" ||
         report.category.toLowerCase().includes(selectedCategory.toLowerCase()) ||
@@ -75,13 +84,24 @@ export default function ReportsScreen() {
 
   useEffect(() => {
     if (params.reportId) {
-      setSelected(reports.find((item) => item.id === params.reportId) ?? null);
+      setSelected(reports.find((item) => item.id === params.reportId && (!activeMember || item.memberId === activeMember.id)) ?? null);
     }
-  }, [params.reportId, reports]);
+  }, [params.reportId, reports, activeMember?.id]);
+
+  useEffect(() => {
+    setSelected((current) => current && activeMember && current.memberId !== activeMember.id ? null : current);
+    setRecipient("");
+  }, [activeMember?.id]);
+
+  function closeReport() {
+    setSelected(null);
+    router.setParams({ reportId: undefined });
+  }
 
   async function extractSavedParameters() {
     if (!selected?.fileId || !token) return;
     const report = selected;
+    setAnalysisError("");
     setAnalyzing(true);
     setAnalysisStep("Extracting saved report parameters...");
     try {
@@ -98,7 +118,9 @@ export default function ReportsScreen() {
       await updateReport(updated);
       setSelected(updated);
     } catch (error) {
-      Alert.alert("Parameters could not be extracted", error instanceof Error ? error.message : "Please retry.");
+      const message = error instanceof Error ? error.message : "Please retry.";
+      setAnalysisError(message);
+      if (Platform.OS !== "web") Alert.alert("Parameters could not be extracted", message);
     } finally { setAnalyzing(false); }
   }
 
@@ -116,11 +138,11 @@ export default function ReportsScreen() {
       if (picked.canceled || !picked.assets?.[0]) return;
       file = picked.assets[0];
     }
+    setAnalysisError("");
     setAnalyzing(true);
     setAnalysisStep("Saving original...");
     try {
-      const form = new FormData();
-      form.append("file", { uri: file.uri, name: file.name, type: file.mimeType || "application/pdf" } as unknown as Blob);
+      const form = await reportUploadForm(file);
       const stored = await apiRequest<{ fileId: string; fileMimeType: string }>("/files", { method: "POST", body: form }, token);
       const attached = { ...report, ...stored, fileName: file.name };
       await updateReport(attached);
@@ -141,6 +163,7 @@ export default function ReportsScreen() {
         setSelected(updated);
       } catch (error) {
         const summary = error instanceof Error ? error.message : "Extraction failed. Please retry.";
+        setAnalysisError(summary);
         const failed = { ...attached, status: "Needs review", summary };
         await updateReport(failed);
         setSelected(failed);
@@ -154,6 +177,7 @@ export default function ReportsScreen() {
   async function shareReport() {
     if (!selected || !token) return;
     setSharing(true);
+    setShareError("");
     try {
       const result = await apiRequest<{ url: string }>(
         "/shares",
@@ -167,9 +191,14 @@ export default function ReportsScreen() {
         },
         token
       );
-      await Share.share({
+      setShareUrl(result.url);
+      if (Platform.OS !== "web") await Share.share({
         message: `MediVault secure clinical report link (expires in 7 days): ${result.url}`,
       });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Please try again.";
+      setShareError(message);
+      Alert.alert("Report could not be shared", message);
     } finally {
       setSharing(false);
     }
@@ -177,11 +206,41 @@ export default function ReportsScreen() {
 
   async function openOriginalReport() {
     if (!selected?.fileId || !token) return;
-    if (!documentPreview) {
-      Alert.alert("Preview unavailable", "Update MediVault to open the original report file.");
-      return;
-    }
     try {
+      if (Platform.OS === "web") {
+        const response = await fetch(`${API_URL}/files/${encodeURIComponent(selected.fileId)}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!response.ok) throw new Error("The original report could not be downloaded. Please retry.");
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = selected.fileName || "medical-report.pdf";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        return;
+      }
+      if (!documentPreview) {
+        if (!await Sharing.isAvailableAsync() || !FileSystem.cacheDirectory) {
+          throw new Error("File preview is unavailable on this device.");
+        }
+        const safeName = (selected.fileName || "medical-report.pdf").replace(/[^a-zA-Z0-9._-]/g, "_");
+        const previewDirectory = `${FileSystem.cacheDirectory}medivault-previews/`;
+        await FileSystem.makeDirectoryAsync(previewDirectory, { intermediates: true });
+        const localUri = `${previewDirectory}${Date.now()}-${safeName}`;
+        let handedOff = false;
+        try {
+          const downloaded = await FileSystem.downloadAsync(`${API_URL}/files/${encodeURIComponent(selected.fileId)}`, localUri, { headers: { Authorization: `Bearer ${token}` } });
+          if (downloaded.status !== 200) throw new Error("The report could not be downloaded. Please retry.");
+          await Sharing.shareAsync(downloaded.uri, { mimeType: selected.fileMimeType, dialogTitle: "Open original report" });
+          handedOff = true;
+        } finally {
+          // The receiving app may read the file after the share sheet closes.
+          // Keep successful handoffs until sign-out; remove failed downloads now.
+          if (!handedOff) await FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => null);
+        }
+        return;
+      }
       await documentPreview.previewRemoteFile(
         `${API_URL}/files/${encodeURIComponent(selected.fileId)}`,
         token,
@@ -199,7 +258,7 @@ export default function ReportsScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
       <ScreenHeader
         eyebrow="Clinical Vault"
-        subtitle={`${memberReports.length} verified laboratory document${memberReports.length === 1 ? "" : "s"}`}
+        subtitle={`${memberReports.length} saved report${memberReports.length === 1 ? "" : "s"}`}
         title="Reports"
       />
 
@@ -208,6 +267,7 @@ export default function ReportsScreen() {
         <View style={styles.searchBar}>
           <Ionicons name="search-outline" size={19} color={colors.muted} />
           <TextInput
+            accessibilityLabel="Search reports"
             onChangeText={setSearch}
             placeholder="Search report, biomarker, or lab"
             placeholderTextColor="#8F9E9B"
@@ -215,7 +275,7 @@ export default function ReportsScreen() {
             value={search}
           />
           {search.length > 0 ? (
-            <Pressable onPress={() => setSearch("")} style={styles.clearSearchBtn}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Clear report search" onPress={() => setSearch("")} style={styles.clearSearchBtn}>
               <Ionicons name="close-circle" size={18} color={colors.muted} />
             </Pressable>
           ) : null}
@@ -262,6 +322,8 @@ export default function ReportsScreen() {
         {filtered.map((report) => (
           <Pressable
             key={report.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Open report: ${report.title}`}
             onPress={() => setSelected(report)}
             style={({ pressed }) => [
               styles.rowItemWrap,
@@ -274,7 +336,7 @@ export default function ReportsScreen() {
                   <Ionicons name="document-text-outline" size={20} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text numberOfLines={1} style={styles.reportTitle}>
+                  <Text numberOfLines={2} style={styles.reportTitle}>
                     {report.title}
                   </Text>
                   <Text style={styles.reportMeta}>
@@ -324,12 +386,12 @@ export default function ReportsScreen() {
       {/* iOS PageSheet Modal for Detailed Clinical Report */}
       <Modal
         animationType="slide"
-        onRequestClose={() => setSelected(null)}
+        onRequestClose={closeReport}
         presentationStyle="pageSheet"
         visible={Boolean(selected)}
       >
         {selected ? (
-          <View style={styles.modal}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[styles.modal, { paddingTop: Platform.OS === "android" ? insets.top : 0 }]}>
             {/* Sheet Handle Indicator */}
             <View style={styles.sheetHandleContainer}>
               <View style={styles.sheetHandle} />
@@ -348,8 +410,9 @@ export default function ReportsScreen() {
                 </Text>
               </View>
               <Pressable
-                accessibilityLabel="Close"
-                onPress={() => setSelected(null)}
+                accessibilityRole="button"
+                  accessibilityLabel="Close report"
+                onPress={closeReport}
                 style={styles.closeBtn}
               >
                 <Ionicons name="close" size={20} color={colors.ink} />
@@ -357,6 +420,7 @@ export default function ReportsScreen() {
             </View>
 
             <ScrollView
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={[
                 styles.modalContent,
                 { paddingBottom: insets.bottom + 36 },
@@ -365,6 +429,7 @@ export default function ReportsScreen() {
             >
               {selected.fileId ? (
                 <Pressable
+                  accessibilityRole="button"
                   accessibilityLabel="Open original report"
                   onPress={openOriginalReport}
                   style={styles.originalFileButton}
@@ -395,9 +460,10 @@ export default function ReportsScreen() {
               {selected.source !== "lab" ? <PrimaryButton
                 title={analyzing ? analysisStep : selected.fileId ? "Select original & retry extraction" : "Attach original & extract values"}
                 icon="document-attach-outline" loading={analyzing} disabled={analyzing}
-                onPress={() => retryAnalysis()}
+                onPress={() => { void retryAnalysis().catch((error) => Alert.alert("File could not be selected", error instanceof Error ? error.message : "Please retry.")); }}
               /> : null}
-              {selected.source !== "lab" ? <PrimaryButton title="Select report photo & extract" icon="images-outline" disabled={analyzing} onPress={() => retryAnalysis(true)} /> : null}
+              {selected.source !== "lab" ? <PrimaryButton title="Select report photo & extract" icon="images-outline" disabled={analyzing} onPress={() => { void retryAnalysis(true).catch((error) => Alert.alert("Photo could not be selected", error instanceof Error ? error.message : "Please retry.")); }} /> : null}
+              {analysisError ? <Text accessibilityRole="alert" style={{ color: colors.critical }}>{analysisError}</Text> : null}
               {!selected.markers.length ? <Card><EmptyState title="No measured values extracted" description="Attach a readable original PDF or photo to extract the report values." icon="document-text-outline" /></Card> : null}
               {/* Executive Summary Card */}
               <Card style={styles.modalSectionCard}>
@@ -438,7 +504,7 @@ export default function ReportsScreen() {
                 </View>
                 <Text style={styles.shareTitle}>Secure Doctor Share</Text>
                 <Text style={styles.shareCopy}>
-                  Generate an end-to-end encrypted 7-day link. The doctor views only this verified report without account login.
+                  Create a link that expires in 7 days. Anyone with the link can view this report, so share it only with your intended recipient.
                 </Text>
 
                 <TextInput
@@ -456,9 +522,11 @@ export default function ReportsScreen() {
                   onPress={shareReport}
                   title={sharing ? "Generating link..." : "Share report link"}
                 />
+                {shareUrl ? <Text selectable accessibilityLabel="Created report share link" style={{ color: colors.primary, marginTop: 12 }}>{shareUrl}</Text> : null}
+                {shareError ? <Text accessibilityRole="alert" style={{ color: colors.critical, marginTop: 12 }}>{shareError}</Text> : null}
               </Card>
             </ScrollView>
-          </View>
+          </KeyboardAvoidingView>
         ) : null}
       </Modal>
     </View>
@@ -715,6 +783,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
   },
   rowTop: {
+    flexWrap: "wrap",
     alignItems: "center",
     flexDirection: "row",
     gap: 12,

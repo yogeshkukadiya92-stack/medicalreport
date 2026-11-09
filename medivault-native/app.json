@@ -25,7 +25,9 @@
         "foregroundImage": "./assets/adaptive-icon.png"
       },
       "permissions": [
-        "android.permission.CAMERA",
+        "android.permission.CAMERA"
+      ],
+      "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -36,7 +38,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Select a medical report to add it to your private MediVault."
+          "photosPermission": "Select a medical report to add it to your private MediVault.",
+          "microphonePermission": false
         }
       ],
       "expo-asset",

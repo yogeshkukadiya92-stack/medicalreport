@@ -21,14 +21,18 @@ import { colors, radius, shadows } from "@/theme";
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { error, isLoading, signIn, signInWithOtp } = useAuth();
-  const [mode, setMode] = useState<"password" | "otp">("otp");
-  const [identifier, setIdentifier] = useState("9876543210");
-  const [secret, setSecret] = useState("1111");
+  const [mode, setMode] = useState<"password" | "otp">("password");
+  const [identifier, setIdentifier] = useState("");
+  const [secret, setSecret] = useState("");
+  const testingOtp = __DEV__;
   const [message, setMessage] = useState("");
+  const [requestFailed, setRequestFailed] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
 
   async function submit() {
+    if (isLoading || isRequesting) return;
+    try {
     const normalized = normalizeLoginIdentifier(identifier);
     if (mode === "otp") {
       await signInWithOtp(normalized, secret);
@@ -36,10 +40,13 @@ export default function LoginScreen() {
       await signIn(normalized, secret);
     }
     router.replace("/(tabs)");
+    } catch { /* AuthProvider displays the error and preserves the form. */ }
   }
 
   async function requestOtp() {
+    if (!isValidLoginIdentifier(identifier) || identifier.includes("@") || isRequesting) return;
     setMessage("");
+    setRequestFailed(false);
     setIsRequesting(true);
     try {
       const result = await apiRequest<{ message?: string }>("/auth/request-otp", {
@@ -49,9 +56,10 @@ export default function LoginScreen() {
         }),
         method: "POST",
       });
-      setMessage(result.message || "OTP generated successfully. Default OTP: 1111");
-      setSecret("1111");
+      setMessage(result.message || "Enter the OTP sent to your mobile number.");
+      setSecret("");
     } catch (requestError) {
+      setRequestFailed(true);
       setMessage(
         requestError instanceof Error
           ? requestError.message
@@ -98,10 +106,12 @@ export default function LoginScreen() {
           {/* iOS Segmented Control */}
           <View style={styles.segment}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: mode === "otp" }}
               onPress={() => {
                 setMode("otp");
-                setIdentifier("9876543210");
-                setSecret("1111");
+                if (identifier.includes("@") || !identifier) setIdentifier(testingOtp ? "9876543210" : "");
+                setSecret(testingOtp ? "1111" : "");
                 setMessage("");
               }}
               style={[styles.segmentButton, mode === "otp" && styles.segmentActive]}
@@ -123,10 +133,12 @@ export default function LoginScreen() {
             </Pressable>
 
             <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: mode === "password" }}
               onPress={() => {
                 setMode("password");
-                setIdentifier("priyank@medivault.in");
-                setSecret("MediVault#2026");
+
+                setSecret("");
                 setMessage("");
               }}
               style={[styles.segmentButton, mode === "password" && styles.segmentActive]}
@@ -167,7 +179,7 @@ export default function LoginScreen() {
                   autoCorrect={false}
                   keyboardType="email-address"
                   onChangeText={setIdentifier}
-                  placeholder="name@example.com or 9876543210"
+                  placeholder="Email or 10-digit mobile"
                   placeholderTextColor="#95A7A2"
                   style={styles.inputInner}
                   value={identifier}
@@ -201,11 +213,8 @@ export default function LoginScreen() {
               <Text style={styles.label}>
                 {mode === "otp" ? "One-time password (OTP)" : "Password"}
               </Text>
-              {mode === "otp" ? (
-                <Pressable
-                  onPress={() => setSecret("1111")}
-                  style={styles.defaultOtpBadge}
-                >
+              {mode === "otp" && testingOtp ? (
+                <Pressable accessibilityRole="button" accessibilityLabel="Use testing OTP 1111" onPress={() => setSecret("1111")} style={[styles.defaultOtpBadge, { minHeight: 44, justifyContent: "center" }]}>
                   <Text style={styles.defaultOtpBadgeText}>Use 1111</Text>
                 </Pressable>
               ) : null}
@@ -223,7 +232,7 @@ export default function LoginScreen() {
                 keyboardType={mode === "otp" ? "number-pad" : "default"}
                 maxLength={mode === "otp" ? 6 : undefined}
                 onChangeText={setSecret}
-                placeholder={mode === "otp" ? "Enter OTP (Default: 1111)" : "Enter password"}
+                placeholder={mode === "otp" ? "Enter OTP" : "Enter password"}
                 placeholderTextColor="#95A7A2"
                 secureTextEntry={mode === "password" && !showPassword}
                 style={styles.inputInner}
@@ -231,7 +240,8 @@ export default function LoginScreen() {
               />
               {mode === "password" ? (
                 <Pressable
-                  accessibilityLabel="Show password"
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? "Hide password" : "Show password"}
                   onPress={() => setShowPassword((v) => !v)}
                   style={styles.eyeBtn}
                 >
@@ -246,9 +256,11 @@ export default function LoginScreen() {
 
             {mode === "otp" ? (
               <View style={styles.otpActionRow}>
-                <Text style={styles.otpHint}>Default OTP is 1111 for instant testing.</Text>
+                <Text style={styles.otpHint}>{testingOtp ? "Testing OTP: 1111" : "Request a code to sign in."}</Text>
                 <Pressable
-                  disabled={isRequesting || identifier.length < 10}
+                  accessibilityRole="button"
+                  accessibilityLabel="Get OTP"
+                  disabled={isLoading || isRequesting || !isValidLoginIdentifier(identifier) || identifier.includes("@")}
                   onPress={requestOtp}
                   style={styles.requestOtpBtn}
                 >
@@ -268,17 +280,17 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          {message ? (
-            <View style={styles.feedbackSuccess}>
-              <Ionicons name="checkmark-circle" size={17} color={colors.primary} />
-              <Text style={styles.messageText}>{message}</Text>
+          {message && message !== error ? (
+            <View accessibilityLiveRegion="polite" style={requestFailed ? styles.feedbackAlert : styles.feedbackSuccess}>
+              <Ionicons name={requestFailed ? "alert-circle" : "checkmark-circle"} size={17} color={requestFailed ? colors.critical : colors.primary} />
+              <Text style={requestFailed ? styles.errorText : styles.messageText}>{message}</Text>
             </View>
           ) : null}
 
           {/* Primary Submit Button */}
           <View style={{ marginTop: 6 }}>
             <PrimaryButton
-              disabled={isLoading || !isValidLoginIdentifier(identifier) || !secret}
+              disabled={isLoading || isRequesting || !isValidLoginIdentifier(identifier) || (mode === "otp" ? identifier.includes("@") || !/^\d{4,6}$/.test(secret) : !secret)}
               icon="lock-closed-outline"
               loading={isLoading}
               onPress={submit}
@@ -290,7 +302,7 @@ export default function LoginScreen() {
           <View style={styles.trustBanner}>
             <Ionicons name="finger-print-outline" size={15} color={colors.primary} />
             <Text style={styles.securityText}>
-              256-bit encrypted keyring · HIPAA & DPDP Compliant
+              Your session is stored securely on your device.
             </Text>
           </View>
         </View>
@@ -454,6 +466,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   otpHint: {
+    flex: 1,
     color: colors.muted,
     fontSize: 11,
     fontWeight: "500",
@@ -463,7 +476,9 @@ const styles = StyleSheet.create({
     borderColor: colors.stroke,
     borderRadius: radius.card,
     borderWidth: 1,
-    marginHorizontal: 20,
+    alignSelf: "center",
+    width: "90%",
+    maxWidth: 460,
     marginTop: 26,
     padding: 22,
     ...shadows.medium,
@@ -473,7 +488,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   requestOtpBtn: {
-    paddingVertical: 4,
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 8,
   },
   requestOtpText: {
     color: colors.primary,
@@ -489,6 +506,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   securityText: {
+    flexShrink: 1,
+    textAlign: "center",
     color: colors.muted,
     fontSize: 11,
     fontWeight: "600",

@@ -11,7 +11,7 @@ import {
 import Svg, { Circle } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/auth-context";
-import { Card, EmptyState, LoadingBlock, ScreenHeader, StatusPill } from "@/components";
+import { Card, EmptyState, LoadingBlock, PrimaryButton, ScreenHeader, StatusPill } from "@/components";
 import { colors, radius, shadows } from "@/theme";
 import { useVault } from "@/vault-context";
 
@@ -27,10 +27,9 @@ export default function HomeScreen() {
     (count, report) => count + report.abnormal,
     0
   );
-  const score = memberReports.length
-    ? Math.max(25, Math.min(95, 90 - abnormal * 5))
-    : 0;
-  const scoreDisplay = memberReports.length ? String(score) : "00";
+  const markers = memberReports.flatMap((report) => report.markers);
+  const score = markers.length ? Math.round(markers.filter((marker) => marker.status === "Normal").length / markers.length * 100) : 0;
+  const scoreDisplay = markers.length ? String(score) : "—";
 
   // SVG Circular progress math
   const ringRadius = 34;
@@ -61,7 +60,8 @@ export default function HomeScreen() {
       <ScreenHeader
         action={
           <Pressable
-            accessibilityLabel="Privacy & Security"
+            accessibilityRole="button"
+                  accessibilityLabel="Privacy & Security"
             onPress={() => router.push("/privacy")}
             style={({ pressed }) => [
               styles.iconButton,
@@ -74,10 +74,10 @@ export default function HomeScreen() {
         eyebrow="Clinical Health Timeline"
         subtitle={
           activeMember
-            ? `${activeMember.relation} · ${activeMember.age || "32"} yrs · ${activeMember.bloodGroup || "O+"}`
+            ? `${activeMember.relation} · ${activeMember.age ?? "—"} yrs · ${activeMember.bloodGroup || "Unknown"}`
             : "Personal Vault"
         }
-        title={activeMember?.name || user?.name || "Priyank Patel"}
+        title={activeMember?.name || user?.name || "My Health Vault"}
       />
 
       {isOffline ? (
@@ -92,6 +92,7 @@ export default function HomeScreen() {
       ) : !activeMember ? (
         <Card style={styles.margin}>
           <EmptyState
+            action={<PrimaryButton title="Add your first profile" onPress={() => router.push("/(tabs)/family")} />}
             description="Create a family profile to connect clinical reports by mobile number."
             icon="person-add-outline"
             title="Add your first profile"
@@ -104,20 +105,14 @@ export default function HomeScreen() {
             <View style={styles.scoreLeft}>
               <View style={styles.scoreBadge}>
                 <View style={styles.scoreBadgeDot} />
-                <Text style={styles.scoreBadgeText}>CLINICAL INDEX</Text>
+                <Text style={styles.scoreBadgeText}>RECORDED VALUES IN RANGE</Text>
               </View>
               <Text style={styles.scoreNumber}>{scoreDisplay}</Text>
               <Text style={styles.scoreStatus}>
-                {!memberReports.length
-                  ? "No health data yet"
-                  : score >= 85
-                    ? "Optimal Health"
-                    : score >= 70
-                      ? "Good Condition"
-                      : "Needs Review"}
+                {!markers.length ? "No measured values yet" : "Values within reference range"}
               </Text>
               <Text style={styles.scoreSubtitle}>
-                Based on {memberReports.length} verified lab report{memberReports.length === 1 ? "" : "s"}
+                Based on {markers.length} recorded values. This is not an overall health assessment.
               </Text>
             </View>
 
@@ -211,7 +206,7 @@ export default function HomeScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.quickBannerTitle}>Scan new medical report</Text>
               <Text style={styles.quickBannerSub}>
-                Upload PDF or photo · AI extracts biomarkers instantly
+                Upload PDF or photo · Review extracted biomarkers
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.primary} />
@@ -245,7 +240,7 @@ export default function HomeScreen() {
                     <Ionicons name="flask-outline" size={18} color={colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text numberOfLines={1} style={styles.reportTitle}>
+                    <Text numberOfLines={2} style={styles.reportTitle}>
                       {report.title}
                     </Text>
                     <Text style={styles.reportMeta}>
@@ -333,6 +328,8 @@ const styles = StyleSheet.create({
     ...shadows.soft,
   },
   metricHeader: {
+    flexWrap: "wrap",
+    gap: 4,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
@@ -452,6 +449,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   reportTopRow: {
+    flexWrap: "wrap",
     alignItems: "center",
     flexDirection: "row",
     gap: 12,

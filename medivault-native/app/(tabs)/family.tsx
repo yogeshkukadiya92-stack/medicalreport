@@ -2,6 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
   Modal,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,22 +26,44 @@ export default function FamilyScreen() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     age: "",
-    bloodGroup: "O+",
+    bloodGroup: "",
     name: "",
     phone: "",
     relation: "Self",
   });
 
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+
   async function submit() {
+    if (saving) return;
+    setFormError("");
+    if (!form.name.trim() || !/^[6-9]\d{9}$/.test(form.phone)) {
+      setFormError("Enter a name and a valid 10-digit Indian mobile number.");
+      return;
+    }
+    if (form.age && (!/^\d{1,3}$/.test(form.age) || Number(form.age) > 130)) {
+      setFormError("Enter an age between 0 and 130, or leave it blank.");
+      return;
+    }
+    if (form.bloodGroup && !BLOOD_GROUPS.includes(form.bloodGroup.trim().toUpperCase())) {
+      setFormError("Enter a valid blood group, such as O+ or AB-, or leave it blank.");
+      return;
+    }
+    setSaving(true);
+    try {
     await addMember({
       age: Number(form.age) || 0,
-      bloodGroup: form.bloodGroup || "Unknown",
-      name: form.name,
+      bloodGroup: form.bloodGroup.trim().toUpperCase() || "Unknown",
+      name: form.name.trim(),
       phone: `+91${form.phone.replace(/\D/g, "").slice(-10)}`,
       relation: form.relation,
     });
     setShowForm(false);
-    setForm({ age: "", bloodGroup: "O+", name: "", phone: "", relation: "Family" });
+    setForm({ age: "", bloodGroup: "", name: "", phone: "", relation: "Self" });
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Profile could not be saved. Please retry.");
+    } finally { setSaving(false); }
   }
 
   return (
@@ -62,6 +86,7 @@ export default function FamilyScreen() {
         title="Family Vault"
       />
 
+      {formError && !showForm ? <Text accessibilityRole="alert" style={{ color: colors.critical, padding: 18 }}>{formError}</Text> : null}
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 36 }]}
         showsVerticalScrollIndicator={false}
@@ -79,7 +104,7 @@ export default function FamilyScreen() {
           return (
             <Pressable
               key={member.id}
-              onPress={() => selectMember(member.id)}
+              onPress={() => { void selectMember(member.id).catch((error) => setFormError(error instanceof Error ? error.message : "Could not switch profile.")); }}
               style={({ pressed }) => [
                 styles.memberCardWrap,
                 pressed && { transform: [{ scale: 0.985 }] },
@@ -150,11 +175,11 @@ export default function FamilyScreen() {
       {/* iOS PageSheet Modal for Adding Profile */}
       <Modal
         animationType="slide"
-        onRequestClose={() => setShowForm(false)}
+        onRequestClose={() => { if (!saving) setShowForm(false); }}
         presentationStyle="pageSheet"
         visible={showForm}
       >
-        <View style={styles.modal}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[styles.modal, { paddingTop: Platform.OS === "android" ? insets.top : 0 }]}>
           {/* Sheet Handle */}
           <View style={styles.sheetHandleWrap}>
             <View style={styles.sheetHandle} />
@@ -168,7 +193,7 @@ export default function FamilyScreen() {
               </View>
               <Text style={styles.formTitle}>Add Family Member</Text>
             </View>
-            <Pressable onPress={() => setShowForm(false)} style={styles.closeBtn}>
+            <Pressable accessibilityLabel="Close add family member" disabled={saving} onPress={() => setShowForm(false)} style={styles.closeBtn}>
               <Ionicons name="close" size={20} color={colors.ink} />
             </Pressable>
           </View>
@@ -187,6 +212,7 @@ export default function FamilyScreen() {
               <View style={styles.inputBox}>
                 <Ionicons name="person-outline" size={18} color={colors.muted} style={styles.inputIcon} />
                 <TextInput
+                  accessibilityLabel="Full name"
                   onChangeText={(name) => setForm((curr) => ({ ...curr, name }))}
                   placeholder="e.g. Dipti Patel"
                   placeholderTextColor="#95A7A2"
@@ -230,6 +256,7 @@ export default function FamilyScreen() {
                   <TextInput
                     keyboardType="number-pad"
                     maxLength={3}
+                    accessibilityLabel="Age"
                     onChangeText={(age) => setForm((c) => ({ ...c, age }))}
                     placeholder="32"
                     placeholderTextColor="#95A7A2"
@@ -244,6 +271,7 @@ export default function FamilyScreen() {
                 <View style={styles.inputBox}>
                   <TextInput
                     autoCapitalize="characters"
+                    accessibilityLabel="Blood group"
                     onChangeText={(bloodGroup) => setForm((c) => ({ ...c, bloodGroup }))}
                     placeholder="e.g. O+, B+"
                     placeholderTextColor="#95A7A2"
@@ -266,6 +294,7 @@ export default function FamilyScreen() {
                   <TextInput
                     keyboardType="phone-pad"
                     maxLength={10}
+                    accessibilityLabel="Mobile number"
                     onChangeText={(phone) => setForm((c) => ({ ...c, phone }))}
                     placeholder="9876543210"
                     placeholderTextColor="#95A7A2"
@@ -284,17 +313,19 @@ export default function FamilyScreen() {
               </Text>
             </Card>
 
+            {formError ? <Text accessibilityRole="alert" style={{ color: colors.critical }}>{formError}</Text> : null}
             {/* Submit CTA */}
             <View style={{ marginTop: 8 }}>
               <PrimaryButton
-                disabled={!form.name.trim() || form.phone.length < 10}
+                loading={saving}
+                disabled={saving || !form.name.trim() || !/^[6-9]\d{9}$/.test(form.phone)}
                 icon="person-add-outline"
                 onPress={submit}
                 title="Save Profile"
               />
             </View>
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -450,7 +481,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.control,
     borderWidth: 1.2,
     flexDirection: "row",
-    height: 50,
+    minHeight: 50,
     paddingHorizontal: 14,
     ...shadows.soft,
   },
@@ -500,6 +531,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   name: {
+    flexShrink: 1,
     color: colors.ink,
     fontSize: 15.5,
     fontWeight: "900",

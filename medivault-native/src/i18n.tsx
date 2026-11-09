@@ -19,12 +19,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>("en");
   useEffect(() => { AsyncStorage.getItem("medivault_language").then((value) => {
     if (value === "en" || value === "gu" || value === "hi") setLanguageState(value);
-  }); }, []);
+  }).catch(() => null); }, []);
   const value = useMemo(() => ({
     language,
     setLanguage: (next: Language) => {
       setLanguageState(next);
-      AsyncStorage.setItem("medivault_language", next);
+      void AsyncStorage.setItem("medivault_language", next).catch(() => null);
     },
     t: (key: CopyKey) => copy[language][key],
   }), [language]);

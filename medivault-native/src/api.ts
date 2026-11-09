@@ -1,10 +1,11 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 const configuredUrl = process.env.EXPO_PUBLIC_API_URL
   || (Constants.expoConfig?.extra?.apiUrl as string | undefined)
   || "https://mr.yogeshaihub.in/api";
 
-export const API_URL = configuredUrl.replace(/\/$/, "");
+export const API_URL = Platform.OS === "web" && __DEV__ ? "/api" : configuredUrl.replace(/\/$/, "");
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message); }

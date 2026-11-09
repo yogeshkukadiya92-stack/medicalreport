@@ -1,3 +1,4 @@
+import { reportUploadForm } from "@/report-upload";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -66,11 +67,7 @@ export default function UploadScreen() {
 
   async function pickPhotoFromGallery() {
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert("Permission required", "Please allow photo access to select report images.");
-        return;
-      }
+      // The system picker grants access only to the selected report image.
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsEditing: false,
         mediaTypes: ["images"],
@@ -93,6 +90,7 @@ export default function UploadScreen() {
   }
 
   async function pickDocument() {
+    try {
     const result = await DocumentPicker.getDocumentAsync({
       copyToCacheDirectory: true,
       type: ["application/pdf", "image/*"],
@@ -123,14 +121,28 @@ export default function UploadScreen() {
         setFile(picked);
       }
     }
+    } catch (error) {
+      Alert.alert("File could not be opened", error instanceof Error ? error.message : "Please try again.");
+    }
   }
 
   async function scanDocument() {
     if (Platform.OS !== "ios" || !documentScanner) {
-      return Alert.alert(
-        "Scanner unavailable",
-        "Use Browse Files to select a clear report image or PDF on this device."
-      );
+      try {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert("Camera permission required", "Allow camera access in device settings, or use Browse Files.");
+          return;
+        }
+        const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 1 });
+        if (!result.canceled && result.assets?.[0]) {
+          const asset = result.assets[0];
+          setFile({ uri: asset.uri, name: asset.fileName || `report-${Date.now()}.jpg`, mimeType: asset.mimeType || "image/jpeg", size: asset.fileSize });
+        }
+      } catch (error) {
+        Alert.alert("Camera unavailable", error instanceof Error ? error.message : "Use Browse Files to select your report.");
+      }
+      return;
     }
     setIsPreparing(true);
     try {
@@ -164,13 +176,8 @@ export default function UploadScreen() {
     }
     setIsSaving(true);
     try {
-      setStep("Encrypting and saving original document");
-      const form = new FormData();
-      form.append("file", {
-        name: file.name,
-        type: file.mimeType,
-        uri: file.uri,
-      } as unknown as Blob);
+      setStep("Saving original document");
+      const form = await reportUploadForm(file);
 
       const stored = await apiRequest<{
         fileId: string;
@@ -253,6 +260,9 @@ export default function UploadScreen() {
           analysis.summary || "Report was saved, but AI could not extract biomarkers."
         );
       }
+      setFile(null);
+      setTitle("");
+      setLab("");
       router.replace({
         params: { reportId: report.id },
         pathname: "/(tabs)/reports",
@@ -275,6 +285,7 @@ export default function UploadScreen() {
         <View style={styles.content}>
           <Card>
             <EmptyState
+              action={<PrimaryButton title="Add family profile" onPress={() => router.push("/(tabs)/family")} />}
               description="Every medical record requires a family profile so longitudinal trends and patient history stay correctly organized."
               icon="person-add-outline"
               title="Add a family profile first"
@@ -369,9 +380,9 @@ export default function UploadScreen() {
           <Text style={styles.dropzoneSubtitle}>
             {file
               ? `${file.mimeType} · ${
-                  file.size ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : "ready"
+                  file.size ? (file.size < 1024 * 1024 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`) : "ready"
                 }${file.enhanced ? " · Auto-cropped & enhanced" : ""}`
-              : "Scan with automatic borders, perspective correction and clarity enhancement. Originals remain encrypted."}
+              : "Take a clear photo or choose a PDF. Review extracted values against your original report."}
           </Text>
 
           {isPreparing ? (
@@ -382,7 +393,7 @@ export default function UploadScreen() {
           ) : null}
 
           {file && !isPreparing ? (
-            <Pressable onPress={() => setFile(null)} style={styles.clearFileBadge}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Remove selected document" disabled={isSaving} onPress={() => setFile(null)} style={styles.clearFileBadge}>
               <Ionicons name="trash-outline" size={13} color={colors.critical} />
               <Text style={styles.clearFileText}>Remove document</Text>
             </Pressable>
@@ -488,7 +499,7 @@ export default function UploadScreen() {
         {/* Action Button */}
         <View style={{ marginTop: 4 }}>
           <PrimaryButton
-            disabled={!file || isSaving}
+            disabled={!file || isSaving || isPreparing}
             icon="shield-checkmark-outline"
             loading={isSaving}
             onPress={submit}

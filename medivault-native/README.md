@@ -57,3 +57,25 @@ eas build --platform ios --profile production
 ```
 
 Before store submission, configure the final Apple Team, Google Play account, privacy policy URL, support URL, screenshots, and production push-notification credentials.
+
+## Local browser testing with OTP 1111
+
+The testing OTP is accepted by default only in development. Production test login
+requires explicit server configuration: `AUTH_TEST_LOGIN_ENABLED=true` and an
+`AUTH_TEST_PHONE_NUMBERS` allowlist of approved test accounts. This never enables
+production OTP signup or password reset. Keep real patient accounts out of that
+allowlist. For browser QA,
+run a development backend with a separate local MongoDB database, then point
+Expo's development proxy at it:
+
+```bash
+# Terminal 1: from medivault-web (local MongoDB must already be running)
+MONGODB_URI=mongodb://127.0.0.1:27029 MONGODB_DB=medivault_local_qa npm run dev -- --hostname 127.0.0.1 --port 3011
+
+# Terminal 2: from medivault-native
+MEDIVAULT_DEV_API_URL=http://127.0.0.1:3011/api npm run start -- --web --port 8089
+```
+
+Create a local test account before signing in. `MEDIVAULT_DEV_API_URL` configures
+only the browser development proxy; it does not change the production/native API
+URL. Test records in this database do not represent production records.

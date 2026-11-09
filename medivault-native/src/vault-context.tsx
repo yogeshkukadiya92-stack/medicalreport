@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { normalizeReport } from "./report-analysis";
-import { apiRequest } from "@/api";
+import { ApiError, apiRequest } from "@/api";
 import { useAuth } from "@/auth-context";
 import type { AppReport, FamilyMember, VaultSnapshot } from "@/types";
 
@@ -23,44 +23,66 @@ type VaultContextValue = VaultSnapshot & {
 const VaultContext = createContext<VaultContextValue | null>(null);
 
 export function VaultProvider({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
-  const [vault, setVault] = useState<VaultSnapshot>(emptyVault);
+  const { token, user } = useAuth();
+  const accountCacheKey = user?.id ? `${cacheKey}:${user.id}` : null;
+  const sessionRef = useRef(token);
+  sessionRef.current = token;
+  const [storedVault, setStoredVault] = useState({ token, snapshot: emptyVault });
+  const vault = storedVault.token === token ? storedVault.snapshot : emptyVault;
+  const setVault = useCallback((snapshot: VaultSnapshot) => {
+    if (sessionRef.current === token) setStoredVault({ token, snapshot });
+  }, [token]);
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
 
   const persist = useCallback(async (next: VaultSnapshot) => {
+    if (!token) throw new Error("Please sign in to save changes.");
+    await apiRequest("/vault", { body: JSON.stringify(next), method: "PUT" }, token);
+    if (sessionRef.current !== token) return;
     setVault(next);
-    await AsyncStorage.setItem(cacheKey, JSON.stringify(next));
-    if (token) await apiRequest("/vault", { body: JSON.stringify(next), method: "PUT" }, token);
-  }, [token]);
+    setIsOffline(false);
+    if (accountCacheKey) await AsyncStorage.setItem(accountCacheKey, JSON.stringify(next)).catch(() => null);
+  }, [token, accountCacheKey, setVault]);
 
   const refresh = useCallback(async () => {
     if (!token) return;
     setIsLoading(true);
     try {
       const result = await apiRequest<{ vault: VaultSnapshot | null }>("/vault", {}, token);
+      if (sessionRef.current !== token) return;
       const snapshot = result.vault ?? emptyVault;
       const next = { ...snapshot, reports: snapshot.reports.map(normalizeReport) };
       setVault(next);
-      await AsyncStorage.setItem(cacheKey, JSON.stringify(next));
+      if (accountCacheKey) await AsyncStorage.setItem(accountCacheKey, JSON.stringify(next)).catch(() => null);
       setIsOffline(false);
-    } catch {
-      const cached = await AsyncStorage.getItem(cacheKey);
+    } catch (error) {
+      if (sessionRef.current !== token) return;
+      if (error instanceof ApiError && [401, 403].includes(error.status)) {
+        setVault(emptyVault);
+        setIsOffline(true);
+        return;
+      }
+      const cached = accountCacheKey ? await AsyncStorage.getItem(accountCacheKey).catch(() => null) : null;
       if (cached) {
-        const snapshot = JSON.parse(cached) as VaultSnapshot;
-        setVault({ ...snapshot, reports: snapshot.reports.map(normalizeReport) });
+        try {
+          const snapshot = JSON.parse(cached) as VaultSnapshot;
+          if (Array.isArray(snapshot.familyMembers) && Array.isArray(snapshot.reports)) {
+            setVault({ ...snapshot, reports: snapshot.reports.map(normalizeReport) });
+          }
+        } catch { /* Ignore invalid cache rather than crashing the vault. */ }
       }
       setIsOffline(true);
     } finally {
-      setIsLoading(false);
+      if (sessionRef.current === token) setIsLoading(false);
     }
-  }, [token]);
+  }, [token, accountCacheKey, setVault]);
 
   useEffect(() => {
+    void AsyncStorage.removeItem(cacheKey).catch(() => null);
     if (token) refresh();
     else {
       setVault(emptyVault);
-      setIsLoading(false);
+      if (sessionRef.current === token) setIsLoading(false);
     }
   }, [refresh, token]);
 

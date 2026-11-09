@@ -110,8 +110,10 @@ class DocumentScanner: NSObject, RCTBridgeModule, VNDocumentCameraViewController
       }
       do {
         let safeName = fileName.replacingOccurrences(of: "/", with: "-")
-        let target = FileManager.default.temporaryDirectory
-          .appendingPathComponent("preview-\(UUID().uuidString)-\(safeName)")
+        let cache = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+          .appendingPathComponent("medivault-previews", isDirectory: true)
+        try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+        let target = cache.appendingPathComponent("preview-\(UUID().uuidString)-\(safeName)")
         try data.write(to: target, options: .atomic)
         DispatchQueue.main.async {
           guard let presenter = Self.topViewController() else {

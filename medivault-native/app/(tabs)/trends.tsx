@@ -90,9 +90,7 @@ export default function TrendsScreen() {
       const latest = trend.points[trend.points.length - 1];
       const matchesFilter =
         filter === "all" ||
-        trend.points.some(
-          (point) => point.status !== "Normal" && point.status !== "Optimal"
-        );
+        (latest && latest.status !== "Normal" && latest.status !== "Optimal");
       const matchesSearch =
         !query ||
         trend.name.toLowerCase().includes(query) ||
@@ -109,7 +107,7 @@ export default function TrendsScreen() {
   }).length;
   const stableCount = Math.max(0, trends.length - attentionCount);
   const healthScore = trends.length ? Math.round((stableCount / trends.length) * 100) : 0;
-  const healthScoreDisplay = trends.length ? String(healthScore) : "00";
+  const healthScoreDisplay = trends.length ? String(healthScore) : "—";
 
   return (
     <ScrollView
@@ -434,7 +432,7 @@ export default function TrendsScreen() {
                 <View style={styles.pointsCountBadge}>
                   <Ionicons name="stats-chart" size={12} color={colors.muted} />
                   <Text style={styles.pointsCountText}>
-                    {trend.points.length} verified reading{trend.points.length === 1 ? "" : "s"}
+                    {trend.points.length} recorded reading{trend.points.length === 1 ? "" : "s"}
                   </Text>
                 </View>
 
