@@ -23,11 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Card, EmptyState, ScreenHeader, StatusPill } from "@/components";
 import { colors, radius, shadows } from "@/theme";
 import { useVault } from "@/vault-context";
-
-function numeric(value: string) {
-  const match = value.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
-  return match ? Number(match[0]) : null;
-}
+import { buildReportTrends } from "@/report-trends";
 
 function curvedPath(points: Array<{ x: number; y: number }>) {
   if (!points.length) return "";
@@ -54,34 +50,7 @@ export default function TrendsScreen() {
     (report) => !activeMember || report.memberId === activeMember.id
   );
 
-  const trends = useMemo(() => {
-    const map = new Map<
-      string,
-      Array<{ date: string; status: string; value: number; valueLabel: string }>
-    >();
-
-    memberReports.forEach((report) =>
-      report.markers.forEach((marker) => {
-        const value = numeric(marker.value);
-        if (value === null) return;
-        const current = map.get(marker.name) ?? [];
-        current.push({
-          date: report.date,
-          status: marker.status,
-          value,
-          valueLabel: marker.value,
-        });
-        map.set(marker.name, current);
-      })
-    );
-
-    return [...map.entries()]
-      .map(([name, points]) => ({
-        name,
-        points: points.sort((a, b) => Date.parse(a.date) - Date.parse(b.date)),
-      }))
-      .sort((a, b) => b.points.length - a.points.length);
-  }, [memberReports]);
+  const trends = useMemo(() => buildReportTrends(memberReports), [memberReports]);
 
   const displayedTrends = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -124,7 +93,7 @@ export default function TrendsScreen() {
     >
       <ScreenHeader
         eyebrow="Biomarker Trajectory"
-        subtitle={`${trends.length} parameters analyzed over time`}
+        subtitle={`${trends.length} result series · Different units are kept separate`}
         title="Health Trends"
       />
 
@@ -132,11 +101,11 @@ export default function TrendsScreen() {
         <View style={styles.orbitCopy}>
           <View style={styles.liveBadge}>
             <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LIVE HEALTH SIGNAL</Text>
+            <Text style={styles.liveText}>RECORDED RESULTS</Text>
           </View>
-          <Text style={styles.orbitTitle}>Clinical orbit</Text>
+          <Text style={styles.orbitTitle}>Reference range summary</Text>
           <Text style={styles.orbitSubtitle}>
-            Your latest biomarkers, balanced into one readable health trajectory.
+            Percentage of latest recorded values marked in range. This is not a health score or diagnosis.
           </Text>
           <View style={styles.orbitStats}>
             <View>
@@ -184,7 +153,7 @@ export default function TrendsScreen() {
           </Svg>
           <View style={styles.orbitScore}>
             <Text style={styles.orbitScoreValue}>{healthScoreDisplay}%</Text>
-            <Text style={styles.orbitScoreLabel}>STABLE</Text>
+            <Text style={styles.orbitScoreLabel}>IN RANGE</Text>
           </View>
         </View>
       </View>
@@ -263,7 +232,7 @@ export default function TrendsScreen() {
       </View>
 
       <View style={styles.content}>
-        {displayedTrends.map((trend) => {
+        {displayedTrends.map((trend, trendIndex) => {
           const values = trend.points.map((p) => p.value);
           const min = Math.min(...values);
           const max = Math.max(...values);
@@ -288,12 +257,12 @@ export default function TrendsScreen() {
           const delta = previous ? latest.value - previous.value : null;
           const isGood = latest.status === "Normal" || latest.status === "Optimal";
           const strokeColor = isGood ? colors.primary : colors.critical;
-          const safeId = trend.name.replace(/[^a-zA-Z0-9]/g, "");
+          const safeId = `trend-${trendIndex}`;
           const gradientId = `grad-${safeId}`;
           const surfaceId = `surface-${safeId}`;
 
           return (
-            <View key={trend.name} style={styles.depthShell}>
+            <View key={trend.key} style={styles.depthShell}>
               <View style={styles.depthLayerFar} />
               <View style={styles.depthLayerNear} />
               <Card style={styles.trendCard}>
@@ -470,7 +439,7 @@ export default function TrendsScreen() {
                   >
                     {delta === null
                       ? "Baseline recorded"
-                      : `${delta > 0 ? "+" : ""}${delta.toFixed(1)} from prior test`}
+                      : `${delta > 0 ? "+" : ""}${delta.toFixed(1)}${trend.unit ? ` ${trend.unit}` : ""} from prior test`}
                   </Text>
                 </View>
               </View>

@@ -289,10 +289,12 @@ export function clearAuthCookie(response: NextResponse) {
 }
 
 function tokenFromRequest(request: NextRequest) {
-  const cookieToken = request.cookies.get(authCookieName)?.value;
-  if (cookieToken) return cookieToken;
   const authHeader = request.headers.get("authorization") || "";
-  return authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+  const bearer = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+  // An explicitly selected mobile account must not be replaced by a different
+  // account left in a browser cookie. Preserve the legacy cookie-session marker.
+  if (bearer && bearer !== "mongo-cookie-session") return bearer;
+  return request.cookies.get(authCookieName)?.value ?? "";
 }
 
 export async function getAuthenticatedUser(request: NextRequest): Promise<AuthUser | null> {
@@ -379,6 +381,35 @@ export async function createAuthUserSession(input: { email: string; name?: strin
   return { token, user: publicUser(user) };
 }
 
+// Email-only registration deliberately does not claim or verify a mobile number.
+// A typed phone, role, or organization in the request must never grant access.
+export async function createEmailAuthUserSession(input: { email: string; name?: string; password: string }) {
+  if (!isMongoConfigured()) throw new Error("MongoDB is not configured.");
+  const email = normalizeEmail(input.email);
+  if (!isValidEmail(email)) throw new Error("Enter a valid email address.");
+  if (email === bootstrapAdminEmail) throw new Error("Owner admin credentials are reserved.");
+  const passwordError = validatePasswordStrength(input.password);
+  if (passwordError) throw new Error(passwordError);
+  const db = await getMongoDb();
+  await ensureAuthIndexes(db);
+  if (await db.collection("authUsers").findOne({ email })) throw new Error("An account with this email already exists. Sign in instead.");
+  const now = new Date().toISOString();
+  const password = hashPassword(input.password);
+  const user: AuthUserDocument = {
+    accountStatus: "active", id: `user-${Date.now()}-${crypto.randomBytes(8).toString("hex")}`,
+    createdAt: now, updatedAt: now, email, name: cleanName(email, input.name),
+    passwordHash: password.hash, passwordSalt: password.salt, passwordIterations: password.iterations,
+  };
+  await db.collection<AuthUserDocument>("authUsers").insertOne(user);
+  return { token: await createSession(db, user.id), user: publicUser(user) };
+}
+
+export async function verifyAuthUserPassword(userId: string, password: string) {
+  const db = await getMongoDb();
+  const user = await db.collection<AuthUserDocument>("authUsers").findOne({ id: userId });
+  return Boolean(user && user.accountStatus !== "suspended" && verifyPassword(password, user));
+}
+
 export async function createManagedAuthUser(input: { email: string; name?: string; password: string; phone: string }) {
   if (!isMongoConfigured()) {
     throw new Error("MongoDB is not configured.");
@@ -437,7 +468,7 @@ export async function loginAuthUserSession(input: { password: string; phone: str
     await ensureBootstrapAdmin(db, input.password);
   }
   const user = await db.collection<AuthUserDocument>("authUsers").findOne(
-    isValidEmail(emailFallback) ? { $or: [{ phone }, { email: emailFallback }] } : { phone },
+    isValidEmail(emailFallback) ? { email: emailFallback } : { phone },
     { projection: { _id: 0 } },
   );
   if (!user || user.accountStatus === "suspended" || !verifyPassword(input.password, user)) {

@@ -28,6 +28,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     { projection: { _id: 0 } },
   );
   if (!share) return NextResponse.json({ error: "This share link is invalid, expired, or revoked." }, { status: 410 });
+  const owner = await db.collection("authUsers").findOne({ id: share.userId }, { projection: { accountStatus: 1 } });
+  if (!owner || owner.accountStatus === "suspended") return NextResponse.json({ error: "This share link is invalid, expired, or revoked." }, { status: 410 });
   const accessedAt = now.toISOString();
   await Promise.all([
     db.collection<SecureShare>("secureShares").updateOne(

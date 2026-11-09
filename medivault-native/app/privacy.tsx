@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -62,6 +63,22 @@ export default function PrivacyScreen() {
   const [savingConsent, setSavingConsent] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  async function deleteAccount() {
+    if (!token || !deleteConfirmed || !deletePassword || deleting) return;
+    setDeleting(true); setDeleteError("");
+    try {
+      await apiRequest("/auth/account", { method: "DELETE", body: JSON.stringify({ password: deletePassword, confirmation: "DELETE" }) }, token);
+      await signOut();
+      router.replace("/login");
+    } catch (error) { setDeleteError(error instanceof Error ? error.message : "Account deletion could not finish. Please retry."); }
+    finally { setDeleting(false); }
+  }
 
   async function load() {
     if (!token) return;
@@ -306,6 +323,22 @@ export default function PrivacyScreen() {
               Your sign-in token is protected using secure device storage on iOS and Android.
             </Text>
           </View>
+        </Card>
+
+        <Card>
+          <Text style={{ color: colors.ink, fontSize: 15, fontWeight: "800", marginBottom: 8 }}>Account deletion</Text>
+          <Text style={{ color: colors.muted, lineHeight: 20, marginBottom: 8 }}>Permanently remove your MediVault login, family vault, uploaded files and share links. Independent clinic records remain with the issuing clinic.</Text>
+          {!showDelete ? <SecondaryButton title="Delete my account" onPress={() => setShowDelete(true)} /> : <>
+            <Text style={{ color: colors.critical, lineHeight: 20, marginBottom: 10 }}>This cannot be undone. Enter your account password to continue.</Text>
+            <TextInput accessibilityLabel="Account deletion password" placeholder="Your account password" value={deletePassword} onChangeText={setDeletePassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={{ minHeight: 48, borderWidth: 1, borderColor: colors.stroke, borderRadius: 12, padding: 12, marginBottom: 8, color: colors.ink }} />
+            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: deleteConfirmed }} accessibilityLabel="Confirm permanent account deletion" disabled={deleting} onPress={() => setDeleteConfirmed(!deleteConfirmed)} style={{ minHeight: 48, flexDirection: "row", gap: 10, alignItems: "center", marginBottom: 8 }}>
+              <Ionicons name={deleteConfirmed ? "checkbox" : "square-outline"} size={23} color={colors.critical} />
+              <Text style={{ flex: 1, color: colors.ink, lineHeight: 20 }}>I understand my account and uploaded data will be permanently deleted.</Text>
+            </Pressable>
+            {deleteError ? <Text accessibilityRole="alert" style={{ color: colors.critical, marginBottom: 10 }}>{deleteError}</Text> : null}
+            <PrimaryButton title={deleting ? "Deleting account..." : "Permanently delete account"} disabled={deleting || !deleteConfirmed || !deletePassword} loading={deleting} onPress={deleteAccount} />
+            <View style={{ marginTop: 10 }}><SecondaryButton title="Keep my account" disabled={deleting} onPress={() => { setShowDelete(false); setDeletePassword(""); setDeleteConfirmed(false); setDeleteError(""); }} /></View>
+          </>}
         </Card>
 
         {confirmLogout ? <Card>

@@ -1,5 +1,6 @@
 import { reportUploadForm } from "@/report-upload";
 import { matchesReportSearch } from "@/report-search";
+import { medicalSourcesForReport } from "@/medical-sources";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { prepareReportAnalysis } from "@/prepare-report";
@@ -13,6 +14,7 @@ import {
   Alert,
   Modal,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   NativeModules,
   Pressable,
@@ -469,9 +471,24 @@ export default function ReportsScreen() {
               <Card style={styles.modalSectionCard}>
                 <View style={styles.sectionTitleRow}>
                   <Ionicons name="information-circle-outline" size={17} color={colors.primary} />
-                  <Text style={styles.sectionLabel}>CLINICAL SUMMARY</Text>
+                  <Text style={styles.sectionLabel}>REPORT SUMMARY</Text>
                 </View>
                 <Text style={styles.detailText}>{selected.summary}</Text>
+                <Text style={styles.detailText}>For information only. AI extraction and summaries can contain errors. Verify values against the original report and ask a qualified healthcare professional before making medical decisions.</Text>
+              </Card>
+
+              <Card style={styles.modalSectionCard}>
+                <Text accessibilityRole="header" style={styles.sectionLabel}>SOURCES & LIMITATIONS</Text>
+                <Text style={styles.detailText}>The issuing report is the primary source for your measurements and printed reference intervals. Reference intervals may differ between laboratories. General educational references are linked below; they do not verify your individual results.</Text>
+                {medicalSourcesForReport(selected).map(source => (
+                  <Pressable key={source.url} accessibilityRole="link" accessibilityLabel={source.title}
+                    onPress={() => { void Linking.openURL(source.url).catch(() => Alert.alert("Source could not be opened", "Check your connection and try again.")); }}
+                    style={{ paddingVertical: 12, minHeight: 44 }}>
+                    <Text style={{ color: colors.primary, fontSize: 13, lineHeight: 20, fontWeight: "700", textDecorationLine: "underline" }}>{source.title}</Text>
+                    <Text style={{ color: colors.muted, fontSize: 11, lineHeight: 17 }}>{source.url}</Text>
+                  </Pressable>
+                ))}
+                <Text style={styles.detailText}>A value inside its printed reference interval does not establish that you are healthy, and an out-of-range value is not a diagnosis.{medicalSourcesForReport(selected).length > 1 ? " BMI is a screening measure and does not directly measure body fat." : ""}</Text>
               </Card>
 
               {/* Biomarkers List */}
@@ -487,7 +504,7 @@ export default function ReportsScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.markerName}>{marker.name}</Text>
                     <Text style={styles.markerRange}>
-                      Reference: {marker.range || "Standard"}
+                      Reference: {marker.range || "Not provided by the report"}
                     </Text>
                   </View>
                   <View style={styles.markerValueCol}>

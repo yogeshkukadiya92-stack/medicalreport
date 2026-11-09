@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import type { AppReport } from "@/lib/vault-types";
+import { medicalSourcesForReport } from "@/lib/medical-sources";
 
 type PublicShare = {
   accessCount: number;
@@ -77,6 +78,13 @@ export default function SecureSharePage() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section aria-labelledby="report-sources" className="mt-4 rounded-lg border border-[#dbe6e3] bg-white p-5">
+          <h2 id="report-sources" className="text-[12px] font-black text-[#087766]">Sources & limitations</h2>
+          <p className="mt-2 text-[13px] leading-6 text-[#52605d]">The issuing report is the primary source for measurements and printed reference intervals. Intervals may differ between laboratories. AI extraction and summaries can contain errors; verify results against the original and consult a qualified healthcare professional.</p>
+          <ul className="mt-3 space-y-3">{medicalSourcesForReport(report).map(source => <li key={source.url}><a className="text-[13px] font-bold text-[#087766] underline" href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a></li>)}</ul>
+          <p className="mt-3 text-[12px] leading-5 text-[#52605d]">These are general educational references, not verification of individual results. In-range values do not establish overall health.{medicalSourcesForReport(report).length > 1 ? " BMI is a screening measure and does not directly measure body fat." : ""} This summary is not a diagnosis or treatment recommendation.</p>
         </section>
 
         <footer className="py-5 text-center text-[10px] font-semibold leading-5 text-[#71817d]">

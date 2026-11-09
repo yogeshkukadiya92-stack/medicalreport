@@ -297,6 +297,10 @@ export default function LoginScreen() {
               title={isLoading ? "Authenticating..." : "Secure sign in"}
             />
           </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Create a free account" disabled={isLoading}
+            onPress={() => router.push("/signup")} style={{ minHeight: 48, justifyContent: "center", alignItems: "center", marginTop: 12 }}>
+            <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 14 }}>New here? Create a free account</Text>
+          </Pressable>
 
           {/* Trust Footnote */}
           <View style={styles.trustBanner}>

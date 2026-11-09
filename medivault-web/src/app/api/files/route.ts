@@ -81,6 +81,11 @@ export async function POST(request: NextRequest) {
     const db = await getMongoDb();
     const bucket = new GridFSBucket(db, { bucketName: "reportFiles" });
     fileId = await uploadBuffer(bucket, file, buffer, userId, detectedMimeType);
+    if (!await getAuthenticatedUserId(request)) {
+      const { ObjectId } = await import("mongodb");
+      await bucket.delete(new ObjectId(fileId));
+      return NextResponse.json({ error: "Your session ended before the upload finished. Sign in again." }, { status: 401 });
+    }
   } catch {
     return NextResponse.json({ error: "Original report could not be saved within the time limit. Please try again." }, { status: 503 });
   }

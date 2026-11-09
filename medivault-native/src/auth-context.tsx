@@ -36,6 +36,7 @@ type AuthContextValue = {
   isLoading: boolean;
   signIn: (phone: string, password: string) => Promise<void>;
   signInWithOtp: (phone: string, otp: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string) => Promise<void>;
   signOut: () => Promise<void>;
   token: string | null;
   user: AuthUser | null;
@@ -67,11 +68,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => setError("Your saved session could not be opened. Please sign in again.")).finally(() => setIsLoading(false));
   }, []);
 
-  async function authenticate(input: { action: "login" | "otp_login"; otp?: string; password?: string; phone: string }) {
+  async function authenticate(input: Record<string, unknown>, endpoint = "/auth/mobile") {
     setError("");
     setIsLoading(true);
     try {
-      const result = await apiRequest<{ accessToken: string; user: AuthUser }>("/auth/mobile", {
+      const result = await apiRequest<{ accessToken: string; user: AuthUser }>(endpoint, {
         body: JSON.stringify(input),
         method: "POST",
       });
@@ -94,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     signIn: (phone, password) => authenticate({ action: "login", password, phone }),
     signInWithOtp: (phone, otp) => authenticate({ action: "otp_login", otp, phone }),
+    signUp: (email, password, name) => authenticate({ email, password, name }, "/auth/register"),
     signOut: async () => {
       if (token) await apiRequest("/auth/logout", { method: "POST" }, token).catch(() => null);
       await removeToken();
