@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
+import { publicOrigin } from "@/lib/public-origin";
 import {
   createShareToken,
   ensureSecureShareIndexes,
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
   });
   return NextResponse.json({
     share: publicShare(share),
-    url: `${request.nextUrl.origin}/share/${generated.token}`,
+    url: `${publicOrigin(request)}/share/${generated.token}`,
   }, { status: 201 });
 }
 
