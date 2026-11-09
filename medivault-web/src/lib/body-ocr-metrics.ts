@@ -37,6 +37,9 @@ export function numberAfterLabel(lines: string[], metric: OcrMetric) {
     if (!match || match.index === undefined) continue;
     // OCR can read the unit '(kg)' as '9)'; it is not a measurement.
     const rawAfterLabel = line.slice(match.index + match[0].length);
+    // This template reader emits kilograms and does not perform conversions.
+    // A readable foreign unit must never be relabelled as kilograms.
+    if (metric.unit === "kg" && /\b(?:lbs?|pounds?|mg|g)\b/i.test(rawAfterLabel)) continue;
     const afterLabel = rawAfterLabel.replace(/^\s*[([]?[^\s)]+\)\s*/, "")
       .replace(/^\s*:?\s*kg\s*\/\s*m(?:\^?2|²)\s*/i, "");
     let values = afterLabel.match(/[+-]?\s*\d+(?:[.,]\d+)?/g) ?? [];

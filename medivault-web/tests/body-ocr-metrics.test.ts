@@ -6,6 +6,8 @@ const value = (name: string, lines: string[]) => numberAfterLabel(lines, bodyOcr
 test("plain weight labels are extracted without confusing target or control values", () => {
   assert.equal(value("Weight", ["Target Weight: 65 kg", "Weight Control: -5 kg", "Weight: 70.0 kg"]), "70");
   assert.equal(value("Weight", ["Body Weight (kg) 70.0"]), "70");
+  assert.equal(value("Weight", ["Weight: 154 lb"]), "");
+  assert.equal(value("Weight", ["Weight (pounds): 154"]), "");
   assert.equal(value("Weight", ["Target Weight: 65 kg", "Weight Control: -5 kg"]), "");
   assert.equal(value("Target Weight", ["Target Weight: 65 kg"]), "65");
   assert.equal(value("Weight Control", ["Weight Control: -5 kg"]), "-5");
