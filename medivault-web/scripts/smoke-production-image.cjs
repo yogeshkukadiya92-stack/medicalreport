@@ -1,0 +1,35 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const base = process.env.QA_API_URL || 'http://127.0.0.1:3300/api';
+const phone = '9876543210';
+(async () => {
+  let healthy = false;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try { healthy = (await fetch(base + '/health', { signal: AbortSignal.timeout(3000) })).ok; } catch {}
+    if (healthy) break;
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  assert.ok(healthy, 'Production container must become healthy');
+  const login = await fetch(base + '/auth/mobile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'otp_login', phone, otp: '1111' }) });
+  assert.equal(login.status, 200);
+  const { accessToken } = await login.json();
+  assert.ok(accessToken);
+  const headers = { Authorization: `Bearer ${accessToken}` };
+  const bytes = fs.readFileSync(path.join(__dirname, '../tests/fixtures/synthetic-report.pdf'));
+  const form = new FormData();
+  form.append('file', new Blob([bytes], { type: 'application/pdf' }), 'synthetic-report.pdf');
+  const upload = await fetch(base + '/files', { method: 'POST', headers, body: form });
+  assert.equal(upload.status, 200);
+  const { fileId } = await upload.json();
+  assert.ok(fileId);
+  const original = await fetch(base + '/files/' + fileId, { headers });
+  assert.equal(original.status, 200);
+  assert.deepEqual(Buffer.from(await original.arrayBuffer()), bytes);
+  const extraction = await fetch(base + '/analyze-report', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ fileId, fileName: 'synthetic-report.pdf', title: 'Synthetic QA report' }), signal: AbortSignal.timeout(65000) });
+  assert.equal(extraction.status, 200);
+  const result = await extraction.json();
+  assert.equal(result.parameters, 0);
+  assert.match(result.summary, /API key is not configured/, 'PDF must render before reaching the deliberately unconfigured AI provider');
+  console.log('PASS: production image health, scoped 1111 login, PDF upload, exact original download and PDF rendering');
+})().catch(error => { console.error(error.message); process.exit(1); });

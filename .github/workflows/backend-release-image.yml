@@ -21,6 +21,22 @@ jobs:
         run: docker build --tag medivault-backend:${{ github.sha }} medivault-web
       - name: Verify bundled PDF renderer worker
         run: docker run --rm --entrypoint node medivault-backend:${{ github.sha }} -e 'const fs=require("fs");fs.accessSync("/app/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs");console.log("PDF worker packaged")'
+      - name: Exercise the production image with isolated synthetic data
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker network create medivault-ci
+          docker run -d --name medivault-ci-db --network medivault-ci mongo:7
+          for attempt in {1..30}; do
+            if docker exec medivault-ci-db mongosh --quiet --eval 'db.adminCommand({ping:1})' >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec medivault-ci-db mongosh medivault_ci --quiet --eval 'db.authUsers.insertOne({id:"ci-test-user",phone:"9876543210",email:"qa@example.test",name:"Synthetic QA",accountStatus:"active",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),passwordHash:"unused",passwordSalt:"unused",passwordIterations:210000})'
+          docker run -d --name medivault-ci-api --network medivault-ci -p 127.0.0.1:3300:3000 -e MONGODB_URI=mongodb://medivault-ci-db:27017 -e MONGODB_DB=medivault_ci -e AUTH_TEST_LOGIN_ENABLED=true -e AUTH_TEST_PHONE_NUMBERS=9876543210 medivault-backend:${{ github.sha }}
+          node medivault-web/scripts/smoke-production-image.cjs
+      - name: Print runtime diagnostics on failure
+        if: failure()
+        run: docker logs medivault-ci-api || true
       - name: Export image
         run: docker save medivault-backend:${{ github.sha }} | gzip > medivault-backend-image.tar.gz
       - name: Save deployment artifact
