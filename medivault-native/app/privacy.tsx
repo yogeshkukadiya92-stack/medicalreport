@@ -18,6 +18,7 @@ import { useAuth } from "@/auth-context";
 import { Card, ScreenHeader, SecondaryButton, LoadingBlock, PrimaryButton } from "@/components";
 import { useLanguage, type Language } from "@/i18n";
 import { colors, radius, shadows } from "@/theme";
+import { PrivacyLinks } from "@/privacy-links";
 
 type Consent = { consent_type: string; is_granted: boolean };
 type AccessEvent = {
@@ -312,6 +313,7 @@ export default function PrivacyScreen() {
           ) : null}
         </Card>
 
+        <PrivacyLinks />
         {/* Security Assurance Banner */}
         <Card style={styles.securityBadgeCard}>
           <View style={styles.securityIconCircle}>

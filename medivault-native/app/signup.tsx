@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/auth-context";
 import { PrimaryButton } from "@/components";
 import { colors } from "@/theme";
+import { PrivacyLinks } from "@/privacy-links";
 
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
@@ -42,6 +43,7 @@ export default function SignupScreen() {
         <PrimaryButton title={isLoading ? "Creating account..." : "Create free account"} loading={isLoading} disabled={isLoading || !email.trim() || !password || !confirmation} onPress={submit} />
         <Text style={styles.copy}>Use your email and password to sign in. Signing up does not link clinic records to an unverified mobile number.</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Back to sign in" disabled={isLoading} onPress={() => router.replace("/login")} style={styles.action}><Text style={styles.link}>Already have an account? Sign in</Text></Pressable>
+        <PrivacyLinks />
       </View>
     </ScrollView>
   </KeyboardAvoidingView>;

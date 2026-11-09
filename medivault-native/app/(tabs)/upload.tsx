@@ -25,6 +25,7 @@ import { Card, EmptyState, PrimaryButton, ScreenHeader } from "@/components";
 import { colors, radius, shadows } from "@/theme";
 import type { AppReport, ReportMarker } from "@/types";
 import { useVault } from "@/vault-context";
+import { PrivacyLinks } from "@/privacy-links";
 
 type PickedFile = {
   enhanced?: boolean;
@@ -497,6 +498,8 @@ export default function UploadScreen() {
         ) : null}
 
         {/* Action Button */}
+        <Text style={{ color: colors.muted, fontSize: 13, lineHeight: 20, marginBottom: 8 }}>When you choose analysis, your selected report is stored in MediVault and sent to Google Gemini to extract measurements. Only upload reports you have permission to process. Check AI results against the original.</Text>
+        <PrivacyLinks />
         <View style={{ marginTop: 4 }}>
           <PrimaryButton
             disabled={!file || isSaving || isPreparing}
