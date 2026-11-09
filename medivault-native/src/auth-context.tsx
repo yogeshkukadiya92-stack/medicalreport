@@ -53,11 +53,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     readToken().then(async (storedToken) => {
       if (!storedToken) return;
       try {
-        const result = await apiRequest<{ user: AuthUser }>("/auth/session", {}, storedToken);
+        const result = await apiRequest<{ user: AuthUser | null }>("/auth/session", {}, storedToken);
+        if (!result.user?.id) {
+          await removeToken();
+          return;
+        }
         setToken(storedToken);
         setUser(result.user);
       } catch (error) {
-        if (error instanceof ApiError && error.status === 401) await removeToken();
+        if (error instanceof ApiError && [401, 403].includes(error.status)) await removeToken();
         else setToken(storedToken);
       }
     }).catch(() => setError("Your saved session could not be opened. Please sign in again.")).finally(() => setIsLoading(false));
