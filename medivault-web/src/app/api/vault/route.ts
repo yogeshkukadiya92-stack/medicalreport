@@ -3,7 +3,7 @@ import { getAuthenticatedUserId } from "@/lib/auth-server";
 import { labReportToAppReport, normalizePhone } from "@/lib/lab-utils";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
 import { accountPatientPhone } from "@/lib/patient-report-access";
-import type { FamilyMember, LabReport, VaultSnapshot } from "@/lib/vault-types";
+import type { AppReport, FamilyMember, LabReport, VaultSnapshot } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
 
@@ -154,4 +154,58 @@ export async function PUT(request: NextRequest) {
   );
 
   return NextResponse.json({ isConfigured: true, saved: true, vault: snapshot || emptyVault });
+}
+
+/** Native edits update only their own record, preserving edits from other devices. */
+export async function PATCH(request: NextRequest) {
+  const userId = await getAuthenticatedUserId(request);
+  if (!userId) return NextResponse.json({ error: "Sign in is required." }, { status: 401 });
+  if (!isMongoConfigured()) return NextResponse.json({ error: "Cloud vault is unavailable." }, { status: 503 });
+  const body = await request.json().catch(() => null) as {
+    action?: string; member?: FamilyMember; memberId?: string; report?: AppReport; reportId?: string;
+  } | null;
+  const db = await getMongoDb();
+  const vaults = db.collection<{ userId: string; snapshot: VaultSnapshot; updatedAt: Date }>("vaults");
+  const now = new Date();
+  let saved;
+  if (body?.action === "add_member") {
+    const member = body.member;
+    if (!member || typeof member.id !== "string" || !member.id || typeof member.name !== "string" || !member.name.trim()) {
+      return NextResponse.json({ error: "A valid family profile is required." }, { status: 400 });
+    }
+    // Pipeline upsert also makes a repeated request for the same ID idempotent.
+    saved = await vaults.findOneAndUpdate({ userId }, [{ $set: {
+      userId: { $literal: userId }, updatedAt: now,
+      "snapshot.activeMemberId": { $literal: member.id },
+      "snapshot.reports": { $ifNull: ["$snapshot.reports", []] },
+      "snapshot.familyMembers": { $concatArrays: [
+        { $filter: { input: { $ifNull: ["$snapshot.familyMembers", []] }, as: "member", cond: { $ne: ["$$member.id", { $literal: member.id }] } } },
+        { $literal: [cleanFamilyMember(member)] },
+      ] },
+    } }], { upsert: true, returnDocument: "after" });
+  } else if (body?.action === "select_member" && typeof body.memberId === "string") {
+    saved = await vaults.findOneAndUpdate({ userId, "snapshot.familyMembers.id": body.memberId },
+      { $set: { "snapshot.activeMemberId": body.memberId, updatedAt: now } }, { returnDocument: "after" });
+  } else if (body?.action === "delete_report" && typeof body.reportId === "string") {
+    saved = await vaults.findOneAndUpdate({ userId },
+      { $pull: { "snapshot.reports": { id: body.reportId, source: { $ne: "lab" } } }, $set: { updatedAt: now } },
+      { returnDocument: "after" });
+  } else if (body?.action === "save_report") {
+    const report = body.report;
+    if (!report || typeof report.id !== "string" || !report.id || report.id.startsWith("lab-") || report.source === "lab" ||
+        typeof report.memberId !== "string" || typeof report.title !== "string" || !Array.isArray(report.markers)) {
+      return NextResponse.json({ error: "A valid self-uploaded report is required." }, { status: 400 });
+    }
+    saved = await vaults.findOneAndUpdate({ userId, "snapshot.familyMembers.id": report.memberId }, [{ $set: {
+      updatedAt: now,
+      "snapshot.reports": { $concatArrays: [
+        { $literal: [{ ...report, source: "self_upload" }] },
+        { $filter: { input: { $ifNull: ["$snapshot.reports", []] }, as: "report", cond: { $ne: ["$$report.id", { $literal: report.id }] } } },
+      ] },
+    } }], { returnDocument: "after" });
+  } else {
+    return NextResponse.json({ error: "Unsupported vault change." }, { status: 400 });
+  }
+  if (!saved) return NextResponse.json({ error: "The family profile or vault no longer exists. Refresh and try again." }, { status: 409 });
+  return NextResponse.json({ saved: true, vault: await mergePublishedLabReports(userId, cleanSnapshot(saved.snapshot)) });
 }

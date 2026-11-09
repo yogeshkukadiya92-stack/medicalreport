@@ -35,10 +35,11 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
 
-  const persist = useCallback(async (next: VaultSnapshot) => {
+  const mutateVault = useCallback(async (change: Record<string, unknown>) => {
     if (!token) throw new Error("Please sign in to save changes.");
-    await apiRequest("/vault", { body: JSON.stringify(next), method: "PUT" }, token);
+    const result = await apiRequest<{ vault: VaultSnapshot }>("/vault", { body: JSON.stringify(change), method: "PATCH" }, token);
     if (sessionRef.current !== token) return;
+    const next = { ...result.vault, reports: result.vault.reports.map(normalizeReport) };
     setVault(next);
     setIsOffline(false);
     if (accountCacheKey) await AsyncStorage.setItem(accountCacheKey, JSON.stringify(next)).catch(() => null);
@@ -92,31 +93,19 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     isLoading,
     isOffline,
     refresh,
-    selectMember: async (memberId) => persist({ ...vault, activeMemberId: memberId }),
+    selectMember: async (memberId) => mutateVault({ action: "select_member", memberId }),
     addMember: async (input) => {
       const member: FamilyMember = {
         ...input,
-        id: `member-${Date.now()}`,
+        id: `member-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
         score: 0,
       };
-      await persist({
-        ...vault,
-        activeMemberId: member.id,
-        familyMembers: [...vault.familyMembers, member],
-      });
+      await mutateVault({ action: "add_member", member });
     },
-    deleteReport: async (reportId) => persist({
-      ...vault,
-      reports: vault.reports.filter((report) => report.id !== reportId || report.source === "lab"),
-    }),
-    updateReport: async (report) => persist({
-      ...vault, reports: vault.reports.map((item) => item.id === report.id ? normalizeReport(report) : item),
-    }),
-    saveUploadedReport: async (report) => persist({
-      ...vault,
-      reports: [normalizeReport(report), ...vault.reports],
-    }),
-  }), [isLoading, isOffline, persist, refresh, vault]);
+    deleteReport: async (reportId) => mutateVault({ action: "delete_report", reportId }),
+    updateReport: async (report) => mutateVault({ action: "save_report", report: normalizeReport(report) }),
+    saveUploadedReport: async (report) => mutateVault({ action: "save_report", report: normalizeReport(report) }),
+  }), [isLoading, isOffline, mutateVault, refresh, vault]);
   return <VaultContext.Provider value={value}>{children}</VaultContext.Provider>;
 }
 

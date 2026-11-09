@@ -186,7 +186,7 @@ export default function HomeScreen() {
                 <Ionicons name="medkit-outline" size={14} color={colors.primary} />
               </View>
               <Text style={styles.metricValue}>
-                {new Set(memberReports.map((item) => item.lab)).size}
+                {new Set(memberReports.filter((item) => item.source === "lab").map((item) => item.lab)).size}
               </Text>
               <Text style={styles.metricSub}>Synced</Text>
             </View>

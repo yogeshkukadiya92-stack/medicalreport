@@ -239,7 +239,7 @@ export default function UploadScreen() {
         fileId: stored.fileId,
         fileMimeType: stored.fileMimeType,
         fileName: file.name,
-        id: `native-${Date.now()}`,
+        id: `native-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
         lab: lab || "Self upload",
         markers: analysis.markers,
         memberId: activeMember.id,
