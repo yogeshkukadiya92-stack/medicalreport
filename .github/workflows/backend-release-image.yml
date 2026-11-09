@@ -1,0 +1,32 @@
+name: Backend release image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-release-image
+  cancel-in-progress: false
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Build the production runtime image
+        run: docker build --tag medivault-backend:${{ github.sha }} medivault-web
+      - name: Verify bundled PDF renderer worker
+        run: docker run --rm --entrypoint node medivault-backend:${{ github.sha }} -e 'const fs=require("fs");fs.accessSync("/app/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs");console.log("PDF worker packaged")'
+      - name: Export image
+        run: docker save medivault-backend:${{ github.sha }} | gzip > medivault-backend-image.tar.gz
+      - name: Save deployment artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: medivault-backend-image
+          path: medivault-backend-image.tar.gz
+          retention-days: 1
+          compression-level: 0
