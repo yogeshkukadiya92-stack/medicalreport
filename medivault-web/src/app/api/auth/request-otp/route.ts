@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Enter a valid mobile number." }, { status: 400 });
   }
 
-  if (!isTestingAuthOtpEnabled()) {
+  if (!isTestingAuthOtpEnabled(phone, body?.purpose ?? "login")) {
     return NextResponse.json(
       { error: "OTP delivery is not configured. Sign in with your password or contact the administrator." },
       { status: 503 },
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({
-    message: "OTP sent successfully. Default OTP is 1111.",
+    message: "Testing login is enabled for this number. Use OTP 1111.",
     purpose: body?.purpose ?? "login",
   });
 }

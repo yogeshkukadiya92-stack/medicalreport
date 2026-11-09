@@ -368,7 +368,11 @@ export async function POST(request: NextRequest) {
         ? await renderReportPdf(buffer, aiProvider.imageLimit)
         : file.contentType?.startsWith("image/") ? [`data:${file.contentType};base64,${buffer.toString("base64")}`] : [];
     } catch (error) {
-      return NextResponse.json({ error: error instanceof Error ? error.message : "PDF pages could not be read. Upload a readable report photo." }, { status: 422 });
+      const message = error instanceof Error ? error.message : "";
+      const safeMessage = /^This PDF has \d+ pages\./.test(message) || message === "The PDF has an unreadable page."
+        ? message : "PDF pages could not be read. Your original is saved. Retry extraction or upload a clear report photo.";
+      console.error("Report PDF rendering failed", error);
+      return NextResponse.json({ error: safeMessage }, { status: 422 });
     }
   }
   const isImage = Boolean(

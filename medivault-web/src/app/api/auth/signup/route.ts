@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as SignupInput | null;
   try {
-    if (!verifyTestingAuthOtp(body?.otp ?? "")) {
+    if (!verifyTestingAuthOtp(body?.otp ?? "", body?.phone ?? "", "signup")) {
       return NextResponse.json({ error: "Invalid or unavailable OTP." }, { status: 400 });
     }
 

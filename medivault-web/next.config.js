@@ -3,7 +3,7 @@ const nextConfig = {
   output: 'standalone',
   serverExternalPackages: ['@napi-rs/canvas', 'pdfjs-dist', 'tesseract.js', '@tesseract.js-data/eng'],
   outputFileTracingIncludes: {
-    '/api/analyze-report': ['./node_modules/@tesseract.js-data/eng/**/*', './node_modules/tesseract.js/**/*', './node_modules/tesseract.js-core/**/*'],
+    '/api/analyze-report': ['./node_modules/pdfjs-dist/**/*', './node_modules/@tesseract.js-data/eng/**/*', './node_modules/tesseract.js/**/*', './node_modules/tesseract.js-core/**/*'],
   },
   reactStrictMode: true,
   compiler: {

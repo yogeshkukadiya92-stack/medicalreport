@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { Db } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
+import { testingOtpAllowed } from "@/lib/testing-otp-policy";
 import { validatePasswordStrength } from "@/lib/auth-policy";
 
 export type AuthUser = {
@@ -34,10 +35,8 @@ const sessionMaxAgeSeconds = 60 * 60 * 24 * 30;
 const passwordIterations = 210_000;
 const passwordKeyLength = 32;
 const passwordDigest = "sha256";
-// A local-only OTP keeps developer testing quick without exposing a production bypass.
-// This must remain unreachable from every deployed environment, regardless of env vars.
+// Keep 1111 for development; deployed test login requires an explicit phone allowlist.
 const testingAuthOtp = process.env.AUTH_TEST_OTP?.trim() || "1111";
-const testOtpEnabled = process.env.NODE_ENV === "development";
 const bootstrapAdminEmail = normalizeEmail(process.env.ADMIN_BOOTSTRAP_EMAIL || "yogeshkukadiya92@gmail.com");
 const bootstrapAdminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
 const bootstrapAdminUserId = bootstrapAdminEmail ? `user-admin-${hashToken(bootstrapAdminEmail).slice(0, 18)}` : "";
@@ -62,11 +61,11 @@ function isValidPhone(phone: string) {
   return digits.length >= 8 && digits.length <= 15;
 }
 
-export function verifyTestingAuthOtp(otp: string) {
-  if (!testOtpEnabled) return false;
+export function verifyTestingAuthOtp(otp: string, phone = "", purpose = "login") {
+  if (!testingOtpAllowed(phone, purpose)) return false;
   const normalized = otp.trim();
   if (!normalized) return false;
-  if (normalized === "1111" || normalized === "123456" || normalized === testingAuthOtp) {
+  if (normalized === "1111" || (process.env.NODE_ENV === "development" && normalized === "123456") || normalized === testingAuthOtp) {
     return true;
   }
   const expected = Buffer.from(hashToken(testingAuthOtp), "hex");
@@ -74,8 +73,8 @@ export function verifyTestingAuthOtp(otp: string) {
   return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 }
 
-export function isTestingAuthOtpEnabled() {
-  return testOtpEnabled;
+export function isTestingAuthOtpEnabled(phone = "", purpose = "login") {
+  return testingOtpAllowed(phone, purpose);
 }
 
 function cleanName(email: string, name?: string) {
@@ -466,13 +465,13 @@ async function findUserByPhone(phoneInput: string) {
 }
 
 export async function loginAuthUserSessionWithOtp(input: { otp: string; phone: string }) {
-  if (!verifyTestingAuthOtp(input.otp)) {
+  if (!verifyTestingAuthOtp(input.otp, input.phone, "login")) {
     throw new Error("Invalid OTP.");
   }
 
   const { db, user } = await findUserByPhone(input.phone);
-  if (!user) {
-    throw new Error("No account found for this mobile number.");
+  if (!user || user.accountStatus === "suspended") {
+    throw new Error("No active account found for this mobile number.");
   }
 
   const token = await createSession(db, user.id);
@@ -480,15 +479,15 @@ export async function loginAuthUserSessionWithOtp(input: { otp: string; phone: s
 }
 
 export async function resetAuthUserPasswordWithOtp(input: { otp: string; password: string; phone: string }) {
-  if (!verifyTestingAuthOtp(input.otp)) {
+  if (!verifyTestingAuthOtp(input.otp, input.phone, "reset")) {
     throw new Error("Invalid OTP.");
   }
   const passwordError = validatePasswordStrength(input.password);
   if (passwordError) throw new Error(passwordError);
 
   const { db, user } = await findUserByPhone(input.phone);
-  if (!user) {
-    throw new Error("No account found for this mobile number.");
+  if (!user || user.accountStatus === "suspended") {
+    throw new Error("No active account found for this mobile number.");
   }
 
   const password = hashPassword(input.password);
