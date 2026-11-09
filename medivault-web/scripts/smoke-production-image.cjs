@@ -16,6 +16,18 @@ const phone = '9876543210';
   const { accessToken } = await login.json();
   assert.ok(accessToken);
   const headers = { Authorization: `Bearer ${accessToken}` };
+  const vault = { activeMemberId: 'ci-self', reports: [], familyMembers: [
+    { id: 'ci-self', name: 'Synthetic self', relation: 'Self', age: 30, score: 0, bloodGroup: 'Unknown', phone },
+    { id: 'ci-other', name: 'Unverified synthetic contact', relation: 'Other', age: 30, score: 0, bloodGroup: 'Unknown', phone: '9876543211' },
+  ] };
+  const saved = await fetch(base + '/vault', { method: 'PUT', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(vault) });
+  assert.equal(saved.status, 200);
+  const loaded = await (await fetch(base + '/vault', { headers })).json();
+  assert.ok(!loaded.vault.reports.some(report => report.id === 'lab-ci-other-report'), 'Adding a contact number must not claim another patient report');
+  const deniedFile = await fetch(base + '/files/000000000000000000000001', { headers });
+  assert.equal(deniedFile.status, 404, 'An unrelated contact number must not authorize downloading a laboratory file');
+  const deniedShare = await fetch(base + '/shares', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ reportId: 'lab-ci-other-report' }) });
+  assert.equal(deniedShare.status, 404, 'An unrelated contact number must not authorize sharing a laboratory report');
   const bytes = fs.readFileSync(path.join(__dirname, '../tests/fixtures/synthetic-report.pdf'));
   const form = new FormData();
   form.append('file', new Blob([bytes], { type: 'application/pdf' }), 'synthetic-report.pdf');
@@ -31,5 +43,5 @@ const phone = '9876543210';
   const result = await extraction.json();
   assert.equal(result.parameters, 0);
   assert.match(result.summary, /API key is not configured/, 'PDF must render before reaching the deliberately unconfigured AI provider');
-  console.log('PASS: production image health, scoped 1111 login, PDF upload, exact original download and PDF rendering');
+  console.log('PASS: patient report isolation; production image health, scoped 1111 login, PDF upload, exact original download and PDF rendering');
 })().catch(error => { console.error(error.message); process.exit(1); });

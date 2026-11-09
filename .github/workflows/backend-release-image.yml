@@ -32,6 +32,7 @@ jobs:
             sleep 1
           done
           docker exec medivault-ci-db mongosh medivault_ci --quiet --eval 'db.authUsers.insertOne({id:"ci-test-user",phone:"9876543210",email:"qa@example.test",name:"Synthetic QA",accountStatus:"active",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),passwordHash:"unused",passwordSalt:"unused",passwordIterations:210000})'
+          docker exec medivault-ci-db mongosh medivault_ci --quiet --eval 'const id=ObjectId("000000000000000000000001"); db.reportFiles.files.insertOne({_id:id,length:7,chunkSize:261120,uploadDate:new Date(),filename:"other-fixture.txt",metadata:{userId:"ci-other-user"}}); db.reportFiles.chunks.insertOne({files_id:id,n:0,data:BinData(0,"UFJJVkFURQ==")}); db.labReports.insertOne({id:"ci-other-report",fileId:id.toString(),normalizedClientPhone:"9876543211",status:"published",title:"Unrelated synthetic report",values:[],reportType:"Medical",labName:"Synthetic QA",createdAt:new Date().toISOString(),parameters:0})'
           docker run -d --name medivault-ci-api --network medivault-ci -p 127.0.0.1:3300:3000 -e MONGODB_URI=mongodb://medivault-ci-db:27017 -e MONGODB_DB=medivault_ci -e AUTH_TEST_LOGIN_ENABLED=true -e AUTH_TEST_PHONE_NUMBERS=9876543210 medivault-backend:${{ github.sha }}
           node medivault-web/scripts/smoke-production-image.cjs
       - name: Print runtime diagnostics on failure

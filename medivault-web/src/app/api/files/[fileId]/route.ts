@@ -3,9 +3,9 @@ import { GridFSBucket, ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
-import { normalizePhone } from "@/lib/lab-utils";
+import { accountPatientPhone } from "@/lib/patient-report-access";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
-import type { LabReport, LabUser, VaultSnapshot } from "@/lib/vault-types";
+import type { LabReport, LabUser } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
 
@@ -34,14 +34,8 @@ async function canViewLabFile(fileId: string, userId: string) {
     if (labReport) return true;
   }
 
-  const vault = await db.collection("vaults").findOne<{ snapshot?: VaultSnapshot }>({ userId });
-  const phones = [
-    ...new Set(
-      (vault?.snapshot?.familyMembers ?? [])
-        .map((member) => normalizePhone(member.phone ?? ""))
-        .filter((phone) => phone.length >= 8),
-    ),
-  ];
+  const accountPhone = await accountPatientPhone(db, userId);
+  const phones = accountPhone ? [accountPhone] : [];
 
   if (!phones.length) return false;
 

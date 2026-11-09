@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/auth-server";
 import { labReportToAppReport, normalizePhone } from "@/lib/lab-utils";
 import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
+import { accountPatientPhone } from "@/lib/patient-report-access";
 import type { FamilyMember, LabReport, VaultSnapshot } from "@/lib/vault-types";
 
 export const runtime = "nodejs";
@@ -29,12 +30,13 @@ function cleanFamilyMember(member: FamilyMember): FamilyMember {
 
 async function mergePublishedLabReports(userId: string, snapshot: VaultSnapshot): Promise<VaultSnapshot> {
   const db = await getMongoDb();
+  const accountPhone = await accountPatientPhone(db, userId);
   const phoneMatches = snapshot.familyMembers
     .map((member) => ({
       member,
       normalizedPhone: normalizePhone(member.phone ?? ""),
     }))
-    .filter((entry) => entry.normalizedPhone.length >= 8);
+    .filter((entry) => Boolean(accountPhone) && entry.normalizedPhone === accountPhone);
 
   if (!phoneMatches.length) {
     return snapshot;

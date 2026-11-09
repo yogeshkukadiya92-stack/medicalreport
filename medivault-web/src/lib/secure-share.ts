@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { Db } from "mongodb";
+import { accountPatientPhone } from "@/lib/patient-report-access";
 import { normalizePhone } from "@/lib/lab-utils";
 import type { AppReport, LabReport, VaultSnapshot } from "@/lib/vault-types";
 
@@ -43,9 +44,10 @@ export async function findOwnedReport(db: Db, userId: string, reportId: string) 
   if (selfReport) return selfReport;
 
   const rawLabId = reportId.startsWith("lab-") ? reportId.slice(4) : reportId;
+  const accountPhone = await accountPatientPhone(db, userId);
   const phones = (snapshot?.familyMembers ?? [])
     .map((member) => ({ member, phone: normalizePhone(member.phone ?? "") }))
-    .filter((entry) => entry.phone.length >= 8);
+    .filter((entry) => Boolean(accountPhone) && entry.phone === accountPhone);
   if (!phones.length) return null;
 
   const report = await db.collection<LabReport>("labReports").findOne(
