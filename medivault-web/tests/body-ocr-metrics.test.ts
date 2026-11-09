@@ -15,9 +15,11 @@ test("legacy InBody weight labels continue to work", () => {
 });
 test("integer percentages and abbreviated BMI labels keep printed values", () => {
   assert.equal(value("PBF", ["PBF: 20 %"]), "20");
+  assert.equal(value("PBF", ["PBF (%) 20"]), "20");
   assert.equal(value("PBF", ["Percent Body Fat: 20.0 %"]), "20");
   assert.equal(value("PBF", ["Percent Body Fat 20 40 60"]), "");
   assert.equal(value("BMI", ["BMI: 22.9 kg/m2"]), "22.9");
+  assert.equal(value("BMI", ["BMI kg/m2 22.9"]), "22.9");
 });
 test("OCR never multiplies incomplete metabolic measurements", () => {
   assert.equal(value("Basal Metabolic Rate", ["BMR: 17 kcal"]), "17");

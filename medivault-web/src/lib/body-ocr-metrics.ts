@@ -36,7 +36,9 @@ export function numberAfterLabel(lines: string[], metric: OcrMetric) {
     const match = line.match(metric.pattern);
     if (!match || match.index === undefined) continue;
     // OCR can read the unit '(kg)' as '9)'; it is not a measurement.
-    const afterLabel = line.slice(match.index + match[0].length).replace(/^\s*[([]?[^\s)]+\)\s*/, "");
+    const rawAfterLabel = line.slice(match.index + match[0].length);
+    const afterLabel = rawAfterLabel.replace(/^\s*[([]?[^\s)]+\)\s*/, "")
+      .replace(/^\s*:?\s*kg\s*\/\s*m(?:\^?2|²)\s*/i, "");
     let values = afterLabel.match(/[+-]?\s*\d+(?:[.,]\d+)?/g) ?? [];
     if (metric.name === "Weight" && /target weight/i.test(afterLabel) && lines[index + 1]) {
       values = lines[index + 1].match(/[+-]?\s*\d+(?:[.,]\d+)?/g) ?? [];
@@ -47,7 +49,7 @@ export function numberAfterLabel(lines: string[], metric: OcrMetric) {
       ? values[metric.nextLineIndex]
       : metric.pick === "last" ? values.at(-1) : values[0];
     // Do not reconstruct missing decimal digits from unrelated chart labels.
-    if (metric.joinTrailingDecimal && !selected?.match(/\d[.,]\d/) && !afterLabel.includes("%")) continue;
+    if (metric.joinTrailingDecimal && !selected?.match(/\d[.,]\d/) && !rawAfterLabel.includes("%")) continue;
     if (!selected) continue;
     const cleanValue = selected.replace(/\s/g, "").replace(",", ".");
     const numericValue = Number(cleanValue);
